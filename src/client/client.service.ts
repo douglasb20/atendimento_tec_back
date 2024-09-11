@@ -28,7 +28,7 @@ export class ClientService {
       await this.query.manager.save(Clients, client);
 
       if ('contacts' in createClientDto && createClientDto.contacts?.length !== 0) {
-        await this.createContactByClient(client, createClientDto.contacts);
+        await this.createContact(client, createClientDto.contacts);
       }
 
       await this.query.commitTransaction();
@@ -103,7 +103,7 @@ export class ClientService {
     }
   }
 
-  async createContactByClient(client: Clients, contacts: Contacts[]) {
+  async createContact(client: Clients, contacts: Contacts[]) {
     const contactsNew = contacts.map((contact) => ({
       nome_contato: contact.nome_contato,
       clients_id: client.id,
