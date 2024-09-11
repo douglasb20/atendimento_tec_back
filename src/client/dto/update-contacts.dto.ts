@@ -1,10 +1,6 @@
 import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
-export class CreateContactsDto {
-  @IsOptional()
-  @IsNumber()
-  clients_id?: number;
-
+export class UpdateContactsDto {
   @IsString()
   @IsNotEmpty({ message: 'Este campo é obrigatório' })
   nome_contato: string;

@@ -1,7 +1,8 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ClientService } from './client.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { AuthGuard } from '@nestjs/passport';
+import { UpdateContactsDto } from './dto/update-contacts.dto';
 
 @Controller('clients')
 export class ClientController {
@@ -10,7 +11,33 @@ export class ClientController {
   @Post('/create_client')
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.CREATED)
-  async createClient(@Body() createClienteDto: CreateClientDto) {
-    return this.clientService.createClient(createClienteDto);
+  async createClient(@Body() createClientDto: CreateClientDto) {
+    return await this.clientService.createClient(createClientDto);
+  }
+
+  @Get()
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async findAll() {
+    return await this.clientService.findAll();
+  }
+
+  @Delete(':client_id/contact/:contact_id')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async deleteContact(@Param('client_id') client_id: string, @Param('contact_id') contact_id: string) {
+    return this.clientService.deleteContact(client_id, contact_id);
+  }
+
+  @Patch(':client_id/contact/:contact_id')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async updateContact(
+    @Body() updateContactDto: UpdateContactsDto,
+    @Param('client_id') client_id: string,
+    @Param('contact_id') contact_id: string
+  ) {
+    return this.clientService.updateContact(updateContactDto, client_id, contact_id);
   }
 }
+

@@ -6,15 +6,13 @@ export class Contacts {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
-  @ManyToOne(() => Clients, (clients) => clients.contacts, { cascade: true })
-  @JoinColumn({ name: 'clients_id' })
-  clients: Clients;
+  @Column({ type: 'int' })
+  clients_id: number;
 
   @Column({ type: 'varchar', length: 90, nullable: false })
   nome_contato: string;
 
   @Column({ type: 'varchar', length: 14, nullable: true, default: null })
-  @JoinColumn({ name: 'clients_id' })
   telefone_contato: string;
 
   @Column({ type: 'timestamp' })
@@ -22,4 +20,8 @@ export class Contacts {
 
   @Column({ type: 'tinyint', nullable: false })
   status: number;
+
+  @ManyToOne(() => Clients, (clients) => clients.contacts)
+  @JoinColumn({ name: 'clients_id', referencedColumnName: 'id' })
+  clients: Clients;
 }
