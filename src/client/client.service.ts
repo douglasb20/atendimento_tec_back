@@ -46,13 +46,23 @@ export class ClientService {
     })
   }
 
+  async findOne(client_id: number) {
+    const client = await this.clientRepository.findOneBy({id: client_id})
+    if (!client) {
+      throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
+    }
+    const contacts = await this.contactRepository.findBy({ clients: client, status: 1 });
+    client.contacts = contacts;
+    return client;
+  }
+
   async deleteContact(client_id: string, contact_id: string) {
     try {
       await this.query.startTransaction();
 
       const client = await this.clientRepository.findOneBy({ id: +client_id });
       if (!client) {
-        throw new BadRequestException(`Cliente com id "${client_id} não existe."`);
+        throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
       }
 
       const contact = await this.contactRepository.findOneBy({ id: +contact_id, clients_id: client.id });
@@ -82,7 +92,7 @@ export class ClientService {
 
       const client = await this.clientRepository.findOneBy({ id: +client_id });
       if (!client) {
-        throw new BadRequestException(`Cliente com id "${client_id} não existe."`);
+        throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
       }
 
       const contact = await this.contactRepository.findOneBy({ id: +contact_id, clients_id: client.id });

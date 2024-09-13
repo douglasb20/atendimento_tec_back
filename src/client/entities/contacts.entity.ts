@@ -1,8 +1,8 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { BaseEntity, Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Clients } from './clients.entity';
 
 @Entity()
-export class Contacts {
+export class Contacts extends BaseEntity{
   @PrimaryGeneratedColumn('increment')
   id: number;
 

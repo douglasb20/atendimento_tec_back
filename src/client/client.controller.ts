@@ -22,6 +22,13 @@ export class ClientController {
     return await this.clientService.findAll();
   }
 
+  @Get(':client_id')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async findOne(@Param('client_id') client_id: string) {
+    return await this.clientService.findOne(Number(client_id));
+  }
+
   @Delete(':client_id/contact/:contact_id')
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
