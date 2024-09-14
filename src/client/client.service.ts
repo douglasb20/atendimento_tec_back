@@ -5,6 +5,7 @@ import { Clients } from './entities/clients.entity';
 import { CreateClientDto } from './dto/create-client.dto';
 import { Contacts } from './entities/contacts.entity';
 import { UpdateContactsDto } from './dto/update-contacts.dto';
+import { UpdateClientDto } from './dto/update-client.dto';
 
 @Injectable()
 export class ClientService {
@@ -28,13 +29,60 @@ export class ClientService {
       await this.query.manager.save(Clients, client);
 
       if ('contacts' in createClientDto && createClientDto.contacts?.length !== 0) {
-        await this.createContact(client, createClientDto.contacts);
+        await this.saveContact(client, createClientDto.contacts);
       }
 
       await this.query.commitTransaction();
     } catch (err) {
       await this.query.rollbackTransaction();
       throw err;
+    }
+  }
+
+  async updateClient(client_id: number, updateClientDto: UpdateClientDto) {
+    try {
+      await this.query.startTransaction();
+      const client = await this.clientRepository.findOneBy({ id: client_id });
+      if (!client) {
+        throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
+      }
+
+      const clientNew = {
+        ...client,
+        nome: updateClientDto.nome,
+        cnpj: updateClientDto.cnpj,
+      };
+
+      const addedClient = await this.query.manager.save(Clients, clientNew);
+
+      if ('contacts' in updateClientDto && updateClientDto.contacts?.length !== 0) {
+        await this.saveContact(addedClient, updateClientDto.contacts);
+      }
+
+      await this.query.commitTransaction();
+    } catch (err) {
+      await this.query.rollbackTransaction();
+      throw err;
+    }
+  }
+
+  async removeClient(client_id: number) {
+    try {
+      await this.query.startTransaction();
+
+      const client = await this.clientRepository.findOneBy({ id: Number(client_id) });
+      if (!client) {
+        throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
+      }
+
+      await this.query.manager.save(Clients, {
+        ...client,
+        status: 0
+      })
+      await this.query.commitTransaction();
+    } catch (err) {
+      await this.query.rollbackTransaction();
+      throw err
     }
   }
 
@@ -47,7 +95,7 @@ export class ClientService {
   }
 
   async findOne(client_id: number) {
-    const client = await this.clientRepository.findOneBy({id: client_id})
+    const client = await this.clientRepository.findOneBy({ id: client_id })
     if (!client) {
       throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
     }
@@ -113,11 +161,11 @@ export class ClientService {
     }
   }
 
-  async createContact(client: Clients, contacts: Contacts[]) {
+  async saveContact(client: Clients, contacts: Contacts[]) {
     const contactsNew = contacts.map((contact) => ({
-      nome_contato: contact.nome_contato,
+      ...contact,
+      id: Number(contact.id),
       clients_id: client.id,
-      telefone_contato: contact.telefone_contato,
     })) as Contacts[];
 
     await this.query.manager.save(Contacts, contactsNew);

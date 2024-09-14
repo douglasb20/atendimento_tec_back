@@ -3,16 +3,31 @@ import { ClientService } from './client.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { UpdateContactsDto } from './dto/update-contacts.dto';
+import { UpdateClientDto } from './dto/update-client.dto';
 
 @Controller('clients')
 export class ClientController {
   constructor(private readonly clientService: ClientService) {}
 
-  @Post('/create_client')
+  @Post()
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.CREATED)
   async createClient(@Body() createClientDto: CreateClientDto) {
     return await this.clientService.createClient(createClientDto);
+  }
+
+  @Patch(':client_id')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async updateClient(@Param('client_id') client_id: string, @Body() updateClientDto: UpdateClientDto) {
+    return await this.clientService.updateClient(Number(client_id), updateClientDto);
+  }
+
+  @Delete(':client_id')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async removeClient(@Param('client_id') client_id: string, @Param('contact_id') contact_id: string) {
+    return this.clientService.removeClient(Number(client_id));
   }
 
   @Get()
