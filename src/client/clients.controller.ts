@@ -10,7 +10,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ClientService } from './client.service';
+import { ClientService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { UpdateContactsDto } from './dto/update-contacts.dto';

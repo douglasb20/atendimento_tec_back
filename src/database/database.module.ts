@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { join } from 'path';
 
 @Module({
   imports: [
@@ -18,6 +17,7 @@ import { join } from 'path';
           autoLoadEntities: true,
           synchronize: false,
           dateStrings: true,
+
         };
       },
       inject: [ConfigService],

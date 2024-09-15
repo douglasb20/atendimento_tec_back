@@ -19,12 +19,11 @@ export const dataSourceOptions: DataSourceOptions = {
 
 export const dataSource = new DataSource({
   ...dataSourceOptions,
-  synchronize: false,
   migrations: [
     CreateUsersTable1704379411392,
     CreateClientsTable1725885677231,
     CreateContactsTable1725896694498,
     CreateAtendimentosStatusTable1726357464159,
-    CreateAtendimentosTable1726357566010
+    CreateAtendimentosTable1726357566010,
   ],
 });

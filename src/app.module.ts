@@ -7,8 +7,8 @@ import * as path from 'path';
 import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 import { UsersModule } from './users/users.module';
-import { ClientModule } from './client/client.module';
-import { SupportModule } from './atendimentos/support.module';
+import { ClientModule } from './client/clients.module';
+import { AtendimentosModule } from './atendimentos/atendimentos.module';
 
 const destPath = path.join(__dirname, '..', '..', '/files');
 @Global()
@@ -32,7 +32,7 @@ const destPath = path.join(__dirname, '..', '..', '/files');
     UsersModule,
     DatabaseModule,
     ClientModule,
-    SupportModule,
+    AtendimentosModule,
   ],
   exports: [MulterModule],
 })

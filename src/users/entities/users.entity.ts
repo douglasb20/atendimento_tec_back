@@ -1,4 +1,4 @@
-import { Atendimento } from 'atendimentos/entities/atendimento-entity';
+import { Atendimentos } from 'atendimentos/entities/atendimento-entity';
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity()
@@ -27,6 +27,6 @@ export class Users {
   @CreateDateColumn({ type: 'timestamp' })
   lastlogin_at: Date;
 
-  @OneToMany(() => Atendimento, (atendimento) => atendimento.clients)
-  atendimentos: Atendimento[];
+  @OneToMany(() => Atendimentos, (atendimentos) => atendimentos.users)
+  atendimentos: Atendimentos[];
 }

@@ -170,7 +170,7 @@ export class ClientService {
   async saveContact(client: Clients, contacts: Contacts[]) {
     const contactsNew = contacts.map((contact) => ({
       ...contact,
-      id: Number(contact.id),
+      ...(contact.id !== undefined && { id: Number(contact.id) }),
       clients_id: client.id,
     })) as Contacts[];
 

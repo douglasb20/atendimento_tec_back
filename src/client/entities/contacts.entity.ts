@@ -1,5 +1,6 @@
-import { BaseEntity, Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { BaseEntity, Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Clients } from './clients.entity';
+import { Atendimentos } from 'atendimentos/entities/atendimento-entity';
 
 @Entity()
 export class Contacts extends BaseEntity {
@@ -24,4 +25,8 @@ export class Contacts extends BaseEntity {
   @ManyToOne(() => Clients, (clients) => clients.contacts)
   @JoinColumn({ name: 'clients_id', referencedColumnName: 'id' })
   clients: Clients;
+
+  @OneToOne(() => Atendimentos, (atendimentos) => atendimentos.contacts)
+  @JoinColumn({ name: 'clients_id', referencedColumnName: 'id' })
+  atendimentos: Atendimentos;
 }

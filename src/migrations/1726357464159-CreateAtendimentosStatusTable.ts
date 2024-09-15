@@ -11,14 +11,14 @@ export class CreateAtendimentosStatusTable1726357464159 implements MigrationInte
             type: 'int',
             isPrimary: true,
             isGenerated: true,
-            generationStrategy: 'increment'
+            generationStrategy: 'increment',
           },
           {
             name: 'descricao',
             type: 'varchar',
-            length: '25'
-          }
-        ]
+            length: '25',
+          },
+        ],
       }),
     );
 
@@ -30,8 +30,8 @@ export class CreateAtendimentosStatusTable1726357464159 implements MigrationInte
         atendimento_status(descricao) \
         values("Aberto"), \
         ("Pendente"), \
-        ("Finalizado")'
-      )
+        ("Finalizado")',
+      );
     }
   }
 

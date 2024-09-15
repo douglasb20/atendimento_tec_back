@@ -13,7 +13,7 @@ import * as path from 'node:path';
           transport: {
             host: configService.get('MAIL_HOST'),
             secure: false,
-            port: 587,
+            port: configService.get('MAIL_PORT'),
             auth: {
               user: configService.get('MAIL_USER'),
               pass: configService.get('MAIL_PASS'),

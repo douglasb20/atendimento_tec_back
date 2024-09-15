@@ -18,39 +18,45 @@ export class CreateAtendimentosTable1726357566010 implements MigrationInterface 
             type: 'int',
           },
           {
+            name: 'contacts_id',
+            type: 'int',
+            isNullable: true,
+            default: null
+          },
+          {
             name: 'users_id',
             type: 'int',
           },
           {
             name: 'data_referencia',
             type: 'date',
-            isNullable: false
+            isNullable: false,
           },
           {
             name: 'hora_inicio',
             type: 'time',
-            isNullable: false
+            isNullable: false,
           },
           {
             name: 'hora_fim',
             type: 'time',
-            isNullable: false
+            isNullable: false,
           },
           {
             name: 'comentario',
             type: 'text',
             isNullable: true,
-            default: null
+            default: null,
           },
           {
             name: 'tipo_entrada',
             type: 'char',
-            length: '1'
+            length: '1',
           },
           {
             name: 'atendimento_status_id',
-            type: 'int'
-          }
+            type: 'int',
+          },
         ],
         foreignKeys: [
           {
@@ -58,6 +64,14 @@ export class CreateAtendimentosTable1726357566010 implements MigrationInterface 
             columnNames: ['clients_id'],
             referencedColumnNames: ['id'],
             referencedTableName: 'clients',
+            onDelete: 'RESTRICT',
+            onUpdate: 'RESTRICT',
+          },
+          {
+            name: 'atendimentos_contacts_fk',
+            columnNames: ['contacts_id'],
+            referencedColumnNames: ['id'],
+            referencedTableName: 'contacts',
             onDelete: 'RESTRICT',
             onUpdate: 'RESTRICT',
           },
@@ -76,8 +90,8 @@ export class CreateAtendimentosTable1726357566010 implements MigrationInterface 
             referencedTableName: 'atendimento_status',
             onDelete: 'RESTRICT',
             onUpdate: 'RESTRICT',
-          }
-        ]
+          },
+        ],
       }),
     );
   }
