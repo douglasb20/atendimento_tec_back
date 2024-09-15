@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ClientService } from './client.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -19,14 +30,20 @@ export class ClientController {
   @Patch(':client_id')
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
-  async updateClient(@Param('client_id') client_id: string, @Body() updateClientDto: UpdateClientDto) {
+  async updateClient(
+    @Param('client_id') client_id: string,
+    @Body() updateClientDto: UpdateClientDto,
+  ) {
     return await this.clientService.updateClient(Number(client_id), updateClientDto);
   }
 
   @Delete(':client_id')
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
-  async removeClient(@Param('client_id') client_id: string, @Param('contact_id') contact_id: string) {
+  async removeClient(
+    @Param('client_id') client_id: string,
+    @Param('contact_id') contact_id: string,
+  ) {
     return this.clientService.removeClient(Number(client_id));
   }
 
@@ -47,7 +64,10 @@ export class ClientController {
   @Delete(':client_id/contact/:contact_id')
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
-  async deleteContact(@Param('client_id') client_id: string, @Param('contact_id') contact_id: string) {
+  async deleteContact(
+    @Param('client_id') client_id: string,
+    @Param('contact_id') contact_id: string,
+  ) {
     return this.clientService.deleteContact(client_id, contact_id);
   }
 
@@ -57,9 +77,8 @@ export class ClientController {
   async updateContact(
     @Body() updateContactDto: UpdateContactsDto,
     @Param('client_id') client_id: string,
-    @Param('contact_id') contact_id: string
+    @Param('contact_id') contact_id: string,
   ) {
     return this.clientService.updateContact(updateContactDto, client_id, contact_id);
   }
 }
-

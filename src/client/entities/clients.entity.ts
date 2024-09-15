@@ -1,8 +1,9 @@
-import { BaseEntity, Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Contacts } from './contacts.entity';
+import { Atendimento } from 'atendimentos/entities/atendimento-entity';
 
 @Entity()
-export class Clients extends BaseEntity {
+export class Clients {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
@@ -11,18 +12,16 @@ export class Clients extends BaseEntity {
 
   @Column({ length: 14, nullable: true, default: null })
   cnpj: string;
+  
+  @CreateDateColumn({ type: 'timestamp' })
+  created_at: Date;
+  
+  @Column({ default: 1, nullable: true })
+  status: number;
 
   @OneToMany(() => Contacts, (contacts) => contacts.clients)
   contacts: Contacts[];
 
-  @CreateDateColumn({ type: 'timestamp' })
-  created_at: Date;
-
-  @Column({ default: 1, nullable: true })
-  status: number;
-
-  static getContactWith(id: number): Promise<Contacts[]> {
-    return Contacts
-      .find({ where: { clients_id: id, status: 1 } });
-  }
+  @OneToMany(() => Atendimento, (atendimento) => atendimento.clients)
+  atendimentos: Atendimento[];
 }

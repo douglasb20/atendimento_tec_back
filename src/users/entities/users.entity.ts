@@ -1,4 +1,5 @@
-import { BeforeInsert, Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Atendimento } from 'atendimentos/entities/atendimento-entity';
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity()
 export class Users {
@@ -26,8 +27,6 @@ export class Users {
   @CreateDateColumn({ type: 'timestamp' })
   lastlogin_at: Date;
 
-  // @BeforeInsert()
-  // generateCreatedDate() {
-
-  // }
+  @OneToMany(() => Atendimento, (atendimento) => atendimento.clients)
+  atendimentos: Atendimento[];
 }

@@ -2,7 +2,7 @@ import { BaseEntity, Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColu
 import { Clients } from './clients.entity';
 
 @Entity()
-export class Contacts extends BaseEntity{
+export class Contacts extends BaseEntity {
   @PrimaryGeneratedColumn('increment')
   id: number;
 

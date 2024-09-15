@@ -77,25 +77,25 @@ export class ClientService {
 
       await this.query.manager.save(Clients, {
         ...client,
-        status: 0
-      })
+        status: 0,
+      });
       await this.query.commitTransaction();
     } catch (err) {
       await this.query.rollbackTransaction();
-      throw err
+      throw err;
     }
   }
 
   async findAll() {
     return this.clientRepository.find({
       where: {
-        status: 1
-      }
-    })
+        status: 1,
+      },
+    });
   }
 
   async findOne(client_id: number) {
-    const client = await this.clientRepository.findOneBy({ id: client_id })
+    const client = await this.clientRepository.findOneBy({ id: client_id });
     if (!client) {
       throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
     }
@@ -113,21 +113,24 @@ export class ClientService {
         throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
       }
 
-      const contact = await this.contactRepository.findOneBy({ id: +contact_id, clients_id: client.id });
+      const contact = await this.contactRepository.findOneBy({
+        id: +contact_id,
+        clients_id: client.id,
+      });
       if (!contact) {
         throw new BadRequestException(`Contato com id "${contact_id}" não existe.`);
       }
 
       await this.query.manager.save(Contacts, {
         ...contact,
-        status: 0
-      })
+        status: 0,
+      });
 
       await this.query.commitTransaction();
-      return ({
+      return {
         ...contact,
-        status: 0
-      });
+        status: 0,
+      };
     } catch (err) {
       await this.query.rollbackTransaction();
       throw err;
@@ -143,18 +146,21 @@ export class ClientService {
         throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
       }
 
-      const contact = await this.contactRepository.findOneBy({ id: +contact_id, clients_id: client.id });
+      const contact = await this.contactRepository.findOneBy({
+        id: +contact_id,
+        clients_id: client.id,
+      });
       if (!contact) {
         throw new BadRequestException(`Contato com id "${contact_id}" não existe.`);
       }
 
       await this.query.manager.save(Contacts, {
         ...contact,
-        ...updateContactDto
-      })
+        ...updateContactDto,
+      });
 
       await this.query.commitTransaction();
-      return ({ ...contact, ...updateContactDto });
+      return { ...contact, ...updateContactDto };
     } catch (err) {
       await this.query.rollbackTransaction();
       throw err;

@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 import { UsersModule } from './users/users.module';
 import { ClientModule } from './client/client.module';
+import { SupportModule } from './atendimentos/support.module';
 
 const destPath = path.join(__dirname, '..', '..', '/files');
 @Global()
@@ -17,7 +18,6 @@ const destPath = path.join(__dirname, '..', '..', '/files');
       dest: destPath,
       limits: { fileSize: 1048576 * 5 /* 5mb */ },
       storage: diskStorage({
-        
         filename(_, file, callback) {
           const extension = file.mimetype.split('/')[1];
           const fileName = `fileUploaded_${Date.now()}.${extension}`;
@@ -32,6 +32,7 @@ const destPath = path.join(__dirname, '..', '..', '/files');
     UsersModule,
     DatabaseModule,
     ClientModule,
+    SupportModule,
   ],
   exports: [MulterModule],
 })

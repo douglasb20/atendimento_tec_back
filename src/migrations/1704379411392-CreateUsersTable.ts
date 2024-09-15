@@ -29,12 +29,13 @@ export class CreateUsersTable1704379411392 implements MigrationInterface {
           },
           {
             name: 'status',
-            type: 'int',
+            type: 'tinyint',
+            length: '1',
             default: '1',
           },
           {
             name: 'is_requestpassword',
-            type: 'int',
+            type: 'tinyint',
             length: '1',
             default: '0',
             comment: 'Verifica se é pedido de nova senha',
@@ -49,14 +50,20 @@ export class CreateUsersTable1704379411392 implements MigrationInterface {
             type: 'datetime',
             isNullable: true,
           },
+          {
+            name: 'role',
+            type: 'varchar',
+            length: '10',
+            isNullable: false,
+          },
         ],
       }),
       true,
     );
     await queryRunner.query(
       'INSERT INTO \
-      users(name, email, password) \
-      values("Douglas", "douglasdev.cn@gmail.com", "$2b$10$u02d66.IaHqUuJ3p42qQF.xrS1VjX3DWwVOTat/zMBu2lzzBFp0Ly")',
+      users(name, email, password, role) \
+      values("Douglas", "douglasdev.cn@gmail.com", "$2b$10$u02d66.IaHqUuJ3p42qQF.xrS1VjX3DWwVOTat/zMBu2lzzBFp0Ly", "admin")',
     );
   }
 
