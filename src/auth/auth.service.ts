@@ -3,12 +3,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { sign } from 'jsonwebtoken';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
+import { format } from 'date-fns';
+
 import { Users } from 'users/entities/users.entity';
 import { SigninDto } from 'users/dto/signin.dto';
 import { JwtPayload } from './models/jwt-payload.model';
 import { ConfigMailerService } from 'mailer/configmailer.service';
 import { UpdateUserDto } from 'users/dto/update-user.dto';
-import { format } from 'date-fns';
 
 @Injectable()
 export class AuthService {
@@ -42,12 +43,12 @@ export class AuthService {
   }
 
   public async signin(email: string, password: string) {
-    const user = await this.findaByEmail(email);
+    const user = await this.findByEmail(email);
     await this.checkPassword(password, user);
 
     const access_token = await this.createAccessToken(user);
 
-    const updateLastLogin: UpdateUserDto = {
+    const updateLastLogin: Partial<UpdateUserDto> = {
       lastlogin_at: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
     };
 
@@ -55,10 +56,11 @@ export class AuthService {
 
     return {
       access_token,
+      expiresIn: Number(process.env.JWT_EXPIRATION) / 1000
     };
   }
 
-  private async findaByEmail(email: string): Promise<Users> {
+  private async findByEmail(email: string): Promise<Users> {
     const user = await this.usersRepository.findOne({
       where: { email, status: 1 },
       select: ['id', 'name', 'email', 'password', 'lastlogin_at'],
@@ -78,7 +80,7 @@ export class AuthService {
   }
 
   async forgottenPassword(email: string): Promise<void> {
-    const user = await this.findaByEmail(email);
+    const user = await this.findByEmail(email);
     await this.mailerService.SendForgottenPassword(user.name, user.id, user.email);
     const altRequestPassword = {
       ...user,

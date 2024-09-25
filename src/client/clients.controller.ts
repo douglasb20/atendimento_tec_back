@@ -42,7 +42,6 @@ export class ClientController {
   @HttpCode(HttpStatus.OK)
   async removeClient(
     @Param('client_id') client_id: string,
-    @Param('contact_id') contact_id: string,
   ) {
     return this.clientService.removeClient(Number(client_id));
   }

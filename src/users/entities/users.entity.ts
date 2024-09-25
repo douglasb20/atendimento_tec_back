@@ -18,6 +18,9 @@ export class Users {
   @Column({ default: 1, nullable: true })
   status: number;
 
+  @Column({ default: null, nullable: true, type: 'decimal' })
+  valor_hora: number;
+
   @Column({ default: 0 })
   is_requestpassword: number;
 
@@ -26,6 +29,9 @@ export class Users {
 
   @CreateDateColumn({ type: 'timestamp' })
   lastlogin_at: Date;
+
+  @Column({ default: 'USER' })
+  role: string;
 
   @OneToMany(() => Atendimentos, (atendimentos) => atendimentos.users)
   atendimentos: Atendimentos[];
