@@ -24,10 +24,10 @@ export class Users {
   @Column({ default: 0 })
   is_requestpassword: number;
 
-  @CreateDateColumn({ type: 'timestamp' })
+  @CreateDateColumn()
   created_at: Date;
 
-  @CreateDateColumn({ type: 'timestamp' })
+  @Column({type: 'datetime'})
   lastlogin_at: Date;
 
   @Column({ default: 'USER' })

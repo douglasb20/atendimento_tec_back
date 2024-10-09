@@ -40,9 +40,7 @@ export class ClientController {
   @Delete(':client_id')
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
-  async removeClient(
-    @Param('client_id') client_id: string,
-  ) {
+  async removeClient(@Param('client_id') client_id: string) {
     return this.clientService.removeClient(Number(client_id));
   }
 

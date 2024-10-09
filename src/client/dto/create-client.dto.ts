@@ -14,5 +14,5 @@ export class CreateClientDto {
 
   @ValidateNested({ each: true })
   @Type(() => CreateContactsDto)
-  contacts: Contacts[];
+  contacts?: CreateContactsDto[];
 }

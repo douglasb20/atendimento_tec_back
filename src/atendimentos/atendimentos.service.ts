@@ -9,17 +9,18 @@ export class AtendimentosService {
   constructor(
     @InjectRepository(Atendimentos)
     private atendimentoRepository: Repository<Atendimentos>,
-    private dataSource: DataSource
-  ) { 
+    private dataSource: DataSource,
+  ) {
     this.queryRunner = this.dataSource.createQueryRunner();
   }
-  
+
   async findAll() {
-    const result = await this.atendimentoRepository.createQueryBuilder('at')
-    .innerJoinAndSelect('clients', 'cli', 'cli.id = at.clients_id')
-    .innerJoinAndSelect('users', 'u', 'u.id = at.users_id')
-    .innerJoinAndSelect('contacts', 'cont', 'cont.id = at.contacts_id')
-    .innerJoinAndSelect('atendimento_status', 'as', 'as.id = at.atendimento_status_id')
+    const result = await this.atendimentoRepository
+      .createQueryBuilder('at')
+      .innerJoinAndSelect('clients', 'cli', 'cli.id = at.clients_id')
+      .innerJoinAndSelect('users', 'u', 'u.id = at.users_id')
+      .innerJoinAndSelect('contacts', 'cont', 'cont.id = at.contacts_id')
+      .innerJoinAndSelect('atendimento_status', 'as', 'as.id = at.atendimento_status_id')
       .select('at.*')
       .addSelect([
         'timediff(at.hora_fim, at.hora_inicio) as duration',

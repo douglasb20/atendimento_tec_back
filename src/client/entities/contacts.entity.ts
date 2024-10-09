@@ -1,4 +1,13 @@
-import { BaseEntity, Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  BaseEntity,
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { Clients } from './clients.entity';
 import { Atendimentos } from 'atendimentos/entities/atendimento-entity';
 
@@ -16,10 +25,10 @@ export class Contacts extends BaseEntity {
   @Column({ type: 'varchar', length: 14, nullable: true, default: null })
   telefone_contato: string;
 
-  @Column({ type: 'timestamp' })
+  @CreateDateColumn()
   created_at: Date;
 
-  @Column({ type: 'tinyint', nullable: false })
+  @Column({ type: 'tinyint', nullable: false, default: 1 })
   status: number;
 
   @ManyToOne(() => Clients, (clients) => clients.contacts)
@@ -27,6 +36,6 @@ export class Contacts extends BaseEntity {
   clients: Clients;
 
   @OneToOne(() => Atendimentos, (atendimentos) => atendimentos.contacts)
-  @JoinColumn({ name: 'clients_id', referencedColumnName: 'id' })
+  @JoinColumn({ name: 'atendimentos_id', referencedColumnName: 'id' })
   atendimentos: Atendimentos;
 }

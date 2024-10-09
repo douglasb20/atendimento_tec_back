@@ -4,8 +4,8 @@ import { AuthGuard } from '@nestjs/passport';
 
 @Controller('atendimentos')
 export class AtendimentosController {
-  constructor(private readonly atendimentoService: AtendimentosService) { }
-  
+  constructor(private readonly atendimentoService: AtendimentosService) {}
+
   @Get()
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)

@@ -56,7 +56,7 @@ export class AuthService {
 
     return {
       access_token,
-      expiresIn: Number(process.env.JWT_EXPIRATION) / 1000
+      expiresIn: Number(process.env.JWT_EXPIRATION) / 1000,
     };
   }
 
