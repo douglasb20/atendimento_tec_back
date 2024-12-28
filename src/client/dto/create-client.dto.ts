@@ -1,6 +1,5 @@
 import { Type } from 'class-transformer';
 import { IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
-import { Contacts } from 'client/entities/contacts.entity';
 import { CreateContactsDto } from './create-contacts.dto';
 
 export class CreateClientDto {
@@ -14,5 +13,5 @@ export class CreateClientDto {
 
   @ValidateNested({ each: true })
   @Type(() => CreateContactsDto)
-  contacts: Contacts[];
+  contacts?: CreateContactsDto[];
 }

@@ -1,6 +1,8 @@
 import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateContactsDto {
+  id?: number;
+  
   @IsOptional()
   @IsNumber()
   clients_id?: number;

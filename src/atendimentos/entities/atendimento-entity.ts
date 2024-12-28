@@ -1,8 +1,8 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Clients } from 'client/entities/clients.entity';
+import { Contacts } from 'client/entities/contacts.entity';
 import { Users } from 'users/entities/users.entity';
 import { AtendimentoStatus } from './atendimento-status-entity';
-import { Contacts } from 'client/entities/contacts.entity';
 
 @Entity({ name: 'atendimentos' })
 export class Atendimentos {
@@ -18,19 +18,19 @@ export class Atendimentos {
   @Column({ name: 'users_id', type: 'int' })
   users_id: number;
 
-  @Column({ name: 'data_referencia', type: 'date' })
+  @CreateDateColumn({ name: 'data_referencia', type: 'date' })
   data_referencia: string;
 
-  @Column({ name: 'hora_inicio', type: 'time' })
+  @CreateDateColumn({ name: 'hora_inicio', type: 'time' })
   hora_inicio: string;
 
-  @Column({ name: 'hora_fim', type: 'time' })
+  @CreateDateColumn({ name: 'hora_fim', type: 'time' })
   hora_fim: string;
 
   @Column({ type: 'text', default: null, nullable: true })
   comentario: string;
 
-  @Column({ type: 'char', length: 1 })
+  @Column({ type: 'varchar', length: 1 })
   tipo_entrada: string;
 
   @Column({ type: 'int' })

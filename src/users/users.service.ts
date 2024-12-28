@@ -12,9 +12,9 @@ export class UsersService {
   constructor(
     @InjectRepository(Users)
     private readonly usersRepository: Repository<Users>,
-    private dataSource: DataSource
+    private dataSource: DataSource,
   ) {
-    this.query = dataSource.createQueryRunner()
+    this.query = dataSource.createQueryRunner();
   }
 
   async findAll() {
@@ -28,8 +28,8 @@ export class UsersService {
       await this.query.startTransaction();
       const newUser = this.usersRepository.create({
         ...createUserDto,
-        password: await bcrypt.hash( createUserDto.password, 10)
-      })
+        password: await bcrypt.hash(createUserDto.password, 10),
+      });
 
       await this.query.manager.save(Users, newUser);
       await this.query.commitTransaction();
@@ -44,17 +44,17 @@ export class UsersService {
   async updateUser(user_id: number, updateUserDto: UpdateUserDto) {
     try {
       await this.query.startTransaction();
-      const user = await this.usersRepository.findOneBy({ id: user_id })
+      const user = await this.usersRepository.findOneBy({ id: user_id });
       if (!user) {
-        throw new BadRequestException('Usuário não localizado com este id')
+        throw new BadRequestException('Usuário não localizado com este id');
       }
 
       if (updateUserDto.password) {
-        user.password = await bcrypt.hash(updateUserDto.password, 10)
+        user.password = await bcrypt.hash(updateUserDto.password, 10);
       }
       const updateUser = this.usersRepository.create({
         ...user,
-      })
+      });
 
       await this.query.manager.save(Users, updateUser);
       await this.query.commitTransaction();
@@ -69,15 +69,15 @@ export class UsersService {
   async deleteUser(user_id: number) {
     try {
       await this.query.startTransaction();
-      const user = await this.usersRepository.findOneBy({ id: user_id })
+      const user = await this.usersRepository.findOneBy({ id: user_id });
       if (!user) {
-        throw new BadRequestException('Usuário não localizado com este id')
+        throw new BadRequestException('Usuário não localizado com este id');
       }
 
       const updateUser = this.usersRepository.create({
         ...user,
-        status: 0
-      })
+        status: 0,
+      });
 
       await this.query.manager.save(Users, updateUser);
       await this.query.commitTransaction();

@@ -21,7 +21,7 @@ export class CreateAtendimentosTable1726357566010 implements MigrationInterface 
             name: 'contacts_id',
             type: 'int',
             isNullable: true,
-            default: null
+            default: null,
           },
           {
             name: 'users_id',

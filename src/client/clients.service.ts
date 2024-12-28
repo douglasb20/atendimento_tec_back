@@ -6,6 +6,7 @@ import { CreateClientDto } from './dto/create-client.dto';
 import { Contacts } from './entities/contacts.entity';
 import { UpdateContactsDto } from './dto/update-contacts.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
+import { CreateContactsDto } from './dto/create-contacts.dto';
 
 @Injectable()
 export class ClientService {
@@ -28,11 +29,12 @@ export class ClientService {
 
       await this.query.manager.save(Clients, client);
 
-      if ('contacts' in createClientDto && createClientDto.contacts?.length !== 0) {
-        await this.saveContact(client, createClientDto.contacts);
+      if ('contacts' in createClientDto && createClientDto?.contacts !== null && createClientDto?.contacts?.length !== 0) {
+        client.contacts = await this.saveContact(client, createClientDto.contacts);
       }
 
       await this.query.commitTransaction();
+      return client;
     } catch (err) {
       await this.query.rollbackTransaction();
       throw err;
@@ -167,13 +169,13 @@ export class ClientService {
     }
   }
 
-  async saveContact(client: Clients, contacts: Contacts[]) {
+  async saveContact(client: Clients, contacts: CreateContactsDto[]) {
     const contactsNew = contacts.map((contact) => ({
       ...contact,
       ...(contact.id !== undefined && { id: Number(contact.id) }),
-      clients_id: client.id,
+      clients: client
     })) as Contacts[];
 
-    await this.query.manager.save(Contacts, contactsNew);
+    return await this.query.manager.save(Contacts, contactsNew);
   }
 }

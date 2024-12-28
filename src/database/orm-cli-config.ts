@@ -27,6 +27,6 @@ export const dataSource = new DataSource({
     CreateContactsTable1725896694498,
     CreateAtendimentosStatusTable1726357464159,
     CreateAtendimentosTable1726357566010,
-    CampoValorHoraUser1727207721539
+    CampoValorHoraUser1727207721539,
   ],
 });
