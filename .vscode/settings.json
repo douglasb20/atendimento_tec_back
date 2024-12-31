@@ -20,5 +20,9 @@
     ".env": ".env.*",
     "app-dev.yaml": "app-*",
     "nest-cli.json": "next-env.d.ts, tsconfig.json, babel.config*, .prettier*, .eslint*"
-  }
+  },
+  "cSpell.ignorePaths": [
+    "package.json"
+    
+  ]
 }

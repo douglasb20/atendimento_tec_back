@@ -28,13 +28,18 @@ export class Atendimentos {
   hora_fim: string;
 
   @Column({ type: 'text', default: null, nullable: true })
-  comentario: string;
+  comentario: string; // cspell: disable-line
 
   @Column({ type: 'varchar', length: 1 })
   tipo_entrada: string;
 
   @Column({ type: 'int' })
+  esta_pago: number;
+
+  @Column({ type: 'int' })
   atendimento_status_id: number;
+
+  // ============= RELATIONS ================
 
   @ManyToOne(() => Clients, (clients) => clients.atendimentos)
   @JoinColumn({ name: 'clients_id', referencedColumnName: 'id' })
