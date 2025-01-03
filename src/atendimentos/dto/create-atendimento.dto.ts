@@ -15,6 +15,7 @@ export class CreateAtendimentoDto {
   @IsNotEmpty({ message: (opt) => `Campo ${opt.property} é obrigatório` })
   hora_inicio: string;
 
+  @IsNotEmpty({ message: (opt) => `Campo ${opt.property} é obrigatório` })
   hora_fim: string;
 
   @IsNotEmpty({message:(opt) => `Campo ${opt.property} é obrigatório`})

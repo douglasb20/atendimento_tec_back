@@ -9,6 +9,8 @@ import { Clients } from 'client/entities/clients.entity';
 import { Contacts } from 'client/entities/contacts.entity';
 import { Users } from 'users/entities/users.entity';
 
+
+
 @Injectable()
 export class AtendimentosService {
   private queryRunner: QueryRunner;
@@ -48,41 +50,17 @@ export class AtendimentosService {
   async createAtendimento(createAtendimentoDto: CreateAtendimentoDto) {
     try {
       await this.queryRunner.startTransaction();
-      let contacts: Contacts;
 
-      // verificando se foi informado o cliente
-      if (!createAtendimentoDto.clients_id) {
-        throw new BadRequestException("Cliente não informado");
-      }
-
-      // verificando se foi informado o usuário
-      if (!createAtendimentoDto.users_id) {
-        throw new BadRequestException("Usuário não informado");
-      }
-
-      const clients = await this.queryRunner.manager.findOneBy(Clients, { id: createAtendimentoDto.clients_id });
-      if (!clients) {
-        throw new NotFoundException("Cliente informado não localizado");
-      }
-
-      // verificando se foi informado o contato
-      if (createAtendimentoDto.contacts_id) {
-        contacts = await this.queryRunner.manager.findOneBy(Contacts, { id: createAtendimentoDto.contacts_id })
-        
-        if (!contacts) {
-          throw new NotFoundException("Contato informado não localizado");
-        }
-      }
-
-      const users: Users = await this.queryRunner.manager.findOneBy(Users, { id: createAtendimentoDto.users_id })
-      if (!users) {
-        throw new NotFoundException("Usuário informado não localizado");
-      }
+      const { clients, users, contacts } = await this.ValidateAtendimento(
+        createAtendimentoDto.clients_id,
+        createAtendimentoDto.users_id,
+        createAtendimentoDto.contacts_id
+      );
 
       const newAtendimento = this.atendimentoRepository.create({
         data_referencia: createAtendimentoDto.data_referencia,
         hora_inicio: createAtendimentoDto.hora_inicio,
-        hora_fim: createAtendimentoDto.hora_fim || null,
+        hora_fim: createAtendimentoDto.hora_fim,
         comentario: createAtendimentoDto.comentario, // cSpell:disable-line
         tipo_entrada: createAtendimentoDto.tipo_entrada,
         esta_pago: createAtendimentoDto.esta_pago,
@@ -100,5 +78,40 @@ export class AtendimentosService {
       await this.queryRunner.rollbackTransaction();
       throw err;
     }
+  }
+
+  async ValidateAtendimento(clients_id: number, users_id: number, contacts_id: number) {
+    let contacts: Contacts;
+    
+    // verificando se foi informado o cliente
+    if (!clients_id) {
+      throw new BadRequestException("Cliente não informado");
+    }
+
+    // verificando se foi informado o usuário
+    if (!users_id) {
+      throw new BadRequestException("Usuário não informado");
+    }
+
+    const clients = await this.queryRunner.manager.findOneBy(Clients, { id: clients_id });
+    if (!clients) {
+      throw new NotFoundException("Cliente informado não localizado");
+    }
+
+    const users: Users = await this.queryRunner.manager.findOneBy(Users, { id: users_id })
+    if (!users) {
+      throw new NotFoundException("Usuário informado não localizado");
+    }
+
+    // verificando se foi informado o contato
+    if (contacts_id) {
+      contacts = await this.queryRunner.manager.findOneBy(Contacts, { id: contacts_id })
+
+      if (!contacts) {
+        throw new NotFoundException("Contato informado não localizado");
+      }
+    }
+
+    return { clients, users, contacts }
   }
 }

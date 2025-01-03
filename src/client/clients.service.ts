@@ -89,11 +89,10 @@ export class ClientService {
   }
 
   async findAll() {
-    return this.clientRepository.find({
-      where: {
-        status: 1,
-      },
-    });
+    return this.clientRepository.findBy({
+      status: 1,
+    },
+    );
   }
 
   async findOne(client_id: number) {
@@ -167,6 +166,13 @@ export class ClientService {
       await this.query.rollbackTransaction();
       throw err;
     }
+  }
+
+  async getAllContactsByClients(client_id: string) {
+    return this.contactRepository.findBy({
+      clients_id: +client_id,
+      status: 1
+    })
   }
 
   async saveContact(client: Clients, contacts: CreateContactsDto[]) {
