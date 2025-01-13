@@ -66,6 +66,7 @@ export class AtendimentosService {
         esta_pago: createAtendimentoDto.esta_pago,
         atendimento_status_id: createAtendimentoDto.atendimento_status_id,
 
+        // teste para git
         clients: clients,
         contacts: contacts,
         users: users,
