@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryRunner, Repository } from 'typeorm';
 import { Clients } from './entities/clients.entity';
@@ -39,6 +40,7 @@ export class ClientService {
       await this.query.rollbackTransaction();
       throw err;
     }
+    
   }
 
   async updateClient(client_id: number, updateClientDto: UpdateClientDto) {
@@ -89,7 +91,7 @@ export class ClientService {
   }
 
   async findAll() {
-    return this.clientRepository.findBy({
+    return this.query.manager.findBy(Clients, {
       status: 1,
     },
     );
@@ -179,7 +181,7 @@ export class ClientService {
     const contactsNew = contacts.map((contact) => ({
       ...contact,
       ...(contact.id !== undefined && { id: Number(contact.id) }),
-      clients: client
+      clients_id: client.id
     })) as Contacts[];
 
     return await this.query.manager.save(Contacts, contactsNew);

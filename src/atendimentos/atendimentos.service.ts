@@ -49,7 +49,7 @@ export class AtendimentosService {
 
   async createAtendimento(createAtendimentoDto: CreateAtendimentoDto) {
     try {
-      await this.queryRunner.startTransaction();
+      await this.queryRunner.startTransaction('READ COMMITTED');
 
       const { clients, users, contacts } = await this.ValidateAtendimento(
         createAtendimentoDto.clients_id,
