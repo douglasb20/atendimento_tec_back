@@ -1,4 +1,13 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { AtendimentosService } from './atendimentos.service';
 import { AuthGuard } from '@nestjs/passport';
 import { CreateAtendimentoDto } from './dto/create-atendimento.dto';
@@ -12,6 +21,13 @@ export class AtendimentosController {
   @HttpCode(HttpStatus.OK)
   async findAll() {
     return await this.atendimentoService.findAll();
+  }
+
+  @Get('/:id')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async findOne(@Param('id') id: string) {
+    return await this.atendimentoService.findOne(Number.parseInt(id));
   }
 
   @Post()

@@ -16,7 +16,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
           // entities: [join(__dirname, '**/*entity.{ts,js}')],
           autoLoadEntities: true,
           synchronize: false,
-          dateStrings: true, 
+          dateStrings: true,
         };
       },
       inject: [ConfigService],

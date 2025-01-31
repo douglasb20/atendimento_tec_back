@@ -79,11 +79,10 @@ export class ClientController {
     return this.clientService.updateContact(updateContactDto, client_id, contact_id);
   }
 
-  @Get(":client_id/contact")
+  @Get(':client_id/contact')
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
-  async getAllContactsByClients(@Param("client_id") client_id: string) {
+  async getAllContactsByClients(@Param('client_id') client_id: string) {
     return this.clientService.getAllContactsByClients(client_id);
   }
-
 }

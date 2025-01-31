@@ -27,7 +27,7 @@ export class Users {
   @CreateDateColumn()
   created_at: Date;
 
-  @Column({type: 'datetime'})
+  @Column({ type: 'datetime' })
   lastlogin_at: Date;
 
   @Column({ default: 'USER' })

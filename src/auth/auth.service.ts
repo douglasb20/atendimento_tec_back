@@ -66,7 +66,7 @@ export class AuthService {
       select: ['id', 'name', 'email', 'password', 'lastlogin_at'],
     });
 
-    if (!user) throw new BadRequestException('Não existe nenhum usuário com este email!');
+    if (!user) throw new BadRequestException('Usuário e/ou senha incorreto!');
 
     return user;
   }
@@ -74,7 +74,7 @@ export class AuthService {
   private async checkPassword(password: string, user: Users): Promise<boolean> {
     const match = await bcrypt.compare(password, user.password);
 
-    if (!match) throw new BadRequestException('Senha incorreta!');
+    if (!match) throw new BadRequestException('Usuário e/ou senha incorreto!');
 
     return match;
   }

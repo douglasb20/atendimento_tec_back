@@ -30,7 +30,11 @@ export class ClientService {
 
       await this.query.manager.save(Clients, client);
 
-      if ('contacts' in createClientDto && createClientDto?.contacts !== null && createClientDto?.contacts?.length !== 0) {
+      if (
+        'contacts' in createClientDto &&
+        createClientDto?.contacts !== null &&
+        createClientDto?.contacts?.length !== 0
+      ) {
         client.contacts = await this.saveContact(client, createClientDto.contacts);
       }
 
@@ -40,7 +44,6 @@ export class ClientService {
       await this.query.rollbackTransaction();
       throw err;
     }
-    
   }
 
   async updateClient(client_id: number, updateClientDto: UpdateClientDto) {
@@ -93,8 +96,7 @@ export class ClientService {
   async findAll() {
     return this.query.manager.findBy(Clients, {
       status: 1,
-    },
-    );
+    });
   }
 
   async findOne(client_id: number) {
@@ -173,15 +175,15 @@ export class ClientService {
   async getAllContactsByClients(client_id: string) {
     return this.contactRepository.findBy({
       clients_id: +client_id,
-      status: 1
-    })
+      status: 1,
+    });
   }
 
   async saveContact(client: Clients, contacts: CreateContactsDto[]) {
     const contactsNew = contacts.map((contact) => ({
       ...contact,
       ...(contact.id !== undefined && { id: Number(contact.id) }),
-      clients_id: client.id
+      clients_id: client.id,
     })) as Contacts[];
 
     return await this.query.manager.save(Contacts, contactsNew);

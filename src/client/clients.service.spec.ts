@@ -27,7 +27,7 @@ describe('ClientService', () => {
   beforeEach(async () => {
     module = await Test.createTestingModule({
       imports: [
-        TypeOrmModule.forRoot({...dataSourceTest, autoLoadEntities: true}),
+        TypeOrmModule.forRoot({ ...dataSourceTest, autoLoadEntities: true }),
         TypeOrmModule.forFeature([Clients, Contacts, Atendimentos]),
       ],
       providers: [ClientService],
@@ -40,8 +40,8 @@ describe('ClientService', () => {
 
     data = {
       nome: 'ManSystem',
-      cnpj: ''
-    }
+      cnpj: '',
+    };
   });
 
   afterAll(async () => {
@@ -55,19 +55,22 @@ describe('ClientService', () => {
   });
 
   it('should create a new client without contact', async () => {
-    const result = await service.createClient(data)
+    const result = await service.createClient(data);
     expect(result.id).toBeDefined();
     expect(result.nome).toEqual(data.nome);
     expect(result.cnpj).toEqual(data.cnpj);
     expect(result.created_at).toBeDefined();
     expect(result.status).toEqual(1);
     expect(result.contacts).toBeUndefined();
-  })
+  });
 
   it('should create a new client with contact', async () => {
-    const newData: CreateClientDto = { ...data, contacts: [{ nome_contato: "Douglas A. Silva", telefone_contato: '64992698043' }] };
+    const newData: CreateClientDto = {
+      ...data,
+      contacts: [{ nome_contato: 'Douglas A. Silva', telefone_contato: '64992698043' }],
+    };
     const result = await service.createClient(newData);
-    
+
     expect(result.id).toBeDefined();
     expect(result.nome).toEqual(data.nome);
     expect(result.cnpj).toEqual(data.cnpj);
@@ -75,5 +78,5 @@ describe('ClientService', () => {
     expect(result.status).toEqual(1);
     expect(result.contacts[0].nome_contato).toEqual(newData.contacts[0].nome_contato);
     expect(result.contacts[0].telefone_contato).toEqual(newData.contacts[0].telefone_contato);
-  })
+  });
 });
