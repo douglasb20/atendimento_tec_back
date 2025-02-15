@@ -1,10 +1,15 @@
-import { IsDate, IsDateString, IsNotEmpty } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsDateString, IsNotEmpty, IsOptional, ValidateNested } from 'class-validator';
+import { CreateAtendimentoServicoDto } from './create-atendimento-servico.dto';
 
 export class CreateAtendimentoDto {
   @IsNotEmpty({ message: (opt) => `Campo ${opt.property} é obrigatório` })
   clients_id: number;
 
+  @IsOptional()
   contacts_id: number;
+  
+  @IsOptional()
   users_id: number;
 
   @IsNotEmpty({ message: (opt) => `Campo ${opt.property} é obrigatório` })
@@ -28,4 +33,8 @@ export class CreateAtendimentoDto {
 
   @IsNotEmpty({ message: (opt) => `Campo ${opt.property} é obrigatório` })
   atendimento_status_id: number;
+
+  @ValidateNested({ each: true })
+  @Type(() => CreateAtendimentoServicoDto)
+  atendimentosServicos?: CreateAtendimentoServicoDto[];
 }

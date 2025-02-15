@@ -9,6 +9,7 @@ import { DatabaseModule } from './database/database.module';
 import { UsersModule } from './users/users.module';
 import { ClientModule } from './client/clients.module';
 import { AtendimentosModule } from './atendimentos/atendimentos.module';
+import { ServicesModule } from './service/services.module';
 
 const destPath = path.join(__dirname, '..', '..', '/files');
 @Global()
@@ -33,6 +34,7 @@ const destPath = path.join(__dirname, '..', '..', '/files');
     DatabaseModule,
     ClientModule,
     AtendimentosModule,
+    ServicesModule,
   ],
   exports: [MulterModule],
 })

@@ -28,12 +28,6 @@ export class CreateUsersTable1704379411392 implements MigrationInterface {
             type: 'varchar',
           },
           {
-            name: 'status',
-            type: 'tinyint',
-            length: '1',
-            default: '1',
-          },
-          {
             name: 'is_requestpassword',
             type: 'tinyint',
             length: '1',
@@ -57,14 +51,26 @@ export class CreateUsersTable1704379411392 implements MigrationInterface {
             isNullable: false,
             default: 'USER',
           },
+          {
+            name: 'is_superuser',
+            type: 'tinyint',
+            length: '1',
+            default: '0',
+          },
+          {
+            name: 'status',
+            type: 'tinyint',
+            length: '1',
+            default: '1',
+          },
         ],
       }),
       true,
     );
     await queryRunner.query(
       'INSERT INTO \
-      users(name, email, password, role) \
-      values("Douglas", "douglasdev.cn@gmail.com", "$2b$10$u02d66.IaHqUuJ3p42qQF.xrS1VjX3DWwVOTat/zMBu2lzzBFp0Ly", "ADMIN")',
+      users(name, email, password, role, is_superuser) \
+      values("Douglas", "douglasdev.cn@gmail.com", "$2b$10$u02d66.IaHqUuJ3p42qQF.xrS1VjX3DWwVOTat/zMBu2lzzBFp0Ly", "ADMIN", 1)',
     );
   }
 

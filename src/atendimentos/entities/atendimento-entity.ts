@@ -4,12 +4,14 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Clients } from 'client/entities/clients.entity';
 import { Contacts } from 'client/entities/contacts.entity';
 import { Users } from 'users/entities/users.entity';
 import { AtendimentoStatus } from './atendimento-status-entity';
+import { AtendimentosServicos } from './atendimento-servico-entity';
 
 @Entity({ name: 'atendimentos' })
 export class Atendimentos {
@@ -38,7 +40,7 @@ export class Atendimentos {
   comentario: string; // cspell: disable-line
 
   @Column({ type: 'varchar', length: 1 })
-  tipo_entrada: string;
+  tipo_entrada: string; // T = por tempo, S = por serviço
 
   @Column({ type: 'int' })
   esta_pago: number;
@@ -63,4 +65,9 @@ export class Atendimentos {
   @ManyToOne(() => AtendimentoStatus, (atendimento) => atendimento.atendimentos)
   @JoinColumn({ name: 'atendimento_status_id', referencedColumnName: 'id' })
   atendimento_status: AtendimentoStatus;
+
+  // ============= RELATIONS ================
+
+  @OneToMany(() => AtendimentosServicos, (atendimentoServico) => atendimentoServico.atendimento)
+  atendimentosServicos: AtendimentosServicos[];
 }

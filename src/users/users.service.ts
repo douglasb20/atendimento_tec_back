@@ -50,10 +50,11 @@ export class UsersService {
       }
 
       if (updateUserDto.password) {
-        user.password = await bcrypt.hash(updateUserDto.password, 10);
+        updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
       }
       const updateUser = this.usersRepository.create({
         ...user,
+        ...updateUserDto,
       });
 
       await this.query.manager.save(Users, updateUser);

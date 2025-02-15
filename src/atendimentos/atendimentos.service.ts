@@ -1,13 +1,17 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryRunner, Repository } from 'typeorm';
+import { AtendimentoListResponse } from 'interface';
 
 import { CreateAtendimentoDto } from './dto/create-atendimento.dto';
+import { CreateAtendimentoServicoDto } from './dto/create-atendimento-servico.dto';
 
 import { Atendimentos } from './entities/atendimento-entity';
+import { AtendimentosServicos } from './entities/atendimento-servico-entity';
 import { Clients } from 'client/entities/clients.entity';
 import { Contacts } from 'client/entities/contacts.entity';
 import { Users } from 'users/entities/users.entity';
+import { Services } from 'service/entities/service.entity';
 
 @Injectable()
 export class AtendimentosService {
@@ -38,8 +42,16 @@ export class AtendimentosService {
         'cont.telefone_contato as contact_telefone',
         'as.descricao as status_descricao',
       ])
-      .where(`at.id = ${id}`)
-      .getRawMany();
+      .where(`at.id = :id`, { id: id })
+      .getRawOne<AtendimentoListResponse>();
+    
+      const atendimentoServico = await this.queryRunner.manager.find(AtendimentosServicos,
+        {
+          where: { id_atendimento: result.id },
+          relations: ['service']
+        }
+      )
+      result.atendimentosServicos = atendimentoServico;
     // return await this.atendimentoRepository.find({
     //   relations: ['atendimento_status', 'users', 'clients', 'contacts'],
     // })
@@ -65,48 +77,61 @@ export class AtendimentosService {
         'as.descricao as status_descricao',
       ])
       .orderBy('at.id', 'DESC')
-      .getRawMany();
-    // return await this.atendimentoRepository.find({
-    //   relations: ['atendimento_status', 'users', 'clients', 'contacts'],
-    // })
+      .getRawMany<AtendimentoListResponse>();
+
+    for (const [k, at] of result.entries()) {
+      const atendimentoServico = await this.queryRunner.manager.find(AtendimentosServicos,
+        {
+          where: { id_atendimento: at.id },
+          relations: ['service']
+        }
+      )
+      result[k].atendimentosServicos = atendimentoServico;
+    }
+
     return result;
   }
 
   async createAtendimento(createAtendimentoDto: CreateAtendimentoDto) {
     try {
       await this.queryRunner.startTransaction('READ COMMITTED');
-
+      
       const { clients, users, contacts } = await this.ValidateAtendimento(
         createAtendimentoDto.clients_id,
         createAtendimentoDto.users_id,
         createAtendimentoDto.contacts_id,
+        createAtendimentoDto.atendimentosServicos
       );
 
       const newAtendimento = this.atendimentoRepository.create({
         data_referencia: createAtendimentoDto.data_referencia,
         hora_inicio: createAtendimentoDto.hora_inicio,
         hora_fim: createAtendimentoDto.hora_fim,
-        comentario: createAtendimentoDto.comentario, // cSpell:disable-line
+        comentario: createAtendimentoDto.comentario,
         tipo_entrada: createAtendimentoDto.tipo_entrada,
         esta_pago: createAtendimentoDto.esta_pago,
         atendimento_status_id: createAtendimentoDto.atendimento_status_id,
 
-        // teste para git
         clients: clients,
         contacts: contacts,
         users: users,
       });
-
+      
       await this.atendimentoRepository.save(newAtendimento);
 
+      if (createAtendimentoDto.atendimentosServicos.length > 0) {
+        newAtendimento.atendimentosServicos = await this.SalvaAtendimentoServico(newAtendimento, createAtendimentoDto.atendimentosServicos);
+      }
+
       await this.queryRunner.commitTransaction();
+      return newAtendimento
     } catch (err) {
       await this.queryRunner.rollbackTransaction();
       throw err;
     }
   }
 
-  async ValidateAtendimento(clients_id: number, users_id: number, contacts_id: number) {
+  async ValidateAtendimento(clients_id: number, users_id: number, contacts_id: number, services: CreateAtendimentoServicoDto[]) {
     let contacts: Contacts;
 
     // verificando se foi informado o cliente
@@ -137,7 +162,32 @@ export class AtendimentosService {
         throw new NotFoundException('Contato informado não localizado');
       }
     }
+    const atendimentoServices: AtendimentosService[] = []
+    if (services.length > 0) {
+      let contErr = 0;
+      services.forEach(async (v) => {
+        const service = await this.queryRunner.manager.findOneBy(Services, { id: v.id_service });
+        if (!service) {
+          contErr++;
+          return;
+        }
+      })
+
+      if (contErr > 0) {
+        throw new NotFoundException('Um dos serviços informado não localizado');
+      }
+    }
 
     return { clients, users, contacts };
   }
+
+  async SalvaAtendimentoServico(atendimento: Atendimentos, servicos: CreateAtendimentoServicoDto[]) {
+    const servicosNew = servicos.map((servico) => ({
+      ...servico,
+      ...(servico.id !== undefined && { id: Number(servico.id) }),
+      id_atendimento: atendimento.id,
+    })) as AtendimentosServicos[];
+    return this.queryRunner.manager.save(AtendimentosServicos, servicosNew);
+  }
+
 }

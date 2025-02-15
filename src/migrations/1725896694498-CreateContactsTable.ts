@@ -61,6 +61,7 @@ export class CreateContactsTable1725896694498 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.dropForeignKey('contacts', 'contacts_clients_fk');
     await queryRunner.dropTable('contacts');
   }
 }

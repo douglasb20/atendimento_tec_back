@@ -14,7 +14,10 @@ export class CreateUserDto {
   password: string;
 
   @IsOptional()
-  @IsDecimal({}, { message: (opt) => `Campo ${opt.property} aceita somente formato decimal` })
+  @IsDecimal(
+    { force_decimal: true },
+    { message: (opt) => `Campo ${opt.property} aceita somente formato decimal` },
+  )
   valor_hora?: number;
 
   @IsString({ message: (opt) => `Campo ${opt.property} aceita somente formato string` })

@@ -15,9 +15,6 @@ export class Users {
   @Column({ select: false })
   password: string;
 
-  @Column({ default: 1, nullable: true })
-  status: number;
-
   @Column({ default: null, nullable: true, type: 'decimal' })
   valor_hora: number;
 
@@ -32,6 +29,12 @@ export class Users {
 
   @Column({ default: 'USER' })
   role: string;
+
+  @Column({ default: 0, nullable: true })
+  is_superuser: number;
+
+  @Column({ default: 1, nullable: true })
+  status: number;
 
   @OneToMany(() => Atendimentos, (atendimentos) => atendimentos.users)
   atendimentos: Atendimentos[];
