@@ -1,3 +1,3 @@
-import { CreateServiceDto } from "./create-service.dto";
+import { CreateServiceDto } from './create-service.dto';
 
-export class UpdateServiceDto extends CreateServiceDto{}
+export class UpdateServiceDto extends CreateServiceDto {}

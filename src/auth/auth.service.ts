@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { sign } from 'jsonwebtoken';
 import * as bcrypt from 'bcrypt';
@@ -13,6 +13,7 @@ import { UpdateUserDto } from 'users/dto/update-user.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   constructor(
     @InjectRepository(Users)
     private readonly usersRepository: Repository<Users>,
@@ -37,6 +38,7 @@ export class AuthService {
   public async validadeUser(jwtPayload: JwtPayload): Promise<SigninDto> {
     const user = await this.usersRepository.findOneBy({ id: jwtPayload.id });
     if (!user) {
+      this.logger.error('Erro de validação: Usuário não encontrado');
       throw new UnauthorizedException('Usuário não encontrado');
     }
     return user;
@@ -66,7 +68,10 @@ export class AuthService {
       select: ['id', 'name', 'email', 'password', 'lastlogin_at'],
     });
 
-    if (!user) throw new BadRequestException('Usuário e/ou senha incorreto!');
+    if (!user) {
+      this.logger.error('Erro autenticação: Usuário e/ou senha incorreto!');
+      throw new BadRequestException('Usuário e/ou senha incorreto!');
+    }
 
     return user;
   }
@@ -74,7 +79,10 @@ export class AuthService {
   private async checkPassword(password: string, user: Users): Promise<boolean> {
     const match = await bcrypt.compare(password, user.password);
 
-    if (!match) throw new BadRequestException('Usuário e/ou senha incorreto!');
+    if (!match) {
+      this.logger.error('Erro autenticação: Usuário e/ou senha incorreto!');
+      throw new BadRequestException('Usuário e/ou senha incorreto!');
+    }
 
     return match;
   }

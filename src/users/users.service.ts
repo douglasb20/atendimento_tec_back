@@ -1,39 +1,32 @@
-import { BadRequestException, Inject, Injectable, Scope } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, QueryRunner, Repository } from 'typeorm';
-import * as bcrypt from 'bcrypt';
-import { Users } from './entities/users.entity';
+import { BadRequestException, Injectable, Logger, Scope } from '@nestjs/common';
+import { DataSource, QueryRunner } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserRepository } from './users.repository';
 
 @Injectable({ scope: Scope.REQUEST })
 export class UsersService {
   private query: QueryRunner;
+  private readonly logger = new Logger(UsersService.name);
   constructor(
-    @InjectRepository(Users)
-    private readonly usersRepository: Repository<Users>,
+    private readonly usersRepository: UserRepository,
     private dataSource: DataSource,
   ) {
-    this.query = dataSource.createQueryRunner();
+    this.query = this.dataSource.createQueryRunner();
   }
 
   async findAll() {
-    return await this.usersRepository.findBy({
-      status: 1,
-    });
+    return await this.usersRepository.findActives();
   }
 
   async addUser(createUserDto: CreateUserDto) {
     try {
       await this.query.startTransaction();
-      const newUser = this.usersRepository.create({
-        ...createUserDto,
-        password: await bcrypt.hash(createUserDto.password, 10),
-      });
 
-      await this.query.manager.save(Users, newUser);
-      await this.query.commitTransaction();
+      const newUser = await this.usersRepository.createUser(createUserDto, this.query.manager);
       delete newUser.password;
+      await this.query.commitTransaction();
+
       return newUser;
     } catch (err) {
       await this.query.rollbackTransaction();
@@ -44,23 +37,12 @@ export class UsersService {
   async updateUser(user_id: number, updateUserDto: UpdateUserDto) {
     try {
       await this.query.startTransaction();
-      const user = await this.usersRepository.findOneBy({ id: user_id });
-      if (!user) {
-        throw new BadRequestException('Usuário não localizado com este id');
-      }
 
-      if (updateUserDto.password) {
-        updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
-      }
-      const updateUser = this.usersRepository.create({
-        ...user,
-        ...updateUserDto,
-      });
-
-      await this.query.manager.save(Users, updateUser);
+      const updatedUser = await this.usersRepository.updateUser(user_id, updateUserDto, this.query.manager);
+      delete updatedUser.password;
       await this.query.commitTransaction();
-      delete updateUser.password;
-      return updateUser;
+
+      return updatedUser;
     } catch (err) {
       await this.query.rollbackTransaction();
       throw err;
@@ -70,19 +52,12 @@ export class UsersService {
   async deleteUser(user_id: number) {
     try {
       await this.query.startTransaction();
-      const user = await this.usersRepository.findOneBy({ id: user_id });
-      if (!user) {
-        throw new BadRequestException('Usuário não localizado com este id');
-      }
 
-      const updateUser = this.usersRepository.create({
-        ...user,
-        status: 0,
-      });
-
-      await this.query.manager.save(Users, updateUser);
+      const updatedUser = await this.usersRepository.deleteUser(user_id, this.query.manager);
+      delete updatedUser.password;
       await this.query.commitTransaction();
-      delete updateUser.password;
+      
+      return updatedUser;
     } catch (err) {
       await this.query.rollbackTransaction();
       throw err;

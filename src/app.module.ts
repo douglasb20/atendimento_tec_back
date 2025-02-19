@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { MulterModule } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -10,6 +11,9 @@ import { UsersModule } from './users/users.module';
 import { ClientModule } from './client/clients.module';
 import { AtendimentosModule } from './atendimentos/atendimentos.module';
 import { ServicesModule } from './service/services.module';
+import { QueryStorageService } from './query-storage/query-storage.service';
+import { LogSistemaModule } from './logSistema/log-sistema.module';
+import { LogSistemaInterceptor } from './logSistema/log-sistema.interceptor';
 
 const destPath = path.join(__dirname, '..', '..', '/files');
 @Global()
@@ -35,7 +39,15 @@ const destPath = path.join(__dirname, '..', '..', '/files');
     ClientModule,
     AtendimentosModule,
     ServicesModule,
+    LogSistemaModule,
   ],
-  exports: [MulterModule],
+  exports: [MulterModule, QueryStorageService],
+  providers: [
+    QueryStorageService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LogSistemaInterceptor,
+    },
+  ],
 })
-export class AppModule {}
+export class AppModule { }

@@ -1,34 +1,34 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, QueryRunner, Repository } from 'typeorm';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { DataSource, QueryRunner } from 'typeorm';
 import { Services } from './entities/service.entity';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
+import { ServiceRepository } from './services.repository';
 
 @Injectable()
 export class ServicesService {
   private query: QueryRunner;
+  private readonly logger = new Logger(ServicesService.name);
   constructor(
-    @InjectRepository(Services)
-    private serviceRepository: Repository<Services>,
+    private readonly serviceRepository: ServiceRepository,
     private dataSource: DataSource,
   ) {
     this.query = this.dataSource.createQueryRunner();
   }
 
   async findAll() {
-    return await this.serviceRepository.findBy({ status: 1 });
+    return await this.serviceRepository.findActives();
   }
 
   async findById(id: number) {
-    return await this.serviceRepository.findOneBy({ id });
+    return await this.serviceRepository.findById(id);
   }
 
   async createService(createServiceDto: CreateServiceDto) {
     try {
       this.query.startTransaction();
       const service = this.serviceRepository.create(createServiceDto);
-      await this.query.manager.save(Services, service);
+      await this.serviceRepository.saveService(service, this.query.manager);
 
       this.query.commitTransaction();
       return service;
@@ -41,19 +41,14 @@ export class ServicesService {
   async updateService(id: number, updateServiceDto: UpdateServiceDto) {
     try {
       this.query.startTransaction();
-      const service = await this.serviceRepository.findOneBy({ id });
-      if (!service) {
-        throw new BadRequestException('Serviço não localizado com este id');
-      }
+      const service = await this.serviceRepository.findById(id);
 
-      const updateService = this.serviceRepository.create(
-        {
-          ...service,
-          ...updateServiceDto
-        }
-      );
+      const updateService = {
+        ...service,
+        ...updateServiceDto,
+      };
 
-      await this.query.manager.save(Services, updateService);
+      await this.serviceRepository.saveService(updateService, this.query.manager);
 
       this.query.commitTransaction();
       return updateService;
@@ -66,19 +61,14 @@ export class ServicesService {
   async deleteService(id: number) {
     try {
       this.query.startTransaction();
-      const service = await this.serviceRepository.findOneBy({ id });
-      if (!service) {
-        throw new BadRequestException('Serviço não localizado com este id');
-      }
+      const service = await this.serviceRepository.findById(id);
 
-      const deleteService = this.serviceRepository.create(
-        {
-          ...service,
-          status: 0
-        }
-      );
+      const deleteService = this.serviceRepository.create({
+        ...service,
+        status: 0,
+      });
 
-      await this.query.manager.save(Services, deleteService);
+      await this.serviceRepository.saveService(deleteService, this.query.manager);
 
       this.query.commitTransaction();
       return deleteService;
@@ -87,5 +77,4 @@ export class ServicesService {
       throw err;
     }
   }
-
 }

@@ -24,5 +24,10 @@
   "cSpell.ignorePaths": [
     "package.json"
     
-  ]
+  ],
+  "rest-client.environmentVariables": {
+    "$shared": {
+      "url": "http://localhost:3001/api"
+    }
+  }
 }

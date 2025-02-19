@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -23,16 +24,24 @@ export class AtendimentosController {
     return await this.atendimentoService.findAll();
   }
 
+  @Get('/status')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async getListStatus() {
+    return await this.atendimentoService.getListStatus();
+  }
+
   @Get('/:id')
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
-  async findOne(@Param('id') id: string) {
-    return await this.atendimentoService.findOne(Number.parseInt(id));
+  async findOne(@Param('id', ParseIntPipe) id: number) {
+    return await this.atendimentoService.findOne(id);
   }
 
   @Post()
   @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.CREATED)
   async createAtendimento(@Body() createAtendimentoDto: CreateAtendimentoDto) {
-    return this.atendimentoService.createAtendimento(createAtendimentoDto);
+    return await this.atendimentoService.createAtendimento(createAtendimentoDto);
   }
 }

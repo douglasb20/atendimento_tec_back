@@ -1,4 +1,4 @@
-import { AtendimentosServicos } from "atendimentos/entities/atendimento-servico-entity";
+import { AtendimentosServicos } from 'atendimentos/entities/atendimento-servico-entity';
 
 export interface AtendimentoListResponse {
   id: number;

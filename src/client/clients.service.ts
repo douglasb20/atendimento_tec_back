@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryRunner, Repository } from 'typeorm';
@@ -12,6 +12,7 @@ import { CreateContactsDto } from './dto/create-contacts.dto';
 @Injectable()
 export class ClientService {
   private query: QueryRunner;
+  private readonly logger = new Logger(ClientService.name);
   constructor(
     @InjectRepository(Clients) private clientRepository: Repository<Clients>,
     @InjectRepository(Contacts) private contactRepository: Repository<Contacts>,
@@ -51,6 +52,7 @@ export class ClientService {
       await this.query.startTransaction();
       const client = await this.clientRepository.findOneBy({ id: client_id });
       if (!client) {
+        this.logger.error(`Erro de salvar cliente: Cliente com id "${client_id}" não existe`);
         throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
       }
 
@@ -79,6 +81,7 @@ export class ClientService {
 
       const client = await this.clientRepository.findOneBy({ id: Number(client_id) });
       if (!client) {
+        this.logger.error(`Erro de remover cliente: Cliente com id "${client_id}" não existe`);
         throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
       }
 
@@ -102,6 +105,7 @@ export class ClientService {
   async findOne(client_id: number) {
     const client = await this.clientRepository.findOneBy({ id: client_id });
     if (!client) {
+      this.logger.error(`Erro de localizar cliente: Cliente com id "${client_id}" não existe`);
       throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
     }
     const contacts = await this.contactRepository.findBy({ clients: client, status: 1 });
@@ -115,6 +119,7 @@ export class ClientService {
 
       const client = await this.clientRepository.findOneBy({ id: +client_id });
       if (!client) {
+        this.logger.error(`Erro de remover cliente: Cliente com id "${client_id}" não existe`);
         throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
       }
 
@@ -123,6 +128,7 @@ export class ClientService {
         clients_id: client.id,
       });
       if (!contact) {
+        this.logger.error(`Erro de salvar cliente: Contato com id "${client_id}" não existe`);
         throw new BadRequestException(`Contato com id "${contact_id}" não existe.`);
       }
 
@@ -148,6 +154,7 @@ export class ClientService {
 
       const client = await this.clientRepository.findOneBy({ id: +client_id });
       if (!client) {
+        this.logger.error(`Erro de atualizar cliente: Cliente com id "${client_id}" não existe`);
         throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
       }
 
@@ -156,6 +163,7 @@ export class ClientService {
         clients_id: client.id,
       });
       if (!contact) {
+        this.logger.error(`Erro de atualizar cliente: Contato com id "${client_id}" não existe`);
         throw new BadRequestException(`Contato com id "${contact_id}" não existe.`);
       }
 

@@ -10,15 +10,17 @@ import { Contacts } from 'client/entities/contacts.entity';
 import { AtendimentosServicos } from './entities/atendimento-servico-entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([
-    Atendimentos,
-    AtendimentoStatus,
-    Users,
-    Clients,
-    Contacts,
-    AtendimentosServicos
-  ])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Atendimentos,
+      AtendimentoStatus,
+      Users,
+      Clients,
+      Contacts,
+      AtendimentosServicos,
+    ]),
+  ],
   controllers: [AtendimentosController],
   providers: [AtendimentosService],
 })
-export class AtendimentosModule { }
+export class AtendimentosModule {}

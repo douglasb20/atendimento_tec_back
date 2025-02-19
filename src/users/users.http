@@ -1,0 +1,43 @@
+# @name login
+POST {{url}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "douglasdev.cn@gmail.com",
+  "password": 1234
+}
+###
+
+@authToken = {{login.response.body.$.access_token}}
+@endpoint = /users
+
+#### 1) Get All Users
+GET {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+
+#### 2) Add new user
+POST {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Carlos",
+  "email": "carlos@teste.com",
+  "password": "1234",
+  "valor_hora": "18.00"
+}
+
+#### 3) Update user
+PATCH {{url}}{{endpoint}}/3
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Carlos",
+  "email": "carlos@teste.com",
+  "valor_hora": 27.00
+}
+
+#### 4) Delete user
+DELETE {{url}}{{endpoint}}/3
+Authorization: Bearer {{authToken}}

@@ -8,7 +8,7 @@ export class CreateAtendimentoDto {
 
   @IsOptional()
   contacts_id: number;
-  
+
   @IsOptional()
   users_id: number;
 

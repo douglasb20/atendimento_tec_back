@@ -1,4 +1,5 @@
-import { IsDecimal, IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsDecimal, IsEmail, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateUserDto {
   @IsString({ message: (opt) => `Campo ${opt.property} aceita somente formato string` })
@@ -14,10 +15,8 @@ export class CreateUserDto {
   password: string;
 
   @IsOptional()
-  @IsDecimal(
-    { force_decimal: true },
-    { message: (opt) => `Campo ${opt.property} aceita somente formato decimal` },
-  )
+  @Transform(({ value }) => parseFloat(value))
+  @IsNumber({}, { message: (opt) => `Campo ${opt.property} aceita somente formato numérico` })
   valor_hora?: number;
 
   @IsString({ message: (opt) => `Campo ${opt.property} aceita somente formato string` })

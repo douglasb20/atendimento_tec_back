@@ -1,0 +1,45 @@
+# @name login
+POST {{url}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "douglasdev.cn@gmail.com",
+  "password": 1234
+}
+###
+
+@authToken = {{login.response.body.$.access_token}}
+
+@endpoint = /servicos
+
+#### 1) Get all services
+GET {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+
+#### 2) Get service by id
+GET {{url}}{{endpoint}}/1
+Authorization: Bearer {{authToken}}
+
+#### 3) Add new service
+POST {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Instalação Roteador2",
+  "valor_servico": "40.00"
+}
+
+#### 4) Update service
+PATCH {{url}}{{endpoint}}/4
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Instalação Roteador",
+  "valor_servico": "45.00"
+}
+
+#### 5) Delete service
+DELETE {{url}}{{endpoint}}/5
+Authorization: Bearer {{authToken}}
