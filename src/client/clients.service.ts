@@ -1,21 +1,21 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { plainToInstance } from 'class-transformer';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, QueryRunner, Repository } from 'typeorm';
-import { Clients } from './entities/clients.entity';
+import { DataSource, QueryRunner } from 'typeorm';
+import { ClientsEntity } from './entities/clients.entity';
 import { CreateClientDto } from './dto/create-client.dto';
-import { Contacts } from './entities/contacts.entity';
+import { ContactsEntity } from './entities/contacts.entity';
 import { UpdateContactsDto } from './dto/update-contacts.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { CreateContactsDto } from './dto/create-contacts.dto';
+import { ClientRepository } from './clients.repository';
+import { ContactRepository } from './contacts.repository';
 
 @Injectable()
 export class ClientService {
   private query: QueryRunner;
   private readonly logger = new Logger(ClientService.name);
   constructor(
-    @InjectRepository(Clients) private clientRepository: Repository<Clients>,
-    @InjectRepository(Contacts) private contactRepository: Repository<Contacts>,
+    private clientRepository: ClientRepository,
+    private contactRepository: ContactRepository,
     private dataSource: DataSource,
   ) {
     this.query = this.dataSource.createQueryRunner();
@@ -24,12 +24,8 @@ export class ClientService {
   async createClient(createClientDto: CreateClientDto) {
     try {
       await this.query.startTransaction();
-      const client = this.clientRepository.create({
-        nome: createClientDto.nome,
-        cnpj: createClientDto.cnpj,
-      });
 
-      await this.query.manager.save(Clients, client);
+      const client = await this.clientRepository.createClient(createClientDto, this.query.manager);
 
       if (
         'contacts' in createClientDto &&
@@ -43,7 +39,7 @@ export class ClientService {
       return client;
     } catch (err) {
       await this.query.rollbackTransaction();
-      throw err;
+      throw new BadRequestException(err.message);
     }
   }
 
@@ -53,7 +49,7 @@ export class ClientService {
       const client = await this.clientRepository.findOneBy({ id: client_id });
       if (!client) {
         this.logger.error(`Erro de salvar cliente: Cliente com id "${client_id}" não existe`);
-        throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
+        throw new Error(`Cliente com id "${client_id}" não existe.`);
       }
 
       const clientNew = {
@@ -62,16 +58,19 @@ export class ClientService {
         cnpj: updateClientDto.cnpj,
       };
 
-      const addedClient = await this.query.manager.save(Clients, clientNew);
+      const addedClient = await this.query.manager.save(ClientsEntity, clientNew);
 
-      if ('contacts' in updateClientDto && updateClientDto.contacts?.length !== 0) {
-        await this.saveContact(addedClient, updateClientDto.contacts);
+      if ('contacts' in updateClientDto && updateClientDto?.contacts) {
+        if (updateClientDto?.contacts.length > 0) {
+          await this.saveContact(addedClient, updateClientDto.contacts);
+        }
       }
 
       await this.query.commitTransaction();
     } catch (err) {
       await this.query.rollbackTransaction();
-      throw err;
+      this.logger.error(err.message);
+      throw new BadRequestException(err.message);
     }
   }
 
@@ -82,22 +81,22 @@ export class ClientService {
       const client = await this.clientRepository.findOneBy({ id: Number(client_id) });
       if (!client) {
         this.logger.error(`Erro de remover cliente: Cliente com id "${client_id}" não existe`);
-        throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
+        throw new Error(`Cliente com id "${client_id}" não existe.`);
       }
 
-      await this.query.manager.save(Clients, {
+      await this.query.manager.save(ClientsEntity, {
         ...client,
         status: 0,
       });
       await this.query.commitTransaction();
     } catch (err) {
       await this.query.rollbackTransaction();
-      throw err;
+      throw new BadRequestException(err.message);
     }
   }
 
   async findAll() {
-    return this.query.manager.findBy(Clients, {
+    return this.query.manager.findBy(ClientsEntity, {
       status: 1,
     });
   }
@@ -120,7 +119,7 @@ export class ClientService {
       const client = await this.clientRepository.findOneBy({ id: +client_id });
       if (!client) {
         this.logger.error(`Erro de remover cliente: Cliente com id "${client_id}" não existe`);
-        throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
+        throw new Error(`Cliente com id "${client_id}" não existe.`);
       }
 
       const contact = await this.contactRepository.findOneBy({
@@ -129,22 +128,15 @@ export class ClientService {
       });
       if (!contact) {
         this.logger.error(`Erro de salvar cliente: Contato com id "${client_id}" não existe`);
-        throw new BadRequestException(`Contato com id "${contact_id}" não existe.`);
+        throw new Error(`Contato com id "${contact_id}" não existe.`);
       }
 
-      await this.query.manager.save(Contacts, {
-        ...contact,
-        status: 0,
-      });
+      await this.query.manager.delete(ContactsEntity, contact_id);
 
       await this.query.commitTransaction();
-      return {
-        ...contact,
-        status: 0,
-      };
     } catch (err) {
       await this.query.rollbackTransaction();
-      throw err;
+      throw new BadRequestException(err.message);
     }
   }
 
@@ -155,7 +147,7 @@ export class ClientService {
       const client = await this.clientRepository.findOneBy({ id: +client_id });
       if (!client) {
         this.logger.error(`Erro de atualizar cliente: Cliente com id "${client_id}" não existe`);
-        throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
+        throw new Error(`Cliente com id "${client_id}" não existe.`);
       }
 
       const contact = await this.contactRepository.findOneBy({
@@ -164,10 +156,10 @@ export class ClientService {
       });
       if (!contact) {
         this.logger.error(`Erro de atualizar cliente: Contato com id "${client_id}" não existe`);
-        throw new BadRequestException(`Contato com id "${contact_id}" não existe.`);
+        throw new Error(`Contato com id "${contact_id}" não existe.`);
       }
 
-      await this.query.manager.save(Contacts, {
+      await this.query.manager.save(ContactsEntity, {
         ...contact,
         ...updateContactDto,
       });
@@ -176,7 +168,7 @@ export class ClientService {
       return { ...contact, ...updateContactDto };
     } catch (err) {
       await this.query.rollbackTransaction();
-      throw err;
+      throw new BadRequestException(err.message);
     }
   }
 
@@ -187,13 +179,13 @@ export class ClientService {
     });
   }
 
-  async saveContact(client: Clients, contacts: CreateContactsDto[]) {
+  async saveContact(client: ClientsEntity, contacts: CreateContactsDto[]) {
     const contactsNew = contacts.map((contact) => ({
       ...contact,
       ...(contact.id !== undefined && { id: Number(contact.id) }),
       clients_id: client.id,
-    })) as Contacts[];
+    })) as ContactsEntity[];
 
-    return await this.query.manager.save(Contacts, contactsNew);
+    return await this.query.manager.save(ContactsEntity, contactsNew);
   }
 }

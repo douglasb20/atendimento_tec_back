@@ -1,0 +1,23 @@
+# @name login
+POST {{url}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "douglasdev.cn@gmail.com",
+  "password": 1234
+}
+###
+
+@authToken = {{login.response.body.$.access_token}}
+
+@endpoint = /atendimentos
+
+
+#### 1) Get all atendimentos
+GET {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+
+
+#### 2) Get atendimento by id
+GET {{url}}{{endpoint}}/5
+Authorization: Bearer {{authToken}}

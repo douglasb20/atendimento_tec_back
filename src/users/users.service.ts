@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, Scope } from '@nestjs/common';
+import { Injectable, Logger, Scope } from '@nestjs/common';
 import { DataSource, QueryRunner } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -38,7 +38,11 @@ export class UsersService {
     try {
       await this.query.startTransaction();
 
-      const updatedUser = await this.usersRepository.updateUser(user_id, updateUserDto, this.query.manager);
+      const updatedUser = await this.usersRepository.updateUser(
+        user_id,
+        updateUserDto,
+        this.query.manager,
+      );
       delete updatedUser.password;
       await this.query.commitTransaction();
 
@@ -56,7 +60,7 @@ export class UsersService {
       const updatedUser = await this.usersRepository.deleteUser(user_id, this.query.manager);
       delete updatedUser.password;
       await this.query.commitTransaction();
-      
+
       return updatedUser;
     } catch (err) {
       await this.query.rollbackTransaction();

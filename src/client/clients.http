@@ -10,14 +10,14 @@ Content-Type: application/json
 
 @authToken = {{login.response.body.$.access_token}}
 
-@endpoint = /servicos
+@endpoint = /clients
 
 #### 1) Get all services
 GET {{url}}{{endpoint}}
 Authorization: Bearer {{authToken}}
 
 #### 2) Get service by id
-GET {{url}}{{endpoint}}/1
+GET {{url}}{{endpoint}}/3
 Authorization: Bearer {{authToken}}
 
 #### 3) Add new service
@@ -26,20 +26,36 @@ Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "name": "Instalação Roteador2",
-  "valor_servico": "40.00"
+  "nome": "MegaMix",
+  "contacts":[
+    {
+      "nome_contato": "Ariel",
+      "telefone_contato": "64984550047"
+    },
+    {
+      "nome_contato": "Eduardo"
+    }
+  ]
 }
 
 #### 4) Update service
-PATCH {{url}}{{endpoint}}/4
+PATCH {{url}}{{endpoint}}/8
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "name": "Instalação Roteador",
-  "valor_servico": "45.00"
+  "nome": "MegaMix",
+  "contacts":[
+    {
+      "nome_contato": "Ariel",
+      "telefone_contato": "64984550047"
+    },
+    {
+      "nome_contato": "Eduardo"
+    }
+  ]
 }
 
 #### 5) Delete service
-DELETE {{url}}{{endpoint}}/6
+DELETE {{url}}{{endpoint}}/5
 Authorization: Bearer {{authToken}}

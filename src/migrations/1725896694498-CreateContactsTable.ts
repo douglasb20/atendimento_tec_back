@@ -54,8 +54,8 @@ export class CreateContactsTable1725896694498 implements MigrationInterface {
         columnNames: ['clients_id'],
         referencedColumnNames: ['id'],
         referencedTableName: 'clients',
-        onDelete: 'CASCADE',
-        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL',
+        onUpdate: 'SET NULL',
       }),
     );
   }

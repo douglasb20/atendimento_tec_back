@@ -7,14 +7,14 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Clients } from 'client/entities/clients.entity';
-import { Contacts } from 'client/entities/contacts.entity';
-import { Users } from 'users/entities/users.entity';
-import { AtendimentoStatus } from './atendimento-status-entity';
-import { AtendimentosServicos } from './atendimento-servico-entity';
+import { ClientsEntity } from 'client/entities/clients.entity';
+import { ContactsEntity } from 'client/entities/contacts.entity';
+import { UsersEntity } from 'users/entities/users.entity';
+import { AtendimentoStatusEntity } from './atendimento-status.entity';
+import { AtendimentosServicosEntity } from './atendimento-servico.entity';
 
 @Entity({ name: 'atendimentos' })
-export class Atendimentos {
+export class AtendimentosEntity {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
@@ -50,24 +50,24 @@ export class Atendimentos {
 
   // ============= RELATIONS ================
 
-  @ManyToOne(() => Clients, (clients) => clients.atendimentos)
+  @ManyToOne(() => ClientsEntity, (clients) => clients.atendimentos)
   @JoinColumn({ name: 'clients_id', referencedColumnName: 'id' })
-  clients: Clients;
+  clients: ClientsEntity;
 
-  @ManyToOne(() => Contacts, (contacts) => contacts.atendimentos)
+  @ManyToOne(() => ContactsEntity, (contacts) => contacts.atendimentos)
   @JoinColumn({ name: 'contacts_id', referencedColumnName: 'id' })
-  contacts: Contacts;
+  contacts: ContactsEntity;
 
-  @ManyToOne(() => Users, (users) => users.atendimentos)
+  @ManyToOne(() => UsersEntity, (users) => users.atendimentos)
   @JoinColumn({ name: 'users_id', referencedColumnName: 'id' })
-  users: Users;
+  users: UsersEntity;
 
-  @ManyToOne(() => AtendimentoStatus, (atendimento) => atendimento.atendimentos)
+  @ManyToOne(() => AtendimentoStatusEntity, (atendimento) => atendimento.atendimentos)
   @JoinColumn({ name: 'atendimento_status_id', referencedColumnName: 'id' })
-  atendimento_status: AtendimentoStatus;
+  atendimento_status: AtendimentoStatusEntity;
 
   // ============= RELATIONS ================
 
-  @OneToMany(() => AtendimentosServicos, (atendimentoServico) => atendimentoServico.atendimento)
-  atendimentosServicos: AtendimentosServicos[];
+  @OneToMany(() => AtendimentosServicosEntity, (atendimentoServico) => atendimentoServico.atendimento)
+  atendimentosServicos: AtendimentosServicosEntity[];
 }

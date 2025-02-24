@@ -31,7 +31,7 @@ export class LogSistemaService {
         metodo: logdata.method,
         request_data: {
           param: logdata.params,
-          body: logdata.body
+          body: logdata.body,
         },
         queries: JSON.stringify(logdata.queries),
       });

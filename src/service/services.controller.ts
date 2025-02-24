@@ -1,25 +1,26 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post, UseGuards
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Sse, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ServicesService } from './services.service';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
+import { interval, map, Observable } from 'rxjs';
 
 @Controller('servicos')
 export class ServicesController {
-  constructor(private servicesService: ServicesService) { }
+  constructor(private servicesService: ServicesService) {}
 
   @Get()
   @UseGuards(AuthGuard('jwt'))
   async findAll() {
     return await this.servicesService.findAll();
+  }
+
+  @Sse('sse')
+  @UseGuards(AuthGuard('jwt'))
+  sse(): Observable<MessageEvent> {
+    return interval(1000).pipe(
+      map((_) => ({ data: { hello: 'world' } }) as MessageEvent),
+    );
   }
 
   @Get(':id')
@@ -45,4 +46,5 @@ export class ServicesController {
   async deleteService(@Param('id') id: string) {
     return await this.servicesService.deleteService(Number(id));
   }
+
 }

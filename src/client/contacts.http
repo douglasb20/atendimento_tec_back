@@ -1,0 +1,30 @@
+# @name login
+POST {{url}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "douglasdev.cn@gmail.com",
+  "password": 1234
+}
+###
+
+@authToken = {{login.response.body.$.access_token}}
+
+@endpoint = /clients/3/contact
+
+#### 1) Get all contacts
+GET {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+
+#### 2) Add new service
+PATCH {{url}}{{endpoint}}/2
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "nome_contato": "Rayene Alves"
+}
+
+#### 3) Delete service
+DELETE {{url}}{{endpoint}}/5
+Authorization: Bearer {{authToken}}

@@ -1,26 +1,24 @@
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import { sign } from 'jsonwebtoken';
 import * as bcrypt from 'bcrypt';
-import { Repository } from 'typeorm';
 import { format } from 'date-fns';
 
-import { Users } from 'users/entities/users.entity';
+import { UsersEntity } from 'users/entities/users.entity';
 import { SigninDto } from 'users/dto/signin.dto';
 import { JwtPayload } from './models/jwt-payload.model';
 import { ConfigMailerService } from 'mailer/configmailer.service';
 import { UpdateUserDto } from 'users/dto/update-user.dto';
+import { UserRepository } from 'users/users.repository';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   constructor(
-    @InjectRepository(Users)
-    private readonly usersRepository: Repository<Users>,
+    private readonly usersRepository: UserRepository,
     private readonly mailerService: ConfigMailerService,
   ) {}
 
-  public async createAccessToken(user: Users): Promise<string> {
+  public async createAccessToken(user: UsersEntity): Promise<string> {
     return sign(
       {
         id: user.id,
@@ -62,7 +60,7 @@ export class AuthService {
     };
   }
 
-  private async findByEmail(email: string): Promise<Users> {
+  private async findByEmail(email: string): Promise<UsersEntity> {
     const user = await this.usersRepository.findOne({
       where: { email, status: 1 },
       select: ['id', 'name', 'email', 'password', 'lastlogin_at'],
@@ -76,7 +74,7 @@ export class AuthService {
     return user;
   }
 
-  private async checkPassword(password: string, user: Users): Promise<boolean> {
+  private async checkPassword(password: string, user: UsersEntity): Promise<boolean> {
     const match = await bcrypt.compare(password, user.password);
 
     if (!match) {

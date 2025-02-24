@@ -1,8 +1,8 @@
-import { AtendimentosServicos } from 'atendimentos/entities/atendimento-servico-entity';
+import { AtendimentosServicosEntity } from 'atendimentos/entities/atendimento-servico.entity';
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
-@Entity()
-export class Services {
+@Entity('services')
+export class ServicesEntity {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
@@ -20,6 +20,6 @@ export class Services {
 
   // ============= RELATIONS ================
 
-  @OneToMany(() => AtendimentosServicos, (atendimentoServico) => atendimentoServico.service)
-  atendimentosServicos: AtendimentosServicos[];
+  @OneToMany(() => AtendimentosServicosEntity, (atendimentoServico) => atendimentoServico.service)
+  atendimentosServicos: AtendimentosServicosEntity[];
 }

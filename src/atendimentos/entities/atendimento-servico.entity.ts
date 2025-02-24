@@ -1,9 +1,9 @@
 import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
-import { Atendimentos } from './atendimento-entity';
-import { Services } from 'service/entities/service.entity';
+import { AtendimentosEntity } from './atendimento.entity';
+import { ServicesEntity } from 'service/entities/service.entity';
 
 @Entity({ name: 'atendimento_servicos' })
-export class AtendimentosServicos {
+export class AtendimentosServicosEntity {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
@@ -18,11 +18,11 @@ export class AtendimentosServicos {
 
   // ============= RELATIONS ================
 
-  @ManyToOne(() => Atendimentos, (atendimento) => atendimento.atendimentosServicos)
+  @ManyToOne(() => AtendimentosEntity, (atendimento) => atendimento.atendimentosServicos)
   @JoinColumn({ name: 'id_atendimento' })
-  atendimento: Atendimentos;
+  atendimento: AtendimentosEntity;
 
-  @ManyToOne(() => Services, (service) => service.atendimentosServicos)
+  @ManyToOne(() => ServicesEntity, (service) => service.atendimentosServicos)
   @JoinColumn({ name: 'id_service' })
-  service: Services;
+  service: ServicesEntity;
 }

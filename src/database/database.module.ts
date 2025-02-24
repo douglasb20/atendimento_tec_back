@@ -22,7 +22,7 @@ import { CustomSqlLogger } from 'Utils/CustomSqlLogger';
           logger: new CustomSqlLogger(queryStorage),
         };
       },
-      inject: [ConfigService,QueryStorageService],
+      inject: [ConfigService, QueryStorageService],
     }),
   ],
 })

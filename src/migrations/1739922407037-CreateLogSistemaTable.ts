@@ -8,10 +8,11 @@ export class CreateLogSistemaTable1739922407037 implements MigrationInterface {
         columns: [
           {
             name: 'id',
-            type: 'int',
+            type: 'bigint',
             isPrimary: true,
             isGenerated: true,
             generationStrategy: 'increment',
+            unsigned: true,
           },
           {
             name: 'rota',
@@ -21,7 +22,6 @@ export class CreateLogSistemaTable1739922407037 implements MigrationInterface {
           {
             name: 'id_usuario',
             type: 'int',
-            isNullable: true,
           },
           {
             name: 'metodo',

@@ -1,4 +1,4 @@
-import { AtendimentosServicos } from 'atendimentos/entities/atendimento-servico-entity';
+import { AtendimentosServicosEntity } from 'atendimentos/entities/atendimento-servico.entity';
 
 export interface AtendimentoListResponse {
   id: number;
@@ -20,5 +20,5 @@ export interface AtendimentoListResponse {
   contact_nome: string;
   contact_telefone: string;
   status_descricao: string;
-  atendimentosServicos: AtendimentosServicos[];
+  atendimentosServicos: AtendimentosServicosEntity[];
 }

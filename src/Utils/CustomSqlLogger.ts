@@ -2,9 +2,8 @@ import { QueryStorageService } from 'query-storage/query-storage.service';
 import { Logger } from 'typeorm';
 
 export class CustomSqlLogger implements Logger {
+  constructor(private readonly queryStorage: QueryStorageService) {}
 
-  constructor(private readonly queryStorage: QueryStorageService) { }
-  
   logQuery(query: string, parameters?: any) {
     if (!parameters) {
       return;

@@ -1,26 +1,26 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ClientService } from './clients.service';
-import { Clients } from './entities/clients.entity';
-import { Contacts } from './entities/contacts.entity';
-import { DataSource, DataSourceOptions, Repository } from 'typeorm';
-import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
-import { Atendimentos } from 'atendimentos/entities/atendimento-entity';
-import { Users } from 'users/entities/users.entity';
-import { AtendimentoStatus } from 'atendimentos/entities/atendimento-status-entity';
+import { ClientsEntity } from './entities/clients.entity';
+import { ContactsEntity } from './entities/contacts.entity';
+import { DataSource, DataSourceOptions } from 'typeorm';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AtendimentosEntity } from 'atendimentos/entities/atendimento.entity';
+import { UsersEntity } from 'users/entities/users.entity';
+import { AtendimentoStatusEntity } from 'atendimentos/entities/atendimento-status.entity';
 import { CreateClientDto } from './dto/create-client.dto';
 
 describe('ClientService', () => {
   let module: TestingModule;
   let service: ClientService;
-  let clientsRepository: Repository<Clients>;
-  let contactsRepository: Repository<Contacts>;
+  // let clientsRepository: Repository<ClientsEntity>;
+  // let contactsRepository: Repository<ContactsEntity>;
   let dataSource: DataSource;
   let data: CreateClientDto;
 
   const dataSourceTest: DataSourceOptions = {
     type: 'sqlite',
     database: ':memory:',
-    entities: [Clients, Contacts, Atendimentos, Users, AtendimentoStatus],
+    entities: [ClientsEntity, ContactsEntity, AtendimentosEntity, UsersEntity, AtendimentoStatusEntity],
     synchronize: true,
   };
 
@@ -28,14 +28,14 @@ describe('ClientService', () => {
     module = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRoot({ ...dataSourceTest, autoLoadEntities: true }),
-        TypeOrmModule.forFeature([Clients, Contacts, Atendimentos]),
+        TypeOrmModule.forFeature([ClientsEntity, ContactsEntity, AtendimentosEntity]),
       ],
       providers: [ClientService],
     }).compile();
 
     service = module.get<ClientService>(ClientService);
-    clientsRepository = module.get<Repository<Clients>>(getRepositoryToken(Clients));
-    contactsRepository = module.get<Repository<Contacts>>(getRepositoryToken(Contacts));
+    // clientsRepository = module.get<Repository<ClientsEntity>>(getRepositoryToken(ClientsEntity));
+    // contactsRepository = module.get<Repository<ContactsEntity>>(getRepositoryToken(ContactsEntity));
     dataSource = module.get<DataSource>(DataSource);
 
     data = {

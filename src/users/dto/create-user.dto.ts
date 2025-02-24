@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsDecimal, IsEmail, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateUserDto {
   @IsString({ message: (opt) => `Campo ${opt.property} aceita somente formato string` })

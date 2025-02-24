@@ -1,16 +1,14 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
-import * as bcrypt from 'bcrypt';
-import { Clients } from './entities/clients.entity';
+import { ClientsEntity } from './entities/clients.entity';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
-
 @Injectable()
-export class ClientRepository extends Repository<Clients> {
+export class ClientRepository extends Repository<ClientsEntity> {
   private readonly logger = new Logger(ClientRepository.name);
   constructor(dataSource: DataSource) {
-    super(Clients, dataSource.manager);
+    super(ClientsEntity, dataSource.manager);
   }
 
   async findActives() {
@@ -20,17 +18,18 @@ export class ClientRepository extends Repository<Clients> {
   async findById(id: number) {
     const client = await this.findOne({ where: { id: id } });
     if (!client) {
-      this.logger.error(`Erro de atualizar usuário: Cliente não localizado com este id`);
+      this.logger.error(`Erro de atualizar cliente: Cliente não localizado com este id`);
       throw new BadRequestException('Cliente não localizado com este id');
     }
     return client;
   }
 
-  async createClient(client: CreateClientDto, manager: EntityManager) {
-    const newClient = this.create({
-      ...client,
+  async createClient(createClientDto: CreateClientDto, manager: EntityManager) {
+    const client = this.create({
+      nome: createClientDto.nome,
+      cnpj: createClientDto.cnpj,
     });
-    return await manager.save(Clients, newClient);
+    return await manager.save(ClientsEntity, client);
   }
 
   async updateClient(id: number, updateClientDto: UpdateClientDto, manager: EntityManager) {
@@ -43,7 +42,7 @@ export class ClientRepository extends Repository<Clients> {
       ...client,
       ...updateClientDto,
     });
-    return await manager.save(Clients, updateClient);
+    return await manager.save(ClientsEntity, updateClient);
   }
 
   async deleteClient(id: number, manager: EntityManager) {
@@ -57,6 +56,6 @@ export class ClientRepository extends Repository<Clients> {
       ...client,
       status: 0,
     };
-    return await manager.save(Clients, updateClient);
+    return await manager.save(ClientsEntity, updateClient);
   }
 }

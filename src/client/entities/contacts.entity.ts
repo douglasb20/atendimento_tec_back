@@ -8,11 +8,11 @@ import {
   OneToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Clients } from './clients.entity';
-import { Atendimentos } from 'atendimentos/entities/atendimento-entity';
+import { ClientsEntity } from './clients.entity';
+import { AtendimentosEntity } from 'atendimentos/entities/atendimento.entity';
 
-@Entity()
-export class Contacts extends BaseEntity {
+@Entity('contacts')
+export class ContactsEntity {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
@@ -31,11 +31,11 @@ export class Contacts extends BaseEntity {
   @Column({ type: 'tinyint', nullable: false, default: 1 })
   status: number;
 
-  @ManyToOne(() => Clients, (clients) => clients.contacts)
+  @ManyToOne(() => ClientsEntity, (clients) => clients.contacts)
   @JoinColumn({ name: 'clients_id', referencedColumnName: 'id' })
-  clients: Clients;
+  clients: ClientsEntity;
 
-  @OneToOne(() => Atendimentos, (atendimentos) => atendimentos.contacts)
+  @OneToOne(() => AtendimentosEntity, (atendimentos) => atendimentos.contacts)
   // @JoinColumn({ name: 'atendimentos_id', referencedColumnName: 'id' })
-  atendimentos: Atendimentos;
+  atendimentos: AtendimentosEntity;
 }
