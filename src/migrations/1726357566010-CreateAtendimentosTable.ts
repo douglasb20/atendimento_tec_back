@@ -14,17 +14,17 @@ export class CreateAtendimentosTable1726357566010 implements MigrationInterface 
             generationStrategy: 'increment',
           },
           {
-            name: 'clients_id',
+            name: 'client_id',
             type: 'int',
           },
           {
-            name: 'contacts_id',
+            name: 'contact_id',
             type: 'int',
             isNullable: true,
             default: null,
           },
           {
-            name: 'users_id',
+            name: 'user_id',
             type: 'int',
           },
           {
@@ -61,7 +61,7 @@ export class CreateAtendimentosTable1726357566010 implements MigrationInterface 
         foreignKeys: [
           {
             name: 'atendimentos_clients_fk',
-            columnNames: ['clients_id'],
+            columnNames: ['client_id'],
             referencedColumnNames: ['id'],
             referencedTableName: 'clients',
             onDelete: 'RESTRICT',
@@ -69,7 +69,7 @@ export class CreateAtendimentosTable1726357566010 implements MigrationInterface 
           },
           {
             name: 'atendimentos_contacts_fk',
-            columnNames: ['contacts_id'],
+            columnNames: ['contact_id'],
             referencedColumnNames: ['id'],
             referencedTableName: 'contacts',
             onDelete: 'RESTRICT',
@@ -77,7 +77,7 @@ export class CreateAtendimentosTable1726357566010 implements MigrationInterface 
           },
           {
             name: 'atendimentos_users_fk',
-            columnNames: ['users_id'],
+            columnNames: ['user_id'],
             referencedColumnNames: ['id'],
             referencedTableName: 'users',
             onDelete: 'RESTRICT',

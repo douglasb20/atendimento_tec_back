@@ -17,7 +17,14 @@ Content-Type: application/json
 GET {{url}}{{endpoint}}
 Authorization: Bearer {{authToken}}
 
-
 #### 2) Get atendimento by id
 GET {{url}}{{endpoint}}/5
+Authorization: Bearer {{authToken}}
+
+#### 3) Get atendimento by user id
+GET {{url}}{{endpoint}}/get_by_user/1
+Authorization: Bearer {{authToken}}
+
+#### 4) Get all atendimentos status
+GET {{url}}{{endpoint}}/status
 Authorization: Bearer {{authToken}}

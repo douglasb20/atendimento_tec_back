@@ -4,13 +4,13 @@ import { CreateAtendimentoServicoDto } from './create-atendimento-servico.dto';
 
 export class CreateAtendimentoDto {
   @IsNotEmpty({ message: (opt) => `Campo ${opt.property} é obrigatório` })
-  clients_id: number;
+  client_id: number;
 
   @IsOptional()
-  contacts_id: number;
+  contact_id: number;
 
   @IsOptional()
-  users_id: number;
+  user_id: number;
 
   @IsNotEmpty({ message: (opt) => `Campo ${opt.property} é obrigatório` })
   @IsDateString({}, { message: (opt) => `Formato do campo ${opt.property} inválido` })

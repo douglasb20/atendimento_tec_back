@@ -7,7 +7,7 @@
   "prettier.endOfLine": "crlf",
   "files.eol": "\r\n",
   "eslint.validate": ["glimmer-ts", "glimmer-js"],
-  "gitlens.ai.experimental.generateCommitMessage.enabled": false,
+  "gitlens.ai.generateCommitMessage.enabled": false,
   "breadcrumbs.enabled": true,
   "explorer.fileNesting.enabled": true,
   "explorer.fileNesting.patterns": {

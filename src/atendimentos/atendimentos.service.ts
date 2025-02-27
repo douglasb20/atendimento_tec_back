@@ -12,6 +12,7 @@ import { UsersEntity } from 'users/entities/users.entity';
 import { ServicesEntity } from 'service/entities/service.entity';
 import { AtendimentoStatusEntity } from './entities/atendimento-status.entity';
 import { AtendimentoRepository } from './atendimentos.repository';
+import { AtendimentoListResponse } from 'interface';
 
 @Injectable()
 export class AtendimentosService {
@@ -24,29 +25,29 @@ export class AtendimentosService {
     this.queryRunner = this.dataSource.createQueryRunner();
   }
 
-  async findOne(id: number) {
+  async findOne(id: number): Promise<AtendimentoListResponse> {
     const result = await this.atendimentoRepository.findAtendimento(id);
-
-    // return await this.atendimentoRepository.find({
-    //   relations: ['atendimento_status', 'users', 'clients', 'contacts'],
-    // })
     return result;
   }
 
-  async findAll() {
+  async findByUserId(user_id: number) {
+    return this.atendimentoRepository.findAtendimentosByUserId(user_id);
+  }
+
+  async findAll(): Promise<AtendimentoListResponse[]> {
     const result = await this.atendimentoRepository.findAtendimentos();
 
     return result;
   }
 
-  async createAtendimento(createAtendimentoDto: CreateAtendimentoDto) {
+  async createAtendimento(createAtendimentoDto: CreateAtendimentoDto): Promise<AtendimentosEntity> {
     try {
       await this.queryRunner.startTransaction('READ COMMITTED');
 
       const { clients, users, contacts } = await this.ValidateAtendimento(
-        createAtendimentoDto.clients_id,
-        createAtendimentoDto.users_id,
-        createAtendimentoDto.contacts_id,
+        createAtendimentoDto.client_id,
+        createAtendimentoDto.user_id,
+        createAtendimentoDto.contact_id,
         createAtendimentoDto.atendimentosServicos,
       );
 
@@ -81,7 +82,7 @@ export class AtendimentosService {
     }
   }
 
-  async getListStatus() {
+  async getListStatus(): Promise<AtendimentoStatusEntity[]> {
     const status = await this.queryRunner.manager.find(AtendimentoStatusEntity);
     return status;
   }
@@ -130,7 +131,7 @@ export class AtendimentosService {
     if (services.length > 0) {
       let contErr = 0;
       services.forEach(async (v) => {
-        const service = await this.queryRunner.manager.findOneBy(ServicesEntity, { id: v.id_service });
+        const service = await this.queryRunner.manager.findOneBy(ServicesEntity, { id: v.service_id });
         if (!service) {
           contErr++;
           return;
@@ -149,11 +150,11 @@ export class AtendimentosService {
   async SalvaAtendimentoServico(
     atendimento: AtendimentosEntity,
     servicos: CreateAtendimentoServicoDto[],
-  ) {
+  ): Promise<AtendimentosServicosEntity[]> {
     const servicosNew = servicos.map((servico) => ({
       ...servico,
       ...(servico.id !== undefined && { id: Number(servico.id) }),
-      id_atendimento: atendimento.id,
+      atendimento_id: atendimento.id,
     })) as AtendimentosServicosEntity[];
     return this.queryRunner.manager.save(AtendimentosServicosEntity, servicosNew);
   }

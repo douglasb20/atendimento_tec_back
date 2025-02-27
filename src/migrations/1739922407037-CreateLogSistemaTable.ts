@@ -20,7 +20,7 @@ export class CreateLogSistemaTable1739922407037 implements MigrationInterface {
             length: '255',
           },
           {
-            name: 'id_usuario',
+            name: 'user_id',
             type: 'int',
           },
           {

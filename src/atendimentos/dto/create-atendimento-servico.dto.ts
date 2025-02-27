@@ -6,10 +6,10 @@ export class CreateAtendimentoServicoDto {
   id?: number;
 
   @IsOptional()
-  id_atendimento?: number;
+  atendimento_id?: number;
 
   @IsNotEmpty({ message: (opt) => `Campo ${opt.property} é obrigatório` })
-  id_service: number;
+  service_id: number;
 
   @IsOptional()
   @Transform(({ value }) => parseFloat(value))

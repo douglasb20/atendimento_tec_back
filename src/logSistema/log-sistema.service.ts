@@ -27,7 +27,7 @@ export class LogSistemaService {
       await this.queryRunner.startTransaction();
       const log = this.logSistemaRepository.create({
         rota: logdata.rota,
-        id_usuario: logdata.id_usuario,
+        user_id: logdata.id_usuario,
         metodo: logdata.method,
         request_data: {
           param: logdata.params,

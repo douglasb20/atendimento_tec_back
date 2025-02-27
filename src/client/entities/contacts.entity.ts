@@ -17,7 +17,7 @@ export class ContactsEntity {
   id: number;
 
   @Column({ type: 'int' })
-  clients_id: number;
+  client_id: number;
 
   @Column({ type: 'varchar', length: 90, nullable: false })
   nome_contato: string;
@@ -25,14 +25,14 @@ export class ContactsEntity {
   @Column({ type: 'varchar', length: 14, nullable: true, default: null })
   telefone_contato: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({type: 'timestamp'})
   created_at: Date;
 
   @Column({ type: 'tinyint', nullable: false, default: 1 })
   status: number;
 
   @ManyToOne(() => ClientsEntity, (clients) => clients.contacts)
-  @JoinColumn({ name: 'clients_id', referencedColumnName: 'id' })
+  @JoinColumn({ name: 'client_id', referencedColumnName: 'id' })
   clients: ClientsEntity;
 
   @OneToOne(() => AtendimentosEntity, (atendimentos) => atendimentos.contacts)

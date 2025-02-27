@@ -12,7 +12,7 @@ export class ServicesEntity {
   @Column({ default: null, nullable: true, type: 'decimal' })
   valor_servico: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({type: 'timestamp'})
   created_at: Date;
 
   @Column({ default: 1, nullable: true })

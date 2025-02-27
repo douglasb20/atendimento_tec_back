@@ -18,14 +18,14 @@ export class AtendimentosEntity {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
-  @Column({ name: 'clients_id', type: 'int' })
-  clients_id: number;
+  @Column({ name: 'client_id', type: 'int' })
+  client_id: number;
 
-  @Column({ name: 'contacts_id', type: 'int' })
-  contacts_id: number;
+  @Column({ name: 'contact_id', type: 'int' })
+  contact_id: number;
 
-  @Column({ name: 'users_id', type: 'int' })
-  users_id: number;
+  @Column({ name: 'user_id', type: 'int' })
+  user_id: number;
 
   @CreateDateColumn({ name: 'data_referencia', type: 'date' })
   data_referencia: string;
@@ -51,15 +51,15 @@ export class AtendimentosEntity {
   // ============= RELATIONS ================
 
   @ManyToOne(() => ClientsEntity, (clients) => clients.atendimentos)
-  @JoinColumn({ name: 'clients_id', referencedColumnName: 'id' })
+  @JoinColumn({ name: 'client_id', referencedColumnName: 'id' })
   clients: ClientsEntity;
 
   @ManyToOne(() => ContactsEntity, (contacts) => contacts.atendimentos)
-  @JoinColumn({ name: 'contacts_id', referencedColumnName: 'id' })
+  @JoinColumn({ name: 'contact_id', referencedColumnName: 'id' })
   contacts: ContactsEntity;
 
   @ManyToOne(() => UsersEntity, (users) => users.atendimentos)
-  @JoinColumn({ name: 'users_id', referencedColumnName: 'id' })
+  @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
   users: UsersEntity;
 
   @ManyToOne(() => AtendimentoStatusEntity, (atendimento) => atendimento.atendimentos)

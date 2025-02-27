@@ -5,7 +5,6 @@ import { UsersEntity } from "users/entities/users.entity";
 
 @Injectable()
 export class TesteService{
-
   constructor(private dataSource: DataSource){}
 
   async log() {

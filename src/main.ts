@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
 import { ConsoleLogger, ValidationPipe } from '@nestjs/common';
+import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -17,10 +17,11 @@ async function bootstrap() {
       },
     }),
   );
+  
   app.setGlobalPrefix('api');
   app.enableCors({
     origin: 'http://localhost:3000',
   });
-  await app.listen(3001);
+  await app.listen(process.env.APP_ENV || 3001);
 }
 bootstrap();

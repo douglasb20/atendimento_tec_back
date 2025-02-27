@@ -124,7 +124,7 @@ export class ClientService {
 
       const contact = await this.contactRepository.findOneBy({
         id: +contact_id,
-        clients_id: client.id,
+        client_id: client.id,
       });
       if (!contact) {
         this.logger.error(`Erro de salvar cliente: Contato com id "${client_id}" não existe`);
@@ -152,7 +152,7 @@ export class ClientService {
 
       const contact = await this.contactRepository.findOneBy({
         id: +contact_id,
-        clients_id: client.id,
+        client_id: client.id,
       });
       if (!contact) {
         this.logger.error(`Erro de atualizar cliente: Contato com id "${client_id}" não existe`);
@@ -174,7 +174,7 @@ export class ClientService {
 
   async getAllContactsByClients(client_id: string) {
     return this.contactRepository.findBy({
-      clients_id: +client_id,
+      client_id: +client_id,
       status: 1,
     });
   }
@@ -183,7 +183,7 @@ export class ClientService {
     const contactsNew = contacts.map((contact) => ({
       ...contact,
       ...(contact.id !== undefined && { id: Number(contact.id) }),
-      clients_id: client.id,
+      client_id: client.id,
     })) as ContactsEntity[];
 
     return await this.query.manager.save(ContactsEntity, contactsNew);

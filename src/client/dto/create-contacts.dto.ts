@@ -5,7 +5,7 @@ export class CreateContactsDto {
 
   @IsOptional()
   @IsNumber()
-  clients_id?: number;
+  client_id?: number;
 
   @IsString()
   @IsNotEmpty({ message: 'Este campo é obrigatório' })

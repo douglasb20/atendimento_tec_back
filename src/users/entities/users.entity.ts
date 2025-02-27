@@ -21,10 +21,10 @@ export class UsersEntity {
   @Column({ default: 0 })
   is_requestpassword: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({type: 'timestamp'})
   created_at: Date;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamp' })
   lastlogin_at: Date;
 
   @Column({ default: 'USER' })

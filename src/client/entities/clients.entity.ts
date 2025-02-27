@@ -13,7 +13,7 @@ export class ClientsEntity {
   @Column({ length: 14, nullable: true, default: null })
   cnpj: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({type: 'timestamp'})
   created_at: Date;
 
   @Column({ default: 1, nullable: true })

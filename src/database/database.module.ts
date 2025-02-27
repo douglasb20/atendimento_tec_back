@@ -18,6 +18,7 @@ import { CustomSqlLogger } from 'Utils/CustomSqlLogger';
           autoLoadEntities: true,
           synchronize: false,
           dateStrings: true,
+          timezone: '-03:00',
           logging: ['query'],
           logger: new CustomSqlLogger(queryStorage),
         };

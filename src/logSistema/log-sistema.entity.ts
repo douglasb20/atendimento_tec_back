@@ -2,19 +2,19 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeor
 
 @Entity('log_sistema')
 export class LogSistemaEntity {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn('increment', { unsigned: true, type: 'bigint' })
   id: number;
 
   @Column({ type: 'varchar', length: 255 })
   rota: string;
 
   @Column({ type: 'int', nullable: true })
-  id_usuario: number;
+  user_id: number;
 
   @Column({ type: 'varchar', length: 10 })
   metodo: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamp' })
   datetime_request: Date;
 
   @Column({ type: 'json' })

@@ -12,14 +12,15 @@ export class CreateAtendimentoServicesTable1739076120026 implements MigrationInt
             isPrimary: true,
             isGenerated: true,
             generationStrategy: 'increment',
+            unsigned: true
           },
           {
-            name: 'id_atendimento',
+            name: 'atendimento_id',
             type: 'int',
             isNullable: false,
           },
           {
-            name: 'id_service',
+            name: 'service_id',
             type: 'int',
             isNullable: false,
           },
@@ -33,7 +34,7 @@ export class CreateAtendimentoServicesTable1739076120026 implements MigrationInt
         foreignKeys: [
           {
             name: 'atendimentoservice_atendimento_fk',
-            columnNames: ['id_atendimento'],
+            columnNames: ['atendimento_id'],
             referencedColumnNames: ['id'],
             referencedTableName: 'atendimentos',
             onDelete: 'CASCADE',
@@ -41,7 +42,7 @@ export class CreateAtendimentoServicesTable1739076120026 implements MigrationInt
           },
           {
             name: 'atendimentoservice_service_fk',
-            columnNames: ['id_service'],
+            columnNames: ['service_id'],
             referencedColumnNames: ['id'],
             referencedTableName: 'services',
             onDelete: 'CASCADE',

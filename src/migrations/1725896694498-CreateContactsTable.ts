@@ -14,7 +14,7 @@ export class CreateContactsTable1725896694498 implements MigrationInterface {
             generationStrategy: 'increment',
           },
           {
-            name: 'clients_id',
+            name: 'client_id',
             type: 'int',
             length: '11',
             isNullable: false,
@@ -51,7 +51,7 @@ export class CreateContactsTable1725896694498 implements MigrationInterface {
       'contacts',
       new TableForeignKey({
         name: 'contacts_clients_fk',
-        columnNames: ['clients_id'],
+        columnNames: ['client_id'],
         referencedColumnNames: ['id'],
         referencedTableName: 'clients',
         onDelete: 'SET NULL',

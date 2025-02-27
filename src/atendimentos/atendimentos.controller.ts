@@ -31,6 +31,13 @@ export class AtendimentosController {
     return await this.atendimentoService.getListStatus();
   }
 
+  @Get('/get_by_user/:user_id')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async findByUserId(@Param('user_id', ParseIntPipe) user_id: number) {
+    return await this.atendimentoService.findByUserId(user_id);
+  }
+
   @Get('/:id')
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)

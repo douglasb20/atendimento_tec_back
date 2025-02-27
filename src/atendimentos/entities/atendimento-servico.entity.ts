@@ -4,14 +4,14 @@ import { ServicesEntity } from 'service/entities/service.entity';
 
 @Entity({ name: 'atendimento_servicos' })
 export class AtendimentosServicosEntity {
-  @PrimaryGeneratedColumn('increment')
+  @PrimaryGeneratedColumn('increment',{unsigned: true})
   id: number;
 
-  @Column({ name: 'id_atendimento', type: 'int' })
-  id_atendimento: number;
+  @Column({ name: 'atendimento_id', type: 'int' })
+  atendimento_id: number;
 
-  @Column({ name: 'id_service', type: 'int' })
-  id_service: number;
+  @Column({ name: 'service_id', type: 'int' })
+  service_id: number;
 
   @Column({ default: null, nullable: true, type: 'decimal' })
   valor_cobrado: number;
@@ -19,10 +19,10 @@ export class AtendimentosServicosEntity {
   // ============= RELATIONS ================
 
   @ManyToOne(() => AtendimentosEntity, (atendimento) => atendimento.atendimentosServicos)
-  @JoinColumn({ name: 'id_atendimento' })
+  @JoinColumn({ name: 'atendimento_id' })
   atendimento: AtendimentosEntity;
 
   @ManyToOne(() => ServicesEntity, (service) => service.atendimentosServicos)
-  @JoinColumn({ name: 'id_service' })
+  @JoinColumn({ name: 'service_id' })
   service: ServicesEntity;
 }
