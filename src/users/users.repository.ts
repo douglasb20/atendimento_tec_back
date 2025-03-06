@@ -17,7 +17,7 @@ export class UserRepository extends Repository<UsersEntity> {
   }
 
   async findById(id: number) {
-    const user = await this.findOne({ where: { id: id } });
+    const user = await this.findOne({ where: { id: id, status: 1 } });
     if (!user) {
       this.logger.error(`Erro de atualizar usuário: Usuário não localizado com este id`);
       throw new BadRequestException('Usuário não localizado com este id');
@@ -48,6 +48,10 @@ export class UserRepository extends Repository<UsersEntity> {
       ...updateUserDto,
     });
     return await manager.save(UsersEntity, updateUser);
+  }
+
+  async updateRefreshTokenUser(id: number, refresh_token: string) {
+    return await this.update({ id }, { refresh_token })
   }
 
   async deleteUser(id: number, manager: EntityManager) {

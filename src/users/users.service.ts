@@ -30,6 +30,7 @@ export class UsersService {
       return newUser;
     } catch (err) {
       await this.query.rollbackTransaction();
+      this.logger.error(err.message)
       throw err;
     }
   }

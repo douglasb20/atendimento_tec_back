@@ -11,6 +11,9 @@ export class LogSistemaEntity {
   @Column({ type: 'int', nullable: true })
   user_id: number;
 
+  @Column({ type: 'varchar', length: 40, nullable: true, default: "NULL" })
+  ip: string;
+
   @Column({ type: 'varchar', length: 10 })
   metodo: string;
 

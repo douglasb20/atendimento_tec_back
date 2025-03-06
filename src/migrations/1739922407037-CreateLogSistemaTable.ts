@@ -24,6 +24,13 @@ export class CreateLogSistemaTable1739922407037 implements MigrationInterface {
             type: 'int',
           },
           {
+            name: 'ip',
+            type: 'varchar',
+            length: '40',
+            isNullable: true,
+            default: null,
+          },
+          {
             name: 'metodo',
             type: 'varchar',
             length: '10',

@@ -52,6 +52,12 @@ export class CreateUsersTable1704379411392 implements MigrationInterface {
             default: 'USER',
           },
           {
+            name: 'refresh_token',
+            type: 'text',
+            isNullable: true,
+            default: null,
+          },
+          {
             name: 'is_superuser',
             type: 'tinyint',
             length: '1',
