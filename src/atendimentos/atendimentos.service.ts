@@ -4,6 +4,7 @@ import { DataSource, QueryRunner } from 'typeorm';
 import { CreateAtendimentoDto } from './dto/create-atendimento.dto';
 import { CreateAtendimentoServicoDto } from './dto/create-atendimento-servico.dto';
 
+import { AtendimentoListResponse } from '@types';
 import { AtendimentosEntity } from './entities/atendimento.entity';
 import { AtendimentosServicosEntity } from './entities/atendimento-servico.entity';
 import { ClientsEntity } from 'client/entities/clients.entity';
@@ -12,7 +13,6 @@ import { UsersEntity } from 'users/entities/users.entity';
 import { ServicesEntity } from 'service/entities/service.entity';
 import { AtendimentoStatusEntity } from './entities/atendimento-status.entity';
 import { AtendimentoRepository } from './atendimentos.repository';
-import { AtendimentoListResponse } from 'interface';
 
 @Injectable()
 export class AtendimentosService {
@@ -88,40 +88,40 @@ export class AtendimentosService {
   }
 
   async ValidateAtendimento(
-    clients_id: number,
-    users_id: number,
-    contacts_id: number,
+    client_id: number,
+    user_id: number,
+    contact_id: number,
     services: CreateAtendimentoServicoDto[],
   ) {
     let contacts: ContactsEntity;
 
     // verificando se foi informado o cliente
-    if (!clients_id) {
+    if (!client_id) {
       this.logger.error('Erro ao validar: Cliente não informado');
       throw new BadRequestException('Cliente não informado');
     }
 
     // verificando se foi informado o usuário
-    if (!users_id) {
+    if (!user_id) {
       this.logger.error('Erro ao validar: Usuário não informado');
       throw new BadRequestException('Usuário não informado');
     }
 
-    const clients = await this.queryRunner.manager.findOneBy(ClientsEntity, { id: clients_id });
+    const clients = await this.queryRunner.manager.findOneBy(ClientsEntity, { id: client_id });
     if (!clients) {
       this.logger.error('Erro ao validar: Cliente informado não localizado');
       throw new NotFoundException('Cliente informado não localizado');
     }
 
-    const users: UsersEntity = await this.queryRunner.manager.findOneBy(UsersEntity, { id: users_id });
+    const users: UsersEntity = await this.queryRunner.manager.findOneBy(UsersEntity, { id: user_id });
     if (!users) {
       this.logger.error('Erro ao validar: Usuário informado não localizado');
       throw new NotFoundException('Usuário informado não localizado');
     }
 
     // verificando se foi informado o contato
-    if (contacts_id) {
-      contacts = await this.queryRunner.manager.findOneBy(ContactsEntity, { id: contacts_id });
+    if (contact_id) {
+      contacts = await this.queryRunner.manager.findOneBy(ContactsEntity, { id: contact_id });
 
       if (!contacts) {
         this.logger.error('Erro ao validar: Contato informado não localizado');

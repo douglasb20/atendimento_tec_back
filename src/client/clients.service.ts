@@ -180,6 +180,7 @@ export class ClientService {
   }
 
   async saveContact(client: ClientsEntity, contacts: CreateContactsDto[]) {
+    await this.query.manager.delete(ContactsEntity, { client_id: client.id });
     const contactsNew = contacts.map((contact) => ({
       ...contact,
       ...(contact.id !== undefined && { id: Number(contact.id) }),

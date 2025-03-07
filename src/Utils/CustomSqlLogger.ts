@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { QueryStorageService } from 'query-storage/query-storage.service';
 import { Logger } from 'typeorm';
 

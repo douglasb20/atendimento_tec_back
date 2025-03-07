@@ -1,7 +1,7 @@
 import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
 import { AtendimentosEntity } from './entities/atendimento.entity';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { AtendimentoListResponse } from 'interface';
+import { AtendimentoListResponse } from '@types';
 import { AtendimentosServicosEntity } from './entities/atendimento-servico.entity';
 import { ClientsEntity } from 'client/entities/clients.entity';
 import { ContactsEntity } from 'client/entities/contacts.entity';
@@ -129,8 +129,8 @@ export class AtendimentoRepository extends Repository<AtendimentosEntity> {
       .innerJoinAndSelect('users', 'u', 'u.id = at.user_id')
       .leftJoinAndSelect('contacts', 'cont', 'cont.id = at.contact_id')
       .innerJoinAndSelect('atendimento_status', 'as', 'as.id = at.atendimento_status_id')
-      .select('at.*')
-      .addSelect([
+      .select([
+        'at.*',
         'timediff(at.hora_fim, at.hora_inicio) as duration',
         'cli.nome as cli_nome',
         'cli.cnpj as cli_cnpj',
@@ -140,6 +140,12 @@ export class AtendimentoRepository extends Repository<AtendimentosEntity> {
         'cont.telefone_contato as contact_telefone',
         'as.descricao as status_descricao',
       ])
+      .addSelect(`
+          CASE
+            WHEN at.tipo_entrada = "T" THEN (TIME_TO_SEC(TIMEDIFF(at.hora_fim, at.hora_inicio)) / 3600) * u.valor_hora
+            ELSE (SELECT SUM(valor_cobrado) FROM atendimento_servicos WHERE atendimento_id=at.id)
+          END AS valor_total
+        `)
       .orderBy('at.id', 'DESC');
 
     return query;

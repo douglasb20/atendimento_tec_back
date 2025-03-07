@@ -29,6 +29,9 @@ export class UsersEntity {
 
   @Column({ default: 'USER' })
   role: string;
+  
+  @Column({ type: 'text', nullable: true, default: null })
+  refresh_token: string;
 
   @Column({ default: 0, nullable: true })
   is_superuser: number;

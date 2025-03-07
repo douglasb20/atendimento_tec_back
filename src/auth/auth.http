@@ -1,0 +1,20 @@
+# @name login
+POST {{url}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "douglasdev.cn@gmail.com",
+  "password": 1234
+}
+###
+
+@authToken = {{login.response.body.$.access_token}}
+
+@endpoint = /auth
+
+POST {{url}}{{endpoint}}/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjMwMDEiLCJzdWIiOjEsImlkIjoxLCJ0eXBlIjoicmVmcmVzaCIsImlhdCI6MTc0MTI5NTI3NywiZXhwIjoxNzQxMzI0MDc3fQ.lq9fbaETcPQrNdEhzj6r5cw7_mKVjn3gKhdFArIJOo8"
+}

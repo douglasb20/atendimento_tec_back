@@ -15,7 +15,6 @@ import { ServicesModule } from './service/services.module';
 import { LogSistemaModule } from './logSistema/log-sistema.module';
 import { QueryStorageService } from './query-storage/query-storage.service';
 import { LogSistemaInterceptor } from './logSistema/log-sistema.interceptor';
-import { TesteService } from 'Teste/teste.service';
 
 const destPath = path.join(__dirname, '..', '..', '/files');
 @Global()
@@ -47,7 +46,6 @@ const destPath = path.join(__dirname, '..', '..', '/files');
   exports: [MulterModule, QueryStorageService],
   providers: [
     QueryStorageService,
-    TesteService,
     {
       provide: APP_INTERCEPTOR,
       useClass: LogSistemaInterceptor,

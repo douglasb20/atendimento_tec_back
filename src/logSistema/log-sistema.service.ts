@@ -5,6 +5,7 @@ import { LogSistemaRepository } from './log-sistema.repository';
 type LogdataType = {
   rota: string;
   id_usuario: number;
+  ip: string;
   method: string;
   datetime_request: Date;
   params: string;
@@ -28,6 +29,7 @@ export class LogSistemaService {
       const log = this.logSistemaRepository.create({
         rota: logdata.rota,
         user_id: logdata.id_usuario,
+        ip: logdata.ip,
         metodo: logdata.method,
         request_data: {
           param: logdata.params,
