@@ -13,6 +13,7 @@ import { UsersEntity } from 'users/entities/users.entity';
 import { ServicesEntity } from 'service/entities/service.entity';
 import { AtendimentoStatusEntity } from './entities/atendimento-status.entity';
 import { AtendimentoRepository } from './atendimentos.repository';
+import { UpdateAtendimentoDto } from './dto/update-atendimento.dto';
 
 @Injectable()
 export class AtendimentosService {
@@ -65,7 +66,7 @@ export class AtendimentosService {
         users: users,
       });
 
-      await this.atendimentoRepository.save(newAtendimento);
+      await this.queryRunner.manager.save(AtendimentosEntity,newAtendimento);
 
       if (createAtendimentoDto.atendimentosServicos.length > 0) {
         newAtendimento.atendimentosServicos = await this.SalvaAtendimentoServico(
@@ -76,6 +77,55 @@ export class AtendimentosService {
 
       await this.queryRunner.commitTransaction();
       return newAtendimento;
+    } catch (err) {
+      await this.queryRunner.rollbackTransaction();
+      throw err;
+    }
+  }
+
+  async updateAtendimento(atendimento_id: number, updateAtendimentoDto: UpdateAtendimentoDto): Promise<AtendimentosEntity> {
+    try {
+      await this.queryRunner.startTransaction('READ COMMITTED');
+
+      const atendimento = await this.atendimentoRepository.findOneBy({ id: atendimento_id })
+      if (!atendimento) {
+        this.logger.error(`Erro de atualizar atendimento: Atendimento não localizado com este id`);
+        throw new NotFoundException("Atendimento não localizado com este id");
+      }
+
+      const { clients, users, contacts } = await this.ValidateAtendimento(
+        updateAtendimentoDto.client_id,
+        updateAtendimentoDto.user_id,
+        updateAtendimentoDto.contact_id,
+        updateAtendimentoDto.atendimentosServicos,
+      );
+
+      const updatedAtendimento = this.atendimentoRepository.create({
+        ...atendimento,
+        data_referencia: updateAtendimentoDto.data_referencia,
+        hora_inicio: updateAtendimentoDto.hora_inicio,
+        hora_fim: updateAtendimentoDto.hora_fim,
+        comentario: updateAtendimentoDto.comentario,
+        tipo_entrada: updateAtendimentoDto.tipo_entrada,
+        esta_pago: updateAtendimentoDto.esta_pago,
+        atendimento_status_id: updateAtendimentoDto.atendimento_status_id,
+
+        clients: clients,
+        contacts: contacts,
+        users: users,
+      });
+
+      await this.queryRunner.manager.save(AtendimentosEntity, updatedAtendimento);
+
+      if (updateAtendimentoDto.atendimentosServicos.length > 0) {
+        updatedAtendimento.atendimentosServicos = await this.SalvaAtendimentoServico(
+          updatedAtendimento,
+          updateAtendimentoDto.atendimentosServicos,
+        );
+      }
+
+      await this.queryRunner.commitTransaction();
+      return updatedAtendimento;
     } catch (err) {
       await this.queryRunner.rollbackTransaction();
       throw err;
@@ -151,6 +201,7 @@ export class AtendimentosService {
     atendimento: AtendimentosEntity,
     servicos: CreateAtendimentoServicoDto[],
   ): Promise<AtendimentosServicosEntity[]> {
+    await this.queryRunner.manager.delete(AtendimentosServicosEntity, { atendimento_id: atendimento.id });
     const servicosNew = servicos.map((servico) => ({
       ...servico,
       ...(servico.id !== undefined && { id: Number(servico.id) }),

@@ -126,12 +126,14 @@ export class AuthService {
       });
 
       if (payload.type !== 'refresh') {
-        throw new UnauthorizedException('Invalid token type');
+        this.logger.error('Erro de validação: Tipo de token inválido');
+        throw new UnauthorizedException('Tipo de token inválido');
       }
       const user = await this.validadeUser(payload);
       
       if (!user || user.refresh_token !== refreshToken) {
-        throw new UnauthorizedException('Invalid refresh token');
+        this.logger.error('Erro de validação: Refresh token inválido');
+        throw new UnauthorizedException('Refresh token inválido');
       }
 
       const token = await this.createToken(user, request);
@@ -140,6 +142,7 @@ export class AuthService {
       return { ...token }
 
     } catch (err) {
+      this.logger.error(`Erro de validação: ${err.message}`);
       throw new UnauthorizedException(err.message)
     }
   }
