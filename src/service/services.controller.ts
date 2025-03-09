@@ -18,9 +18,7 @@ export class ServicesController {
   @Sse('sse')
   @UseGuards(AuthGuard('jwt'))
   sse(): Observable<MessageEvent> {
-    return interval(1000).pipe(
-      map((_) => ({ data: { hello: 'world' } }) as MessageEvent),
-    );
+    return interval(1000).pipe(map((_) => ({ data: { hello: 'world' } }) as MessageEvent));
   }
 
   @Get(':id')
@@ -46,5 +44,4 @@ export class ServicesController {
   async deleteService(@Param('id') id: string) {
     return await this.servicesService.deleteService(Number(id));
   }
-
 }

@@ -18,9 +18,7 @@ export class AtendimentoRepository extends Repository<AtendimentosEntity> {
 
   async findAtendimento(id: number): Promise<AtendimentoListResponse> {
     const query = this.queryAtendimento();
-    const result = await query
-      .where(`at.id = :id`, { id })
-      .getRawOne<AtendimentoListResponse>();
+    const result = await query.where(`at.id = :id`, { id }).getRawOne<AtendimentoListResponse>();
 
     const atendimentoServico = await this.manager.find(AtendimentosServicosEntity, {
       where: { atendimento_id: result.id },
@@ -33,8 +31,7 @@ export class AtendimentoRepository extends Repository<AtendimentosEntity> {
 
   async findAtendimentos(): Promise<AtendimentoListResponse[]> {
     const query = this.queryAtendimento();
-    const result = await query
-      .getRawMany<AtendimentoListResponse>();
+    const result = await query.getRawMany<AtendimentoListResponse>();
 
     for (const [k, at] of result.entries()) {
       const atendimentoServico = await this.manager.find(AtendimentosServicosEntity, {
@@ -89,7 +86,9 @@ export class AtendimentoRepository extends Repository<AtendimentosEntity> {
       throw new NotFoundException('Cliente informado não localizado');
     }
 
-    const users: UsersEntity = await this.queryRunner.manager.findOneBy(UsersEntity, { id: user_id });
+    const users: UsersEntity = await this.queryRunner.manager.findOneBy(UsersEntity, {
+      id: user_id,
+    });
     if (!users) {
       this.logger.error('Erro ao validar: Usuário informado não localizado');
       throw new NotFoundException('Usuário informado não localizado');
@@ -107,7 +106,9 @@ export class AtendimentoRepository extends Repository<AtendimentosEntity> {
     if (services.length > 0) {
       let contErr = 0;
       services.forEach(async (v) => {
-        const service = await this.queryRunner.manager.findOneBy(ServicesEntity, { id: v.service_id });
+        const service = await this.queryRunner.manager.findOneBy(ServicesEntity, {
+          id: v.service_id,
+        });
         if (!service) {
           contErr++;
           return;
@@ -140,12 +141,14 @@ export class AtendimentoRepository extends Repository<AtendimentosEntity> {
         'cont.telefone_contato as contact_telefone',
         'as.descricao as status_descricao',
       ])
-      .addSelect(`
+      .addSelect(
+        `
           CASE
             WHEN at.tipo_entrada = "T" THEN (TIME_TO_SEC(TIMEDIFF(at.hora_fim, at.hora_inicio)) / 3600) * u.valor_hora
             ELSE (SELECT SUM(valor_cobrado) FROM atendimento_servicos WHERE atendimento_id=at.id)
           END AS valor_total
-        `)
+        `,
+      )
       .orderBy('at.id', 'DESC');
 
     return query;

@@ -16,5 +16,5 @@ POST {{url}}{{endpoint}}/refresh
 Content-Type: application/json
 
 {
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjMwMDEiLCJzdWIiOjEsImlkIjoxLCJ0eXBlIjoicmVmcmVzaCIsImlhdCI6MTc0MTI5NTI3NywiZXhwIjoxNzQxMzI0MDc3fQ.lq9fbaETcPQrNdEhzj6r5cw7_mKVjn3gKhdFArIJOo8"
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjMwMDEiLCJzdWIiOjEsImlkIjoxLCJ0eXBlIjoicmVmcmVzaCIsImlhdCI6MTc0MTUzMjczMSwiZXhwIjoxNzQxNTYxNTMxfQ.uwF2-lDU0JRgu72YlAFCboMYgxqVOxGX1KrDsJ1dKXE"
 }

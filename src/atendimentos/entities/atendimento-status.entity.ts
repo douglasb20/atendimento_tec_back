@@ -9,6 +9,6 @@ export class AtendimentoStatusEntity {
   @Column({ type: 'varchar', length: '25' })
   descricao: string;
 
-  @OneToMany(() => AtendimentosEntity, (atendimentos) => atendimentos.atendimento_status)
+  @OneToMany(() => AtendimentosEntity, (atendimentos) => atendimentos.atendimentoStatus)
   atendimentos: AtendimentosEntity[];
 }

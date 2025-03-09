@@ -17,7 +17,7 @@ import { UpdateAtendimentoDto } from './dto/update-atendimento.dto';
 
 @Controller('atendimentos')
 export class AtendimentosController {
-  constructor(private readonly atendimentoService: AtendimentosService) { }
+  constructor(private readonly atendimentoService: AtendimentosService) {}
 
   @Get()
   @UseGuards(AuthGuard('jwt'))
@@ -53,10 +53,13 @@ export class AtendimentosController {
   async createAtendimento(@Body() createAtendimentoDto: CreateAtendimentoDto) {
     return await this.atendimentoService.createAtendimento(createAtendimentoDto);
   }
-  @Patch("/:id")
+  @Patch('/:id')
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
-  async updateAtendimento(@Param('id', ParseIntPipe) id: number, @Body() createAtendimentoDto: UpdateAtendimentoDto) {
+  async updateAtendimento(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() createAtendimentoDto: UpdateAtendimentoDto,
+  ) {
     return await this.atendimentoService.updateAtendimento(id, createAtendimentoDto);
   }
 }

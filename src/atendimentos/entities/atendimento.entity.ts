@@ -64,10 +64,13 @@ export class AtendimentosEntity {
 
   @ManyToOne(() => AtendimentoStatusEntity, (atendimento) => atendimento.atendimentos)
   @JoinColumn({ name: 'atendimento_status_id', referencedColumnName: 'id' })
-  atendimento_status: AtendimentoStatusEntity;
+  atendimentoStatus: AtendimentoStatusEntity;
 
   // ============= RELATIONS ================
 
-  @OneToMany(() => AtendimentosServicosEntity, (atendimentoServico) => atendimentoServico.atendimento)
+  @OneToMany(
+    () => AtendimentosServicosEntity,
+    (atendimentoServico) => atendimentoServico.atendimento,
+  )
   atendimentosServicos: AtendimentosServicosEntity[];
 }

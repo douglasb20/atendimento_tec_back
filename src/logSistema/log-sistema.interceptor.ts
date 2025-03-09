@@ -9,7 +9,7 @@ export class LogSistemaInterceptor implements NestInterceptor {
   constructor(
     private readonly logSistemaService: LogSistemaService,
     private readonly queryStorage: QueryStorageService,
-  ) { }
+  ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
@@ -23,9 +23,9 @@ export class LogSistemaInterceptor implements NestInterceptor {
 
         const ip =
           (request.headers['x-forwarded-for'] as string)?.split(',')[0] || // Pega o primeiro IP da lista de proxies
-          request.socket?.remoteAddress ||  // Caso contrário, pega o endereço do socket
+          request.socket?.remoteAddress || // Caso contrário, pega o endereço do socket
           request.ip; // Se nada funcionar, pega o IP direto
-        
+
         const logdata = {
           rota: request.url,
           id_usuario: user?.id || null,

@@ -21,4 +21,4 @@ export type AtendimentoListResponse = {
   status_descricao: string;
   atendimento_status_id: number;
   atendimentosServicos: AtendimentosServicosEntity[];
-}
+};

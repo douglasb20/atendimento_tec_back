@@ -1,5 +1,6 @@
 import { AtendimentosEntity } from 'atendimentos/entities/atendimento.entity';
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { UserRefreshTokensEntity } from './user-refresh-tokens.entity';
 
 @Entity('users')
 export class UsersEntity {
@@ -21,7 +22,7 @@ export class UsersEntity {
   @Column({ default: 0 })
   is_requestpassword: number;
 
-  @CreateDateColumn({type: 'timestamp'})
+  @CreateDateColumn({ type: 'timestamp' })
   created_at: Date;
 
   @Column({ type: 'timestamp' })
@@ -29,9 +30,6 @@ export class UsersEntity {
 
   @Column({ default: 'USER' })
   role: string;
-  
-  @Column({ type: 'text', nullable: true, default: null })
-  refresh_token: string;
 
   @Column({ default: 0, nullable: true })
   is_superuser: number;
@@ -41,4 +39,7 @@ export class UsersEntity {
 
   @OneToMany(() => AtendimentosEntity, (atendimentos) => atendimentos.users)
   atendimentos: AtendimentosEntity[];
+
+  @OneToMany(() => UserRefreshTokensEntity, (userRefreshTokens) => userRefreshTokens.users)
+  userRefreshTokens: UserRefreshTokensEntity[]
 }

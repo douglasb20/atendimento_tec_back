@@ -66,7 +66,7 @@ export class AtendimentosService {
         users: users,
       });
 
-      await this.queryRunner.manager.save(AtendimentosEntity,newAtendimento);
+      await this.queryRunner.manager.save(AtendimentosEntity, newAtendimento);
 
       if (createAtendimentoDto.atendimentosServicos.length > 0) {
         newAtendimento.atendimentosServicos = await this.SalvaAtendimentoServico(
@@ -83,14 +83,17 @@ export class AtendimentosService {
     }
   }
 
-  async updateAtendimento(atendimento_id: number, updateAtendimentoDto: UpdateAtendimentoDto): Promise<AtendimentosEntity> {
+  async updateAtendimento(
+    atendimento_id: number,
+    updateAtendimentoDto: UpdateAtendimentoDto,
+  ): Promise<AtendimentosEntity> {
     try {
       await this.queryRunner.startTransaction('READ COMMITTED');
 
-      const atendimento = await this.atendimentoRepository.findOneBy({ id: atendimento_id })
+      const atendimento = await this.atendimentoRepository.findOneBy({ id: atendimento_id });
       if (!atendimento) {
         this.logger.error(`Erro de atualizar atendimento: Atendimento não localizado com este id`);
-        throw new NotFoundException("Atendimento não localizado com este id");
+        throw new NotFoundException('Atendimento não localizado com este id');
       }
 
       const { clients, users, contacts } = await this.ValidateAtendimento(
@@ -163,7 +166,9 @@ export class AtendimentosService {
       throw new NotFoundException('Cliente informado não localizado');
     }
 
-    const users: UsersEntity = await this.queryRunner.manager.findOneBy(UsersEntity, { id: user_id });
+    const users: UsersEntity = await this.queryRunner.manager.findOneBy(UsersEntity, {
+      id: user_id,
+    });
     if (!users) {
       this.logger.error('Erro ao validar: Usuário informado não localizado');
       throw new NotFoundException('Usuário informado não localizado');
@@ -181,7 +186,9 @@ export class AtendimentosService {
     if (services.length > 0) {
       let contErr = 0;
       services.forEach(async (v) => {
-        const service = await this.queryRunner.manager.findOneBy(ServicesEntity, { id: v.service_id });
+        const service = await this.queryRunner.manager.findOneBy(ServicesEntity, {
+          id: v.service_id,
+        });
         if (!service) {
           contErr++;
           return;
@@ -201,7 +208,9 @@ export class AtendimentosService {
     atendimento: AtendimentosEntity,
     servicos: CreateAtendimentoServicoDto[],
   ): Promise<AtendimentosServicosEntity[]> {
-    await this.queryRunner.manager.delete(AtendimentosServicosEntity, { atendimento_id: atendimento.id });
+    await this.queryRunner.manager.delete(AtendimentosServicosEntity, {
+      atendimento_id: atendimento.id,
+    });
     const servicosNew = servicos.map((servico) => ({
       ...servico,
       ...(servico.id !== undefined && { id: Number(servico.id) }),

@@ -12,7 +12,7 @@ export class CreateAtendimentoServicesTable1739076120026 implements MigrationInt
             isPrimary: true,
             isGenerated: true,
             generationStrategy: 'increment',
-            unsigned: true
+            unsigned: true,
           },
           {
             name: 'atendimento_id',

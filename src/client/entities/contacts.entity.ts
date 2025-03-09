@@ -24,7 +24,7 @@ export class ContactsEntity {
   @Column({ type: 'varchar', length: 14, nullable: true, default: null })
   telefone_contato: string;
 
-  @CreateDateColumn({type: 'timestamp'})
+  @CreateDateColumn({ type: 'timestamp' })
   created_at: Date;
 
   @Column({ type: 'tinyint', nullable: false, default: 1 })

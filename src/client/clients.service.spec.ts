@@ -20,7 +20,13 @@ describe('ClientService', () => {
   const dataSourceTest: DataSourceOptions = {
     type: 'sqlite',
     database: ':memory:',
-    entities: [ClientsEntity, ContactsEntity, AtendimentosEntity, UsersEntity, AtendimentoStatusEntity],
+    entities: [
+      ClientsEntity,
+      ContactsEntity,
+      AtendimentosEntity,
+      UsersEntity,
+      AtendimentoStatusEntity,
+    ],
     synchronize: true,
   };
 

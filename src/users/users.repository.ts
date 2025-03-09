@@ -50,10 +50,6 @@ export class UserRepository extends Repository<UsersEntity> {
     return await manager.save(UsersEntity, updateUser);
   }
 
-  async updateRefreshTokenUser(id: number, refresh_token: string) {
-    return await this.update({ id }, { refresh_token })
-  }
-
   async deleteUser(id: number, manager: EntityManager) {
     const user = await this.findById(id);
     if (!user) {

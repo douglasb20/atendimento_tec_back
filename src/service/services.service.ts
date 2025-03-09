@@ -33,7 +33,7 @@ export class ServicesService {
       return service;
     } catch (err) {
       this.query.rollbackTransaction();
-      this.logger.error(err.message)
+      this.logger.error(err.message);
       throw err;
     }
   }

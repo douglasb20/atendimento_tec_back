@@ -9,18 +9,19 @@ import { UserRepository } from 'users/users.repository';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
+import { UserRefreshTokensEntity } from 'users/entities/user-refresh-tokens.entity';
 
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }), // Registra a estratégia
-    TypeOrmModule.forFeature([UsersEntity]),
+    TypeOrmModule.forFeature([UsersEntity, UserRefreshTokensEntity]),
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.getOrThrow('ACCESS_JWT_SECRET'),
-        signOptions: {expiresIn : '30min'}
-      })
-    })
+        signOptions: { expiresIn: '30min' },
+      }),
+    }),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, ConfigMailerService, UserRepository],
