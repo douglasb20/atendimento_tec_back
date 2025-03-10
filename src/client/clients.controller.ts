@@ -15,20 +15,24 @@ import { CreateClientDto } from './dto/create-client.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { UpdateContactsDto } from './dto/update-contacts.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
+import { PermissionGuard } from 'permissions/permissions.guard';
+import { Permissions } from 'permissions/permissions.decorator';
 
 @Controller('clients')
 export class ClientController {
   constructor(private readonly clientService: ClientService) {}
 
   @Post()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('client:add')
   @HttpCode(HttpStatus.CREATED)
   async createClient(@Body() createClientDto: CreateClientDto) {
     return await this.clientService.createClient(createClientDto);
   }
 
   @Patch(':client_id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('client:update')
   @HttpCode(HttpStatus.OK)
   async updateClient(
     @Param('client_id') client_id: string,
@@ -38,28 +42,32 @@ export class ClientController {
   }
 
   @Delete(':client_id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('client:delete')
   @HttpCode(HttpStatus.OK)
   async removeClient(@Param('client_id') client_id: string) {
     return this.clientService.removeClient(Number(client_id));
   }
 
   @Get()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('client:view')
   @HttpCode(HttpStatus.OK)
   async findAll() {
     return await this.clientService.findAll();
   }
 
   @Get(':client_id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('client:view')
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('client_id') client_id: string) {
     return await this.clientService.findOne(Number(client_id));
   }
 
   @Delete(':client_id/contact/:contact_id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('contact:delete')
   @HttpCode(HttpStatus.OK)
   async deleteContact(
     @Param('client_id') client_id: string,
@@ -69,7 +77,8 @@ export class ClientController {
   }
 
   @Patch(':client_id/contact/:contact_id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('contact:update')
   @HttpCode(HttpStatus.OK)
   async updateContact(
     @Body() updateContactDto: UpdateContactsDto,
@@ -80,7 +89,8 @@ export class ClientController {
   }
 
   @Get(':client_id/contact')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('contact:view_by_client')
   @HttpCode(HttpStatus.OK)
   async getAllContactsByClients(@Param('client_id') client_id: string) {
     return this.clientService.getAllContactsByClients(client_id);

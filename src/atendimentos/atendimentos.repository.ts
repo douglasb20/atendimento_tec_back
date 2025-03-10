@@ -1,4 +1,4 @@
-import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
+import { DataSource, Not, Repository, SelectQueryBuilder } from 'typeorm';
 import { AtendimentosEntity } from './entities/atendimento.entity';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { AtendimentoListResponse } from '@types';
@@ -18,7 +18,10 @@ export class AtendimentoRepository extends Repository<AtendimentosEntity> {
 
   async findAtendimento(id: number): Promise<AtendimentoListResponse> {
     const query = this.queryAtendimento();
-    const result = await query.where(`at.id = :id`, { id }).getRawOne<AtendimentoListResponse>();
+    const result = await query
+      .where(`at.id = :id`, { id })
+      .andWhere({ atendimento_status_id: Not(4) })
+      .getRawOne<AtendimentoListResponse>();
 
     const atendimentoServico = await this.manager.find(AtendimentosServicosEntity, {
       where: { atendimento_id: result.id },
@@ -31,7 +34,9 @@ export class AtendimentoRepository extends Repository<AtendimentosEntity> {
 
   async findAtendimentos(): Promise<AtendimentoListResponse[]> {
     const query = this.queryAtendimento();
-    const result = await query.getRawMany<AtendimentoListResponse>();
+    const result = await query
+      .where({ atendimento_status_id: Not(4) })
+      .getRawMany<AtendimentoListResponse>();
 
     for (const [k, at] of result.entries()) {
       const atendimentoServico = await this.manager.find(AtendimentosServicosEntity, {
@@ -48,6 +53,7 @@ export class AtendimentoRepository extends Repository<AtendimentosEntity> {
     const query = this.queryAtendimento();
     const result = await query
       .where(`at.user_id = :user_id`, { user_id })
+      .andWhere({ atendimento_status_id: Not(4) })
       .getRawMany<AtendimentoListResponse>();
 
     for (const [k, at] of result.entries()) {

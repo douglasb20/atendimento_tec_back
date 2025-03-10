@@ -1,11 +1,17 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
-import { UsersEntity } from "./users.entity";
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { UsersEntity } from './users.entity';
 
 @Entity('user_refresh_tokens')
-export class UserRefreshTokensEntity{
-
+export class UserRefreshTokensEntity {
   @PrimaryGeneratedColumn('increment')
-  id: number
+  id: number;
 
   @Column({ type: 'int', nullable: false })
   user_id: number;
@@ -18,6 +24,5 @@ export class UserRefreshTokensEntity{
 
   @ManyToOne(() => UsersEntity, (user) => user.userRefreshTokens)
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
-  users: UsersEntity
-
+  users: UsersEntity;
 }

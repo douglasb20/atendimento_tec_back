@@ -12,15 +12,15 @@ Content-Type: application/json
 
 @endpoint = /clients
 
-#### 1) Get all services
+#### 1) Get all clients
 GET {{url}}{{endpoint}}
 Authorization: Bearer {{authToken}}
 
-#### 2) Get service by id
+#### 2) Get client by id
 GET {{url}}{{endpoint}}/3
 Authorization: Bearer {{authToken}}
 
-#### 3) Add new service
+#### 3) Add new client
 POST {{url}}{{endpoint}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -38,7 +38,7 @@ Content-Type: application/json
   ]
 }
 
-#### 4) Update service
+#### 4) Update client
 PATCH {{url}}{{endpoint}}/8
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -56,6 +56,6 @@ Content-Type: application/json
   ]
 }
 
-#### 5) Delete service
+#### 5) Delete client
 DELETE {{url}}{{endpoint}}/5
 Authorization: Bearer {{authToken}}

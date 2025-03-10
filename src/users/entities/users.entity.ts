@@ -1,6 +1,7 @@
 import { AtendimentosEntity } from 'atendimentos/entities/atendimento.entity';
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { UserRefreshTokensEntity } from './user-refresh-tokens.entity';
+import { PermissionXUserEntity } from 'permissions/entities/permission-x-user.entity';
 
 @Entity('users')
 export class UsersEntity {
@@ -40,6 +41,9 @@ export class UsersEntity {
   @OneToMany(() => AtendimentosEntity, (atendimentos) => atendimentos.users)
   atendimentos: AtendimentosEntity[];
 
+  @OneToMany(() => PermissionXUserEntity, (permissionUser) => permissionUser.user)
+  permissionUser: PermissionXUserEntity[];
+
   @OneToMany(() => UserRefreshTokensEntity, (userRefreshTokens) => userRefreshTokens.users)
-  userRefreshTokens: UserRefreshTokensEntity[]
+  userRefreshTokens: UserRefreshTokensEntity[];
 }

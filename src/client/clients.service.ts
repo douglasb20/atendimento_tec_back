@@ -39,6 +39,7 @@ export class ClientService {
       return client;
     } catch (err) {
       await this.query.rollbackTransaction();
+      this.logger.error(err.message);
       throw new BadRequestException(err.message);
     }
   }
@@ -91,6 +92,7 @@ export class ClientService {
       await this.query.commitTransaction();
     } catch (err) {
       await this.query.rollbackTransaction();
+      this.logger.error(err.message);
       throw new BadRequestException(err.message);
     }
   }
@@ -136,6 +138,7 @@ export class ClientService {
       await this.query.commitTransaction();
     } catch (err) {
       await this.query.rollbackTransaction();
+      this.logger.error(err.message);
       throw new BadRequestException(err.message);
     }
   }
@@ -168,6 +171,7 @@ export class ClientService {
       return { ...contact, ...updateContactDto };
     } catch (err) {
       await this.query.rollbackTransaction();
+      this.logger.error(err.message);
       throw new BadRequestException(err.message);
     }
   }

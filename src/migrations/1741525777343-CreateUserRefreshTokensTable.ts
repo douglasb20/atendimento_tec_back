@@ -12,12 +12,12 @@ export class CreateUserRefreshTokensTable1741525777343 implements MigrationInter
             unsigned: true,
             isPrimary: true,
             isGenerated: true,
-            generationStrategy: 'increment'
+            generationStrategy: 'increment',
           },
           {
             name: 'user_id',
             type: 'int',
-            isNullable: false
+            isNullable: false,
           },
           {
             name: 'refresh_token',
@@ -28,7 +28,7 @@ export class CreateUserRefreshTokensTable1741525777343 implements MigrationInter
             name: 'expires_at',
             type: 'datetime',
             isNullable: false,
-          }
+          },
         ],
         foreignKeys: [
           {
@@ -37,14 +37,14 @@ export class CreateUserRefreshTokensTable1741525777343 implements MigrationInter
             referencedColumnNames: ['id'],
             referencedTableName: 'users',
             onDelete: 'RESTRICT',
-            onUpdate: 'RESTRICT'
-          }
-        ]
-      })
-    )
+            onUpdate: 'RESTRICT',
+          },
+        ],
+      }),
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.dropTable('user_refresh_tokens')
+    await queryRunner.dropTable('user_refresh_tokens');
   }
 }

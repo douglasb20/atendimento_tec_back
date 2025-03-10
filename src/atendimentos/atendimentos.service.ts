@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { DataSource, QueryRunner } from 'typeorm';
+import { DataSource, Not, QueryRunner } from 'typeorm';
 
 import { CreateAtendimentoDto } from './dto/create-atendimento.dto';
 import { CreateAtendimentoServicoDto } from './dto/create-atendimento-servico.dto';
@@ -79,7 +79,8 @@ export class AtendimentosService {
       return newAtendimento;
     } catch (err) {
       await this.queryRunner.rollbackTransaction();
-      throw err;
+      this.logger.error(err.message);
+      throw new BadRequestException(err.message);
     }
   }
 
@@ -131,12 +132,37 @@ export class AtendimentosService {
       return updatedAtendimento;
     } catch (err) {
       await this.queryRunner.rollbackTransaction();
-      throw err;
+      this.logger.error(err.message);
+      throw new BadRequestException(err.message);
+    }
+  }
+
+  async deleteAtendimento(id: number) {
+    try{
+      await this.queryRunner.startTransaction();
+      const atendimento = await this.atendimentoRepository.findAtendimento(id);
+      if (!atendimento) {
+        this.logger.error(`Erro de atualizar atendimento: Atendimento não localizado com este id`);
+        throw new NotFoundException('Atendimento não localizado com este id');
+      }
+
+      await this.queryRunner.manager.save(AtendimentosEntity, {
+        ...atendimento,
+        atendimento_status_id: 4
+      })
+
+      await this.queryRunner.commitTransaction();
+    } catch (err) {
+      await this.queryRunner.rollbackTransaction();
+      this.logger.error(err.message);
+      throw new BadRequestException(err.message);
     }
   }
 
   async getListStatus(): Promise<AtendimentoStatusEntity[]> {
-    const status = await this.queryRunner.manager.find(AtendimentoStatusEntity);
+    const status = await this.queryRunner.manager.findBy(AtendimentoStatusEntity, {
+      id: Not(4)
+    });
     return status;
   }
 

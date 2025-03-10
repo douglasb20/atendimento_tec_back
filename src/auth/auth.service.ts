@@ -18,6 +18,7 @@ type TokenResponse = {
   refresh_token: string;
   refresh_expires: number;
 };
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -83,7 +84,7 @@ export class AuthService {
       };
     } catch (err) {
       await this.query.rollbackTransaction();
-      throw new BadRequestException(err)
+      throw new BadRequestException(err);
     }
   }
 
@@ -128,21 +129,27 @@ export class AuthService {
 
   // ==========================================================
 
-  async saveRefreshToken(user: UsersEntity, refreshToken: string, expires: number, userRefresh: UserRefreshTokensEntity = null) {
-
+  async saveRefreshToken(
+    user: UsersEntity,
+    refreshToken: string,
+    expires: number,
+    userRefresh: UserRefreshTokensEntity = null,
+  ) {
     const newUserRefresh = this.query.manager.create(UserRefreshTokensEntity, {
       ...userRefresh,
       user_id: user.id,
       refresh_token: refreshToken,
       expires_at: new Date(expires * 1000),
 
-      users: user
-    })
+      users: user,
+    });
     await this.query.manager.save(UserRefreshTokensEntity, newUserRefresh);
   }
 
   public async validadeRefresh(refreshToken: string): Promise<UserRefreshTokensEntity> {
-    const userRefresh = await this.query.manager.findOneBy(UserRefreshTokensEntity, { refresh_token: refreshToken });
+    const userRefresh = await this.query.manager.findOneBy(UserRefreshTokensEntity, {
+      refresh_token: refreshToken,
+    });
     if (!userRefresh) {
       this.logger.error('Erro de validação: Refresh token não encontrado');
       throw new UnauthorizedException('Refresh token não encontrado');
@@ -186,7 +193,6 @@ export class AuthService {
 
   @Cron(CronExpression.EVERY_MINUTE)
   async destroyExpiredRefresh() {
-    console.log(new Date().toLocaleString())
-    await this.query.manager.delete(UserRefreshTokensEntity, { expires_at: LessThan(new Date()) })
+    await this.query.manager.delete(UserRefreshTokensEntity, { expires_at: LessThan(new Date()) });
   }
 }
