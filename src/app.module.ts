@@ -43,7 +43,7 @@ const destPath = path.join(__dirname, '..', '..', '/files');
     AtendimentosModule,
     ServicesModule,
     LogSistemaModule,
-    PermissionModule
+    PermissionModule,
   ],
   exports: [MulterModule, QueryStorageService],
   providers: [

@@ -3,16 +3,11 @@ import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from
 import { UsersEntity } from 'users/entities/users.entity';
 import { PermissionService } from './permission.service';
 
-
 @Injectable()
 export class PermissionGuard implements CanActivate {
-  constructor(
-    private readonly permissionService: PermissionService,
-  ) {}
+  constructor(private readonly permissionService: PermissionService) {}
 
-  async canActivate(
-    context: ExecutionContext,
-  ): Promise<boolean> {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const user: UsersEntity = request.user; // Usuário autenticado, já injetado pelo AuthGuard
     const handler = context.getHandler(); // Obtém o handler (método do controller)

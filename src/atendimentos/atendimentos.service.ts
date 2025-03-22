@@ -138,7 +138,7 @@ export class AtendimentosService {
   }
 
   async deleteAtendimento(id: number) {
-    try{
+    try {
       await this.queryRunner.startTransaction();
       const atendimento = await this.atendimentoRepository.findAtendimento(id);
       if (!atendimento) {
@@ -148,8 +148,8 @@ export class AtendimentosService {
 
       await this.queryRunner.manager.save(AtendimentosEntity, {
         ...atendimento,
-        atendimento_status_id: 4
-      })
+        atendimento_status_id: 4,
+      });
 
       await this.queryRunner.commitTransaction();
     } catch (err) {
@@ -161,7 +161,7 @@ export class AtendimentosService {
 
   async getListStatus(): Promise<AtendimentoStatusEntity[]> {
     const status = await this.queryRunner.manager.findBy(AtendimentoStatusEntity, {
-      id: Not(4)
+      id: Not(4),
     });
     return status;
   }

@@ -77,9 +77,7 @@ export class AtendimentosController {
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('atendimento:delete')
   @HttpCode(HttpStatus.OK)
-  async deleteAtendimento(
-    @Param('id', ParseIntPipe) id: number,
-  ) {
+  async deleteAtendimento(@Param('id', ParseIntPipe) id: number) {
     return await this.atendimentoService.deleteAtendimento(id);
   }
 }

@@ -3,6 +3,8 @@ import { DataSource, QueryRunner } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserRepository } from './users.repository';
+import { UsersEntity } from './entities/users.entity';
+import { PermissionsRepository } from 'permissions/permissions.repository';
 
 @Injectable({ scope: Scope.REQUEST })
 export class UsersService {
@@ -10,16 +12,17 @@ export class UsersService {
   private readonly logger = new Logger(UsersService.name);
   constructor(
     private readonly usersRepository: UserRepository,
+    private readonly permissionsRepository: PermissionsRepository,
     private dataSource: DataSource,
   ) {
     this.query = this.dataSource.createQueryRunner();
   }
 
-  async findAll() {
+  async findAll(): Promise<UsersEntity[]> {
     return await this.usersRepository.findActives();
   }
 
-  async addUser(createUserDto: CreateUserDto) {
+  async addUser(createUserDto: CreateUserDto): Promise<UsersEntity> {
     try {
       await this.query.startTransaction();
 
@@ -35,7 +38,7 @@ export class UsersService {
     }
   }
 
-  async updateUser(user_id: number, updateUserDto: UpdateUserDto) {
+  async updateUser(user_id: number, updateUserDto: UpdateUserDto): Promise<UsersEntity> {
     try {
       await this.query.startTransaction();
 
@@ -54,7 +57,7 @@ export class UsersService {
     }
   }
 
-  async deleteUser(user_id: number) {
+  async deleteUser(user_id: number): Promise<UsersEntity> {
     try {
       await this.query.startTransaction();
 
@@ -67,5 +70,9 @@ export class UsersService {
       await this.query.rollbackTransaction();
       throw err;
     }
+  }
+
+  async permissionsByUser(user_id: number) {
+    return this.permissionsRepository.permissionByUser(user_id);
   }
 }

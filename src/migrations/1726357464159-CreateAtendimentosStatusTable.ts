@@ -30,7 +30,8 @@ export class CreateAtendimentosStatusTable1726357464159 implements MigrationInte
         atendimento_status(descricao) \
         values("Aberto"), \
         ("Pendente"), \
-        ("Finalizado")',
+        ("Finalizado"), \
+        ("Excluído")'
       );
     }
   }

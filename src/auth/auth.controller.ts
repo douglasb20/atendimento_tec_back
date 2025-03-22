@@ -6,21 +6,21 @@ import { SigninDto } from 'users/dto/signin.dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) { }
+  constructor(private authService: AuthService) {}
 
-  @Post('signin')
+  @Post('/signin')
   @HttpCode(HttpStatus.OK)
   async signin(@Body() userDto: SigninDto, @Req() request: Request) {
     return this.authService.signin(userDto.email, userDto.password, request);
   }
 
-  @Post('forgotten_password/:email')
+  @Post('/forgotten_password/:email')
   @HttpCode(HttpStatus.OK)
   async forgottenPassword(@Param('email') email: string) {
     return this.authService.forgottenPassword(email);
   }
 
-  @Post('refresh')
+  @Post('/refresh')
   @HttpCode(HttpStatus.OK)
   refresh(@Body() body: any, @Req() request: Request) {
     const { refreshToken } = body;

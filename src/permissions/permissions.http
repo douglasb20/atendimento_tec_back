@@ -1,0 +1,21 @@
+# @name login
+POST {{url}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "douglasdev.cn@gmail.com",
+  "password": 1234
+}
+###
+
+@authToken = {{login.response.body.$.access_token}}
+
+@endpoint = /permissions
+
+#### 1) Get all permissions
+GET {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+
+#### 2) Get all permissions modules
+GET {{url}}{{endpoint}}/modules
+Authorization: Bearer {{authToken}}

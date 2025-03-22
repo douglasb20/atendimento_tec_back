@@ -19,9 +19,9 @@ export class CreatePermissionsTable1738349913965 implements MigrationInterface {
             length: '90',
           },
           {
-            name: 'module',
-            type: 'varchar',
-            length: '120',
+            name: 'permission_module_id',
+            type: 'int',
+            length: '11',
           },
           {
             name: 'name',
@@ -29,6 +29,16 @@ export class CreatePermissionsTable1738349913965 implements MigrationInterface {
             length: '120',
           },
         ],
+        foreignKeys: [
+          {
+            name: 'permission_permission_module_fk',
+            columnNames: ['permission_module_id'],
+            referencedColumnNames: ['id'],
+            referencedTableName: 'permission_module',
+            onDelete: 'RESTRICT',
+            onUpdate: 'RESTRICT'
+          }
+        ]
       }),
     );
     if (await queryRunner.hasTable('permissions')) {

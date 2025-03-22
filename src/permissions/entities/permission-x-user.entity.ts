@@ -4,13 +4,13 @@ import { PermissionsEntity } from './permission.entity';
 
 @Entity({
   name: 'permission_x_user',
-  withoutRowid: true
+  withoutRowid: true,
 })
 export class PermissionXUserEntity {
-  @PrimaryColumn({type: 'int' })
+  @PrimaryColumn({ type: 'int' })
   user_id: number;
-  
-  @PrimaryColumn({type: 'int'})
+
+  @PrimaryColumn({ type: 'int' })
   permission_id: number;
 
   @ManyToOne(() => UsersEntity, (user) => user.permissionUser)

@@ -7,6 +7,7 @@ import { ConfigMailerModule } from 'mailer/configmailer.module';
 import { AtendimentosEntity } from 'atendimentos/entities/atendimento.entity';
 import { UserRepository } from './users.repository';
 import { UserRefreshTokensEntity } from './entities/user-refresh-tokens.entity';
+import { PermissionsRepository } from 'permissions/permissions.repository';
 
 @Module({
   imports: [
@@ -14,6 +15,6 @@ import { UserRefreshTokensEntity } from './entities/user-refresh-tokens.entity';
     ConfigMailerModule,
   ],
   controllers: [UsersController],
-  providers: [UsersService, UserRepository],
+  providers: [UsersService, UserRepository, PermissionsRepository],
 })
 export class UsersModule {}

@@ -6,22 +6,14 @@ import { PermissionGuard } from './permissions.guard'; // Importa o PermissionGu
 import { PermissionsRepository } from './permissions.repository'; // Ajuste conforme necessário
 import { PermissionXUserEntity } from './entities/permission-x-user.entity';
 import { PermissionService } from './permission.service';
+import { PermissionsController } from './permissions.controller';
+import { PermissionModuleEntity } from './entities/permission-module.entity';
 
 @Global()
 @Module({
-  imports: [
-    TypeOrmModule.forFeature(
-      [
-        PermissionsEntity,
-        PermissionXUserEntity
-      ]
-    )
-  ],
-  providers: [
-    PermissionGuard,
-    PermissionsRepository,
-    PermissionService
-  ],
-  exports: [PermissionService], 
+  imports: [TypeOrmModule.forFeature([PermissionsEntity, PermissionXUserEntity, PermissionModuleEntity])],
+  providers: [PermissionGuard, PermissionsRepository, PermissionService],
+  exports: [PermissionService],
+  controllers: [PermissionsController],
 })
-export class PermissionModule {}
+export class PermissionModule { }

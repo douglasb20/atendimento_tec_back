@@ -41,3 +41,8 @@ Content-Type: application/json
 #### 4) Delete user
 DELETE {{url}}{{endpoint}}/3
 Authorization: Bearer {{authToken}}
+
+
+#### 5) Get user info
+GET {{url}}{{endpoint}}/info
+Authorization: Bearer {{authToken}}

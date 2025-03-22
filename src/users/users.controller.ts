@@ -8,13 +8,16 @@ import {
   Param,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { AuthGuard } from '@nestjs/passport';
+import { Request } from 'express';
 
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UsersEntity } from './entities/users.entity';
 import { PermissionGuard } from 'permissions/permissions.guard';
 import { Permissions } from 'permissions/permissions.decorator';
 
@@ -52,5 +55,17 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   async deleteUser(@Param('id') id: string) {
     return this.usersService.deleteUser(Number(id));
+  }
+
+  @Get('/info')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('user:view')
+  @HttpCode(HttpStatus.OK)
+  async userInfo(@Req() req: Request) {
+    const user: UsersEntity = req.user as UsersEntity;
+    const permissions = await this.usersService.permissionsByUser(user.id);
+
+    user['permissions'] = permissions.map((e) => e.name);
+    return user;
   }
 }
