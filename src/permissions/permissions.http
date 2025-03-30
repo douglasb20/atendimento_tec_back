@@ -19,3 +19,32 @@ Authorization: Bearer {{authToken}}
 #### 2) Get all permissions modules
 GET {{url}}{{endpoint}}/modules
 Authorization: Bearer {{authToken}}
+
+#### 3) Add new permissions
+POST {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+[
+  {
+    "label": "Adicionar serviço",
+    "permission_module_id": 3,
+    "name": "service:add"
+  },
+  {
+    "label": "Atualizar serviço",
+    "permission_module_id": 3,
+    "name": "service:update"
+  }
+]
+
+#### 4) Update permission
+Put {{url}}{{endpoint}}/9
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "label": "Adicionar serviço",
+  "permission_module_id": 3,
+  "name": "service:add"
+}

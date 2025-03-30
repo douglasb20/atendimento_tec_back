@@ -16,10 +16,16 @@ export class PermissionsEntity {
   @Column({ length: 120 })
   name: string;
 
-  @OneToMany(() => PermissionXUserEntity, (permissionUser) => permissionUser.permission)
+  @OneToMany(
+    () => PermissionXUserEntity,
+    (permissionUser) => permissionUser.permission
+  )
   permission: PermissionXUserEntity[];
 
-  @OneToOne(() => PermissionModuleEntity, (permissionModule) => permissionModule.permission)
+  @OneToOne(
+    () => PermissionModuleEntity,
+    (permissionModule) => permissionModule.permission
+  )
   @JoinColumn({ name: 'permission_module_id' })
   permissionModule: PermissionModuleEntity
 }
