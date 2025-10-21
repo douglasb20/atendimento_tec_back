@@ -1,9 +1,9 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
-import { PermissionsEntity } from "./permission.entity";
+import { Permissions } from "./permission.entity";
 
 
 @Entity('permission_module')
-export class PermissionModuleEntity { 
+export class PermissionModule { 
 
   @PrimaryGeneratedColumn('increment')
   id: number;
@@ -11,6 +11,6 @@ export class PermissionModuleEntity {
   @Column({ length: 60 })
   nome: string;
 
-  @OneToMany(() => PermissionsEntity, (permission) => permission.permissionModule)
-  permission: PermissionsEntity
+  @OneToMany(() => Permissions, (permission) => permission.permissionModule)
+  permission: Permissions
 }

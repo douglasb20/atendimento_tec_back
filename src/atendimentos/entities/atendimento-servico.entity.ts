@@ -1,6 +1,6 @@
 import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { AtendimentosEntity } from './atendimento.entity';
-import { ServicesEntity } from 'service/entities/service.entity';
+import { Services } from 'service/entities/service.entity';
 
 @Entity({ name: 'atendimento_servicos' })
 export class AtendimentosServicosEntity {
@@ -22,7 +22,7 @@ export class AtendimentosServicosEntity {
   @JoinColumn({ name: 'atendimento_id' })
   atendimento: AtendimentosEntity;
 
-  @ManyToOne(() => ServicesEntity, (service) => service.atendimentosServicos)
+  @ManyToOne(() => Services, (service) => service.atendimentosServicos)
   @JoinColumn({ name: 'service_id' })
-  service: ServicesEntity;
+  service: Services;
 }

@@ -6,16 +6,18 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { diskStorage } from 'multer';
 import * as path from 'path';
 
+import { DatabaseModule } from './core/database/database.module';
+import { LogSistemaModule } from './core/logSistema/log-sistema.module';
+import { QueryStorageService } from './core/query-storage/query-storage.service';
+import { LogSistemaInterceptor } from './core/logSistema/log-sistema.interceptor';
+
 import { AuthModule } from './auth/auth.module';
-import { DatabaseModule } from './database/database.module';
 import { UsersModule } from './users/users.module';
 import { ClientModule } from './client/clients.module';
 import { AtendimentosModule } from './atendimentos/atendimentos.module';
 import { ServicesModule } from './service/services.module';
-import { LogSistemaModule } from './logSistema/log-sistema.module';
-import { QueryStorageService } from './query-storage/query-storage.service';
-import { LogSistemaInterceptor } from './logSistema/log-sistema.interceptor';
-import { PermissionModule } from 'permissions/permissions.module';
+import { PermissionsModule } from 'permissions/permissions.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 const destPath = path.join(__dirname, '..', '..', '/files');
 @Global()
@@ -43,7 +45,8 @@ const destPath = path.join(__dirname, '..', '..', '/files');
     AtendimentosModule,
     ServicesModule,
     LogSistemaModule,
-    PermissionModule,
+    PermissionsModule,
+    WhatsappModule,
   ],
   exports: [MulterModule, QueryStorageService],
   providers: [

@@ -1,12 +1,12 @@
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { ServicesEntity } from './entities/service.entity';
+import { Services } from './entities/service.entity';
 
 @Injectable()
-export class ServiceRepository extends Repository<ServicesEntity> {
+export class ServiceRepository extends Repository<Services> {
   private readonly logger = new Logger(ServiceRepository.name);
   constructor(dataSource: DataSource) {
-    super(ServicesEntity, dataSource.manager);
+    super(Services, dataSource.manager);
   }
 
   async findActives() {
@@ -22,7 +22,7 @@ export class ServiceRepository extends Repository<ServicesEntity> {
     return service;
   }
 
-  async saveService(service: ServicesEntity, manager: EntityManager) {
-    return await manager.save(ServicesEntity, service);
+  async saveService(service: Services, manager: EntityManager) {
+    return await manager.save(Services, service);
   }
 }

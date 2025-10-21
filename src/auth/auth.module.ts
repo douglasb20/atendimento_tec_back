@@ -3,18 +3,18 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { UsersEntity } from 'users/entities/users.entity';
-import { ConfigMailerService } from 'mailer/configmailer.service';
+import { Users } from 'users/entities/users.entity';
+import { ConfigMailerService } from 'core/mailer/configmailer.service';
 import { UserRepository } from 'users/users.repository';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
-import { UserRefreshTokensEntity } from 'users/entities/user-refresh-tokens.entity';
+import { UserRefreshTokens } from 'users/entities/user-refresh-tokens.entity';
 
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }), // Registra a estratégia
-    TypeOrmModule.forFeature([UsersEntity, UserRefreshTokensEntity]),
+    TypeOrmModule.forFeature([Users, UserRefreshTokens]),
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

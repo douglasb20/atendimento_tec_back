@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { QueryStorageService } from 'query-storage/query-storage.service';
+import { QueryStorageService } from 'core/query-storage/query-storage.service';
 import { Logger } from 'typeorm';
 
 export class CustomSqlLogger implements Logger {

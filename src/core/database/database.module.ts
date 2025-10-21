@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { QueryStorageService } from 'query-storage/query-storage.service';
+import { QueryStorageService } from 'core/query-storage/query-storage.service';
 import { CustomSqlLogger } from 'Utils/CustomSqlLogger';
 
 @Module({

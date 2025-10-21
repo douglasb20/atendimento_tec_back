@@ -1,9 +1,9 @@
 import { Column, Entity, JoinColumn, OneToMany, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
-import { PermissionXUserEntity } from './permission-x-user.entity';
-import { PermissionModuleEntity } from './permission-module.entity';
+import { PermissionXUser } from './permission-x-user.entity';
+import { PermissionModule } from './permission-module.entity';
 
 @Entity('permissions')
-export class PermissionsEntity {
+export class Permissions {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
@@ -17,15 +17,15 @@ export class PermissionsEntity {
   name: string;
 
   @OneToMany(
-    () => PermissionXUserEntity,
+    () => PermissionXUser,
     (permissionUser) => permissionUser.permission
   )
-  permission: PermissionXUserEntity[];
+  permission: PermissionXUser[];
 
   @OneToOne(
-    () => PermissionModuleEntity,
+    () => PermissionModule,
     (permissionModule) => permissionModule.permission
   )
   @JoinColumn({ name: 'permission_module_id' })
-  permissionModule: PermissionModuleEntity
+  permissionModule: PermissionModule
 }

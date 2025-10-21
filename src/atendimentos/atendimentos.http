@@ -28,3 +28,7 @@ Authorization: Bearer {{authToken}}
 #### 4) Get all atendimentos status
 GET {{url}}{{endpoint}}/status
 Authorization: Bearer {{authToken}}
+
+#### 5) Get all atendimentos by date range
+GET {{url}}{{endpoint}}/1/filter?dataInicio=2025-03-01&dataFim=2025-03-10
+Authorization: Bearer {{authToken}}

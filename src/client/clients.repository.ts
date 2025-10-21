@@ -1,14 +1,14 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
-import { ClientsEntity } from './entities/clients.entity';
+import { Clients } from './entities/clients.entity';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
 @Injectable()
-export class ClientRepository extends Repository<ClientsEntity> {
+export class ClientRepository extends Repository<Clients> {
   private readonly logger = new Logger(ClientRepository.name);
   constructor(dataSource: DataSource) {
-    super(ClientsEntity, dataSource.manager);
+    super(Clients, dataSource.manager);
   }
 
   async findActives() {
@@ -29,7 +29,7 @@ export class ClientRepository extends Repository<ClientsEntity> {
       nome: createClientDto.nome,
       cnpj: createClientDto.cnpj,
     });
-    return await manager.save(ClientsEntity, client);
+    return await manager.save(Clients, client);
   }
 
   async updateClient(id: number, updateClientDto: UpdateClientDto, manager: EntityManager) {
@@ -42,7 +42,7 @@ export class ClientRepository extends Repository<ClientsEntity> {
       ...client,
       ...updateClientDto,
     });
-    return await manager.save(ClientsEntity, updateClient);
+    return await manager.save(Clients, updateClient);
   }
 
   async deleteClient(id: number, manager: EntityManager) {
@@ -56,6 +56,6 @@ export class ClientRepository extends Repository<ClientsEntity> {
       ...client,
       status: 0,
     };
-    return await manager.save(ClientsEntity, updateClient);
+    return await manager.save(Clients, updateClient);
   }
 }

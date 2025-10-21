@@ -4,9 +4,9 @@ import { AtendimentosService } from './atendimentos.service';
 import { AtendimentosController } from './atendimentos.controller';
 import { AtendimentoStatusEntity } from './entities/atendimento-status.entity';
 import { AtendimentosEntity } from './entities/atendimento.entity';
-import { UsersEntity } from 'users/entities/users.entity';
-import { ClientsEntity } from 'client/entities/clients.entity';
-import { ContactsEntity } from 'client/entities/contacts.entity';
+import { Users } from 'users/entities/users.entity';
+import { Clients } from 'client/entities/clients.entity';
+import { Contacts } from 'client/entities/contacts.entity';
 import { AtendimentosServicosEntity } from './entities/atendimento-servico.entity';
 import { AtendimentoRepository } from './atendimentos.repository';
 
@@ -15,9 +15,9 @@ import { AtendimentoRepository } from './atendimentos.repository';
     TypeOrmModule.forFeature([
       AtendimentosEntity,
       AtendimentoStatusEntity,
-      UsersEntity,
-      ClientsEntity,
-      ContactsEntity,
+      Users,
+      Clients,
+      Contacts,
       AtendimentosServicosEntity,
     ]),
   ],

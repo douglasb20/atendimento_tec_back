@@ -7,10 +7,10 @@ import { CreateAtendimentoServicoDto } from './dto/create-atendimento-servico.dt
 import { AtendimentoListResponse } from '@types';
 import { AtendimentosEntity } from './entities/atendimento.entity';
 import { AtendimentosServicosEntity } from './entities/atendimento-servico.entity';
-import { ClientsEntity } from 'client/entities/clients.entity';
-import { ContactsEntity } from 'client/entities/contacts.entity';
-import { UsersEntity } from 'users/entities/users.entity';
-import { ServicesEntity } from 'service/entities/service.entity';
+import { Clients } from 'client/entities/clients.entity';
+import { Contacts } from 'client/entities/contacts.entity';
+import { Users } from 'users/entities/users.entity';
+import { Services } from 'service/entities/service.entity';
 import { AtendimentoStatusEntity } from './entities/atendimento-status.entity';
 import { AtendimentoRepository } from './atendimentos.repository';
 import { UpdateAtendimentoDto } from './dto/update-atendimento.dto';
@@ -172,7 +172,7 @@ export class AtendimentosService {
     contact_id: number,
     services: CreateAtendimentoServicoDto[],
   ) {
-    let contacts: ContactsEntity;
+    let contacts: Contacts;
 
     // verificando se foi informado o cliente
     if (!client_id) {
@@ -186,13 +186,13 @@ export class AtendimentosService {
       throw new BadRequestException('Usuário não informado');
     }
 
-    const clients = await this.queryRunner.manager.findOneBy(ClientsEntity, { id: client_id });
+    const clients = await this.queryRunner.manager.findOneBy(Clients, { id: client_id });
     if (!clients) {
       this.logger.error('Erro ao validar: Cliente informado não localizado');
       throw new NotFoundException('Cliente informado não localizado');
     }
 
-    const users: UsersEntity = await this.queryRunner.manager.findOneBy(UsersEntity, {
+    const users: Users = await this.queryRunner.manager.findOneBy(Users, {
       id: user_id,
     });
     if (!users) {
@@ -202,7 +202,7 @@ export class AtendimentosService {
 
     // verificando se foi informado o contato
     if (contact_id) {
-      contacts = await this.queryRunner.manager.findOneBy(ContactsEntity, { id: contact_id });
+      contacts = await this.queryRunner.manager.findOneBy(Contacts, { id: contact_id });
 
       if (!contacts) {
         this.logger.error('Erro ao validar: Contato informado não localizado');
@@ -212,7 +212,7 @@ export class AtendimentosService {
     if (services.length > 0) {
       let contErr = 0;
       services.forEach(async (v) => {
-        const service = await this.queryRunner.manager.findOneBy(ServicesEntity, {
+        const service = await this.queryRunner.manager.findOneBy(Services, {
           id: v.service_id,
         });
         if (!service) {
@@ -243,5 +243,10 @@ export class AtendimentosService {
       atendimento_id: atendimento.id,
     })) as AtendimentosServicosEntity[];
     return this.queryRunner.manager.save(AtendimentosServicosEntity, servicosNew);
+  }
+
+  async filterByDate(userId: number, dataInicio: string, dataFim: string): Promise<AtendimentoListResponse[]> {
+    const result = await this.atendimentoRepository.filterByDate(userId, dataInicio, dataFim);
+    return result;
   }
 }

@@ -1,13 +1,13 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { UpdateContactsDto } from './dto/update-contacts.dto';
-import { ContactsEntity } from './entities/contacts.entity';
+import { Contacts } from './entities/contacts.entity';
 
 @Injectable()
-export class ContactRepository extends Repository<ContactsEntity> {
+export class ContactRepository extends Repository<Contacts> {
   private readonly logger = new Logger(ContactRepository.name);
   constructor(dataSource: DataSource) {
-    super(ContactsEntity, dataSource.manager);
+    super(Contacts, dataSource.manager);
   }
 
   async findActives() {
@@ -38,7 +38,7 @@ export class ContactRepository extends Repository<ContactsEntity> {
       ...contact,
       ...updateContactDto,
     });
-    return await manager.save(ContactsEntity, updateContact);
+    return await manager.save(Contacts, updateContact);
   }
 
   async deleteContact(id: number, manager: EntityManager) {
@@ -52,6 +52,6 @@ export class ContactRepository extends Repository<ContactsEntity> {
       ...contact,
       status: 0,
     };
-    return await manager.save(ContactsEntity, updateContact);
+    return await manager.save(Contacts, updateContact);
   }
 }

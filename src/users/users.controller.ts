@@ -17,7 +17,7 @@ import { Request } from 'express';
 
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { UsersEntity } from './entities/users.entity';
+import { Users } from './entities/users.entity';
 import { PermissionGuard } from 'permissions/permissions.guard';
 import { Permissions } from 'permissions/permissions.decorator';
 
@@ -62,7 +62,7 @@ export class UsersController {
   @Permissions('user:view')
   @HttpCode(HttpStatus.OK)
   async userInfo(@Req() req: Request) {
-    const user: UsersEntity = req.user as UsersEntity;
+    const user: Users = req.user as Users;
     const permissions = await this.usersService.permissionsByUser(user.id);
 
     user['permissions'] = permissions.map((e) => e.name);

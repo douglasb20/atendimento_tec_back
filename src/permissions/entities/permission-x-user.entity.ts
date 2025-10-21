@@ -1,23 +1,23 @@
 import { Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
-import { UsersEntity } from 'users/entities/users.entity';
-import { PermissionsEntity } from './permission.entity';
+import { Users } from 'users/entities/users.entity';
+import { Permissions } from './permission.entity';
 
 @Entity({
   name: 'permission_x_user',
   withoutRowid: true,
 })
-export class PermissionXUserEntity {
+export class PermissionXUser {
   @PrimaryColumn({ type: 'int' })
   user_id: number;
 
   @PrimaryColumn({ type: 'int' })
   permission_id: number;
 
-  @ManyToOne(() => UsersEntity, (user) => user.permissionUser)
+  @ManyToOne(() => Users, (user) => user.permissionUser)
   @JoinColumn({ name: 'user_id' })
-  user: UsersEntity;
+  user: Users;
 
-  @ManyToOne(() => PermissionsEntity, (permission) => permission.permission)
+  @ManyToOne(() => Permissions, (permission) => permission.permission)
   @JoinColumn({ name: 'permission_id' })
-  permission: PermissionsEntity;
+  permission: Permissions;
 }

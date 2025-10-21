@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { UsersEntity } from 'users/entities/users.entity';
+import { Users } from 'users/entities/users.entity';
 import { PermissionService } from './permission.service';
 
 @Injectable()
@@ -9,7 +9,7 @@ export class PermissionGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const user: UsersEntity = request.user; // Usuário autenticado, já injetado pelo AuthGuard
+    const user: Users = request.user; // Usuário autenticado, já injetado pelo AuthGuard
     const handler = context.getHandler(); // Obtém o handler (método do controller)
     const requiredPermission = this.getRequiredPermission(handler); // Pega a permissão do método
 

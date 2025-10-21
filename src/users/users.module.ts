@@ -2,16 +2,16 @@ import { Module } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { UsersEntity } from './entities/users.entity';
-import { ConfigMailerModule } from 'mailer/configmailer.module';
+import { Users } from './entities/users.entity';
+import { ConfigMailerModule } from 'core/mailer/configmailer.module';
 import { AtendimentosEntity } from 'atendimentos/entities/atendimento.entity';
 import { UserRepository } from './users.repository';
-import { UserRefreshTokensEntity } from './entities/user-refresh-tokens.entity';
+import { UserRefreshTokens } from './entities/user-refresh-tokens.entity';
 import { PermissionsRepository } from 'permissions/permissions.repository';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UsersEntity, AtendimentosEntity, UserRefreshTokensEntity]),
+    TypeOrmModule.forFeature([Users, AtendimentosEntity, UserRefreshTokens]),
     ConfigMailerModule,
   ],
   controllers: [UsersController],

@@ -1,10 +1,10 @@
 import { AtendimentosEntity } from 'atendimentos/entities/atendimento.entity';
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
-import { UserRefreshTokensEntity } from './user-refresh-tokens.entity';
-import { PermissionXUserEntity } from 'permissions/entities/permission-x-user.entity';
+import { UserRefreshTokens } from './user-refresh-tokens.entity';
+import { PermissionXUser } from 'permissions/entities/permission-x-user.entity';
 
 @Entity('users')
-export class UsersEntity {
+export class Users {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
@@ -41,9 +41,9 @@ export class UsersEntity {
   @OneToMany(() => AtendimentosEntity, (atendimentos) => atendimentos.users)
   atendimentos: AtendimentosEntity[];
 
-  @OneToMany(() => PermissionXUserEntity, (permissionUser) => permissionUser.user)
-  permissionUser: PermissionXUserEntity[];
+  @OneToMany(() => PermissionXUser, (permissionUser) => permissionUser.user)
+  permissionUser: PermissionXUser[];
 
-  @OneToMany(() => UserRefreshTokensEntity, (userRefreshTokens) => userRefreshTokens.users)
-  userRefreshTokens: UserRefreshTokensEntity[];
+  @OneToMany(() => UserRefreshTokens, (userRefreshTokens) => userRefreshTokens.users)
+  userRefreshTokens: UserRefreshTokens[];
 }

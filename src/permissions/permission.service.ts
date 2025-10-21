@@ -1,9 +1,9 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { PermissionsRepository } from './permissions.repository';
 import { DataSource, QueryRunner } from 'typeorm';
+
+import { PermissionsRepository } from './permissions.repository';
 import { CreatePermissionDto } from './dto/create-permission.dto';
 import { UpdatePermissionDto } from './dto/update-permission.dto';
-import { PermissionsEntity } from './entities/permission.entity';
 
 @Injectable()
 export class PermissionService {
@@ -34,8 +34,7 @@ export class PermissionService {
     try {
       await this.queryRunner.startTransaction();
 
-      const permissions = this.permissionRepository.create(createPermissionDto);
-      await this.queryRunner.manager.save(permissions);
+      await this.permissionRepository.createPermission(createPermissionDto, this.queryRunner.manager);
       
       await this.queryRunner.commitTransaction();
     } catch (err) {
@@ -48,16 +47,8 @@ export class PermissionService {
   async updatePermission(id: number, updatePermissionDto: UpdatePermissionDto) {
     try {
       await this.queryRunner.startTransaction();
-      const permission = await this.permissionRepository.findOneBy({ id });
-      if (!permission) { 
-        this.logger.error(`Erro de atualizar permissão: Permissão com id "${id}" nao encontrada`); 
-        throw new BadRequestException(`Permissão com id "${id}" nao encontrada`); 
-      }
-
-      await this.queryRunner.manager.save(PermissionsEntity, {
-        ...permission,
-        ...updatePermissionDto,
-      });
+      
+      await this.permissionRepository.updatePermission(id, updatePermissionDto, this.queryRunner.manager);
       
       await this.queryRunner.commitTransaction();
     } catch (err) {

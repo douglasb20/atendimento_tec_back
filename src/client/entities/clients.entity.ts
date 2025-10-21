@@ -1,9 +1,9 @@
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
-import { ContactsEntity } from './contacts.entity';
+import { Contacts } from './contacts.entity';
 import { AtendimentosEntity } from 'atendimentos/entities/atendimento.entity';
 
 @Entity('clients')
-export class ClientsEntity {
+export class Clients {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
@@ -19,8 +19,8 @@ export class ClientsEntity {
   @Column({ default: 1, nullable: true })
   status: number;
 
-  @OneToMany(() => ContactsEntity, (contacts) => contacts.clients)
-  contacts: ContactsEntity[];
+  @OneToMany(() => Contacts, (contacts) => contacts.clients)
+  contacts: Contacts[];
 
   @OneToMany(() => AtendimentosEntity, (atendimentos) => atendimentos.clients)
   atendimentos: AtendimentosEntity[];

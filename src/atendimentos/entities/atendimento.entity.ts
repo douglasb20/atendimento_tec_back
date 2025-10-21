@@ -7,9 +7,9 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { ClientsEntity } from 'client/entities/clients.entity';
-import { ContactsEntity } from 'client/entities/contacts.entity';
-import { UsersEntity } from 'users/entities/users.entity';
+import { Clients } from 'client/entities/clients.entity';
+import { Contacts } from 'client/entities/contacts.entity';
+import { Users } from 'users/entities/users.entity';
 import { AtendimentoStatusEntity } from './atendimento-status.entity';
 import { AtendimentosServicosEntity } from './atendimento-servico.entity';
 
@@ -50,17 +50,17 @@ export class AtendimentosEntity {
 
   // ============= RELATIONS ================
 
-  @ManyToOne(() => ClientsEntity, (clients) => clients.atendimentos)
+  @ManyToOne(() => Clients, (clients) => clients.atendimentos)
   @JoinColumn({ name: 'client_id', referencedColumnName: 'id' })
-  clients: ClientsEntity;
+  clients: Clients;
 
-  @ManyToOne(() => ContactsEntity, (contacts) => contacts.atendimentos)
+  @ManyToOne(() => Contacts, (contacts) => contacts.atendimentos)
   @JoinColumn({ name: 'contact_id', referencedColumnName: 'id' })
-  contacts: ContactsEntity;
+  contacts: Contacts;
 
-  @ManyToOne(() => UsersEntity, (users) => users.atendimentos)
+  @ManyToOne(() => Users, (users) => users.atendimentos)
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
-  users: UsersEntity;
+  users: Users;
 
   @ManyToOne(() => AtendimentoStatusEntity, (atendimento) => atendimento.atendimentos)
   @JoinColumn({ name: 'atendimento_status_id', referencedColumnName: 'id' })

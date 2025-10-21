@@ -1,19 +1,19 @@
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { PermissionsEntity } from './entities/permission.entity';
+import { Permissions } from './entities/permission.entity';
 import { PermissionGuard } from './permissions.guard'; // Importa o PermissionGuard
 import { PermissionsRepository } from './permissions.repository'; // Ajuste conforme necessário
-import { PermissionXUserEntity } from './entities/permission-x-user.entity';
+import { PermissionXUser } from './entities/permission-x-user.entity';
 import { PermissionService } from './permission.service';
 import { PermissionsController } from './permissions.controller';
-import { PermissionModuleEntity } from './entities/permission-module.entity';
+import { PermissionModule } from './entities/permission-module.entity';
 
 @Global()
 @Module({
-  imports: [TypeOrmModule.forFeature([PermissionsEntity, PermissionXUserEntity, PermissionModuleEntity])],
+  imports: [TypeOrmModule.forFeature([Permissions, PermissionXUser, PermissionModule])],
   providers: [PermissionGuard, PermissionsRepository, PermissionService],
   exports: [PermissionService],
   controllers: [PermissionsController],
 })
-export class PermissionModule { }
+export class PermissionsModule { }

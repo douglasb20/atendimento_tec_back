@@ -2,7 +2,7 @@ import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nes
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { LogSistemaService } from './log-sistema.service';
-import { QueryStorageService } from 'query-storage/query-storage.service'; // Importa o storage de queries
+import { QueryStorageService } from 'core/query-storage/query-storage.service'; // Importa o storage de queries
 
 @Injectable()
 export class LogSistemaInterceptor implements NestInterceptor {

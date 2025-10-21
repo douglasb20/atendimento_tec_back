@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AtendimentosService } from './atendimentos.service';
@@ -36,6 +37,18 @@ export class AtendimentosController {
   @HttpCode(HttpStatus.OK)
   async getListStatus() {
     return await this.atendimentoService.getListStatus();
+  }
+
+  @Get('/:userId/filter')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('atendimento:view')
+  @HttpCode(HttpStatus.OK)
+  async filterByDate(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query('dataInicio') dataInicio: string,
+    @Query('dataFim') dataFim: string,
+  ) {
+    return await this.atendimentoService.filterByDate(userId, dataInicio, dataFim);
   }
 
   @Get('/get_by_user/:user_id')

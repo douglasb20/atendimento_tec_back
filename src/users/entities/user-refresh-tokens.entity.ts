@@ -6,10 +6,10 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { UsersEntity } from './users.entity';
+import { Users } from './users.entity';
 
 @Entity('user_refresh_tokens')
-export class UserRefreshTokensEntity {
+export class UserRefreshTokens {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
@@ -22,7 +22,7 @@ export class UserRefreshTokensEntity {
   @CreateDateColumn({ type: 'timestamp' })
   expires_at: Date;
 
-  @ManyToOne(() => UsersEntity, (user) => user.userRefreshTokens)
+  @ManyToOne(() => Users, (user) => user.userRefreshTokens)
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
-  users: UsersEntity;
+  users: Users;
 }

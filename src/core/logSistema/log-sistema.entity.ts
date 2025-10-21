@@ -1,7 +1,7 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('log_sistema')
-export class LogSistemaEntity {
+export class LogSistema {
   @PrimaryGeneratedColumn('increment', { unsigned: true, type: 'bigint' })
   id: number;
 

@@ -4,13 +4,13 @@ import * as bcrypt from 'bcrypt';
 import { format } from 'date-fns';
 import { Request } from 'express';
 
-import { UsersEntity } from 'users/entities/users.entity';
+import { Users } from 'users/entities/users.entity';
 import { JwtPayload } from './models/jwt-payload.model';
-import { ConfigMailerService } from 'mailer/configmailer.service';
+import { ConfigMailerService } from 'core/mailer/configmailer.service';
 import { UpdateUserDto } from 'users/dto/update-user.dto';
 import { UserRepository } from 'users/users.repository';
 import { DataSource, LessThan, QueryRunner } from 'typeorm';
-import { UserRefreshTokensEntity } from 'users/entities/user-refresh-tokens.entity';
+import { UserRefreshTokens } from 'users/entities/user-refresh-tokens.entity';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 type TokenResponse = {
@@ -32,7 +32,7 @@ export class AuthService {
     this.query = this.dataSource.createQueryRunner();
   }
 
-  public async createToken(user: UsersEntity, request: Request): Promise<TokenResponse> {
+  public async createToken(user: Users, request: Request): Promise<TokenResponse> {
     const issuer = `${request.protocol}://${request.get('host')}`;
     const payload = {
       iss: issuer,
@@ -73,7 +73,7 @@ export class AuthService {
         lastlogin_at: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
       };
 
-      await this.query.manager.update(UsersEntity, user.id, updateLastLogin);
+      await this.query.manager.update(Users, user.id, updateLastLogin);
       await this.saveRefreshToken(user, token.refresh_token, token.refresh_expires);
 
       await this.query.commitTransaction();
@@ -130,12 +130,12 @@ export class AuthService {
   // ==========================================================
 
   async saveRefreshToken(
-    user: UsersEntity,
+    user: Users,
     refreshToken: string,
     expires: number,
-    userRefresh: UserRefreshTokensEntity = null,
+    userRefresh: UserRefreshTokens = null,
   ) {
-    const newUserRefresh = this.query.manager.create(UserRefreshTokensEntity, {
+    const newUserRefresh = this.query.manager.create(UserRefreshTokens, {
       ...userRefresh,
       user_id: user.id,
       refresh_token: refreshToken,
@@ -143,11 +143,11 @@ export class AuthService {
 
       users: user,
     });
-    await this.query.manager.save(UserRefreshTokensEntity, newUserRefresh);
+    await this.query.manager.save(UserRefreshTokens, newUserRefresh);
   }
 
-  public async validadeRefresh(refreshToken: string): Promise<UserRefreshTokensEntity> {
-    const userRefresh = await this.query.manager.findOneBy(UserRefreshTokensEntity, {
+  public async validadeRefresh(refreshToken: string): Promise<UserRefreshTokens> {
+    const userRefresh = await this.query.manager.findOneBy(UserRefreshTokens, {
       refresh_token: refreshToken,
     });
     if (!userRefresh) {
@@ -157,7 +157,7 @@ export class AuthService {
     return userRefresh;
   }
 
-  public async validadeUser(jwtPayload: JwtPayload): Promise<UsersEntity> {
+  public async validadeUser(jwtPayload: JwtPayload): Promise<Users> {
     const user = await this.usersRepository.findById(jwtPayload.sub);
     if (!user) {
       this.logger.error('Erro de validação: Usuário não encontrado');
@@ -166,7 +166,7 @@ export class AuthService {
     return user;
   }
 
-  private async checkPassword(password: string, user: UsersEntity): Promise<boolean> {
+  private async checkPassword(password: string, user: Users): Promise<boolean> {
     const match = await bcrypt.compare(password, user.password);
 
     if (!match) {
@@ -177,7 +177,7 @@ export class AuthService {
     return match;
   }
 
-  private async findByEmail(email: string): Promise<UsersEntity> {
+  private async findByEmail(email: string): Promise<Users> {
     const user = await this.usersRepository.findOne({
       where: { email, status: 1 },
       select: ['id', 'name', 'email', 'password', 'lastlogin_at'],
@@ -193,6 +193,6 @@ export class AuthService {
 
   @Cron(CronExpression.EVERY_MINUTE)
   async destroyExpiredRefresh() {
-    await this.query.manager.delete(UserRefreshTokensEntity, { expires_at: LessThan(new Date()) });
+    await this.query.manager.delete(UserRefreshTokens, { expires_at: LessThan(new Date()) });
   }
 }

@@ -2,7 +2,7 @@ import { AtendimentosServicosEntity } from 'atendimentos/entities/atendimento-se
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('services')
-export class ServicesEntity {
+export class Services {
   @PrimaryGeneratedColumn('increment')
   id: number;
 

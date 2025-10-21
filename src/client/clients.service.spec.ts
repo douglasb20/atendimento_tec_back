@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ClientService } from './clients.service';
-import { ClientsEntity } from './entities/clients.entity';
-import { ContactsEntity } from './entities/contacts.entity';
+import { Clients } from './entities/clients.entity';
+import { Contacts } from './entities/contacts.entity';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AtendimentosEntity } from 'atendimentos/entities/atendimento.entity';
-import { UsersEntity } from 'users/entities/users.entity';
+import { Users } from 'users/entities/users.entity';
 import { AtendimentoStatusEntity } from 'atendimentos/entities/atendimento-status.entity';
 import { CreateClientDto } from './dto/create-client.dto';
 
@@ -21,10 +21,10 @@ describe('ClientService', () => {
     type: 'sqlite',
     database: ':memory:',
     entities: [
-      ClientsEntity,
-      ContactsEntity,
+      Clients,
+      Contacts,
       AtendimentosEntity,
-      UsersEntity,
+      Users,
       AtendimentoStatusEntity,
     ],
     synchronize: true,
@@ -34,7 +34,7 @@ describe('ClientService', () => {
     module = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRoot({ ...dataSourceTest, autoLoadEntities: true }),
-        TypeOrmModule.forFeature([ClientsEntity, ContactsEntity, AtendimentosEntity]),
+        TypeOrmModule.forFeature([Clients, Contacts, AtendimentosEntity]),
       ],
       providers: [ClientService],
     }).compile();

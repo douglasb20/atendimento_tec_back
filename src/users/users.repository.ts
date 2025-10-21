@@ -1,15 +1,15 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { UsersEntity } from './entities/users.entity';
+import { Users } from './entities/users.entity';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 
 @Injectable()
-export class UserRepository extends Repository<UsersEntity> {
+export class UserRepository extends Repository<Users> {
   private readonly logger = new Logger(UserRepository.name);
   constructor(dataSource: DataSource) {
-    super(UsersEntity, dataSource.manager);
+    super(Users, dataSource.manager);
   }
 
   async findActives() {
@@ -30,7 +30,7 @@ export class UserRepository extends Repository<UsersEntity> {
       ...user,
       password: await bcrypt.hash(user.password, 10),
     });
-    return await manager.save(UsersEntity, newUser);
+    return await manager.save(Users, newUser);
   }
 
   async updateUser(id: number, updateUserDto: UpdateUserDto, manager: EntityManager) {
@@ -47,9 +47,9 @@ export class UserRepository extends Repository<UsersEntity> {
       ...user,
       ...updateUserDto,
     });
-    return await manager.save(UsersEntity, updateUser);
+    return await manager.save(Users, updateUser);
   }
-
+  
   async deleteUser(id: number, manager: EntityManager) {
     const user = await this.findById(id);
     if (!user) {
@@ -61,6 +61,6 @@ export class UserRepository extends Repository<UsersEntity> {
       ...user,
       status: 0,
     };
-    return await manager.save(UsersEntity, updateUser);
+    return await manager.save(Users, updateUser);
   }
 }

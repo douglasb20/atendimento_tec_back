@@ -3,10 +3,10 @@ import { AtendimentosEntity } from './entities/atendimento.entity';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { AtendimentoListResponse } from '@types';
 import { AtendimentosServicosEntity } from './entities/atendimento-servico.entity';
-import { ClientsEntity } from 'client/entities/clients.entity';
-import { ContactsEntity } from 'client/entities/contacts.entity';
-import { ServicesEntity } from 'service/entities/service.entity';
-import { UsersEntity } from 'users/entities/users.entity';
+import { Clients } from 'client/entities/clients.entity';
+import { Contacts } from 'client/entities/contacts.entity';
+import { Services } from 'service/entities/service.entity';
+import { Users } from 'users/entities/users.entity';
 import { CreateAtendimentoServicoDto } from './dto/create-atendimento-servico.dto';
 
 @Injectable()
@@ -66,13 +66,32 @@ export class AtendimentoRepository extends Repository<AtendimentosEntity> {
     return result;
   }
 
+  async filterByDate(userId: number, dataInicio: string, dataFim: string): Promise<AtendimentoListResponse[]> {
+    const query = this.queryAtendimento();
+    const result = await query
+      .where(`at.data_referencia BETWEEN :dataInicio AND :dataFim`, { dataInicio, dataFim })
+      .andWhere({ atendimento_status_id: Not(4) })
+      .andWhere(`at.user_id = :userId`, { userId })
+      .getRawMany<AtendimentoListResponse>();
+
+    for (const [k, at] of result.entries()) {
+      const atendimentoServico = await this.manager.find(AtendimentosServicosEntity, {
+        where: { atendimento_id: at.id },
+        relations: ['service'],
+      });
+      result[k].atendimentosServicos = atendimentoServico;
+    }
+
+    return result;
+  }
+
   async ValidateAtendimento(
     client_id: number,
     user_id: number,
     contact_id: number,
     services: CreateAtendimentoServicoDto[],
   ) {
-    let contacts: ContactsEntity;
+    let contacts: Contacts;
 
     // verificando se foi informado o cliente
     if (!client_id) {
@@ -86,13 +105,13 @@ export class AtendimentoRepository extends Repository<AtendimentosEntity> {
       throw new BadRequestException('Usuário não informado');
     }
 
-    const clients = await this.queryRunner.manager.findOneBy(ClientsEntity, { id: client_id });
+    const clients = await this.queryRunner.manager.findOneBy(Clients, { id: client_id });
     if (!clients) {
       this.logger.error('Erro ao validar: Cliente informado não localizado');
       throw new NotFoundException('Cliente informado não localizado');
     }
 
-    const users: UsersEntity = await this.queryRunner.manager.findOneBy(UsersEntity, {
+    const users: Users = await this.queryRunner.manager.findOneBy(Users, {
       id: user_id,
     });
     if (!users) {
@@ -102,7 +121,7 @@ export class AtendimentoRepository extends Repository<AtendimentosEntity> {
 
     // verificando se foi informado o contato
     if (contact_id) {
-      contacts = await this.queryRunner.manager.findOneBy(ContactsEntity, { id: contact_id });
+      contacts = await this.queryRunner.manager.findOneBy(Contacts, { id: contact_id });
 
       if (!contacts) {
         this.logger.error('Erro ao validar: Contato informado não localizado');
@@ -112,7 +131,7 @@ export class AtendimentoRepository extends Repository<AtendimentosEntity> {
     if (services.length > 0) {
       let contErr = 0;
       services.forEach(async (v) => {
-        const service = await this.queryRunner.manager.findOneBy(ServicesEntity, {
+        const service = await this.queryRunner.manager.findOneBy(Services, {
           id: v.service_id,
         });
         if (!service) {

@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { DataSource, QueryRunner } from 'typeorm';
-import { ClientsEntity } from './entities/clients.entity';
+import { Clients } from './entities/clients.entity';
 import { CreateClientDto } from './dto/create-client.dto';
-import { ContactsEntity } from './entities/contacts.entity';
+import { Contacts } from './entities/contacts.entity';
 import { UpdateContactsDto } from './dto/update-contacts.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { CreateContactsDto } from './dto/create-contacts.dto';
@@ -59,7 +59,7 @@ export class ClientService {
         cnpj: updateClientDto.cnpj,
       };
 
-      const addedClient = await this.query.manager.save(ClientsEntity, clientNew);
+      const addedClient = await this.query.manager.save(Clients, clientNew);
 
       if ('contacts' in updateClientDto && updateClientDto?.contacts) {
         if (updateClientDto?.contacts.length > 0) {
@@ -85,7 +85,7 @@ export class ClientService {
         throw new Error(`Cliente com id "${client_id}" não existe.`);
       }
 
-      await this.query.manager.save(ClientsEntity, {
+      await this.query.manager.save(Clients, {
         ...client,
         status: 0,
       });
@@ -98,7 +98,7 @@ export class ClientService {
   }
 
   async findAll() {
-    return this.query.manager.findBy(ClientsEntity, {
+    return this.query.manager.findBy(Clients, {
       status: 1,
     });
   }
@@ -133,7 +133,7 @@ export class ClientService {
         throw new Error(`Contato com id "${contact_id}" não existe.`);
       }
 
-      await this.query.manager.delete(ContactsEntity, contact_id);
+      await this.query.manager.delete(Contacts, contact_id);
 
       await this.query.commitTransaction();
     } catch (err) {
@@ -162,7 +162,7 @@ export class ClientService {
         throw new Error(`Contato com id "${contact_id}" não existe.`);
       }
 
-      await this.query.manager.save(ContactsEntity, {
+      await this.query.manager.save(Contacts, {
         ...contact,
         ...updateContactDto,
       });
@@ -183,14 +183,14 @@ export class ClientService {
     });
   }
 
-  async saveContact(client: ClientsEntity, contacts: CreateContactsDto[]) {
-    await this.query.manager.delete(ContactsEntity, { client_id: client.id });
+  async saveContact(client: Clients, contacts: CreateContactsDto[]) {
+    await this.query.manager.delete(Contacts, { client_id: client.id });
     const contactsNew = contacts.map((contact) => ({
       ...contact,
       ...(contact.id !== undefined && { id: Number(contact.id) }),
       client_id: client.id,
-    })) as ContactsEntity[];
+    })) as Contacts[];
 
-    return await this.query.manager.save(ContactsEntity, contactsNew);
+    return await this.query.manager.save(Contacts, contactsNew);
   }
 }
