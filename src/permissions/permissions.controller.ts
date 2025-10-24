@@ -9,7 +9,7 @@ import {
   ParseIntPipe,
   Post,
   Put,
-  UseGuards
+  UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PermissionGuard } from './permissions.guard';
@@ -20,15 +20,13 @@ import { UpdatePermissionDto } from './dto/update-permission.dto';
 
 @Controller('permissions')
 export class PermissionsController {
-  constructor(
-    private permissionService: PermissionService
-  ) { }
+  constructor(private permissionService: PermissionService) {}
 
   @Get()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('permission:view')
   async findAll() {
-    return this.permissionService.findAll()
+    return this.permissionService.findAll();
   }
 
   @Post()
@@ -44,7 +42,10 @@ export class PermissionsController {
   @Put(':id')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @HttpCode(HttpStatus.OK)
-  async updatePermission(@Param('id', ParseIntPipe) id: number, @Body() updatePermissionDto: UpdatePermissionDto) {
+  async updatePermission(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updatePermissionDto: UpdatePermissionDto,
+  ) {
     return await this.permissionService.updatePermission(id, updatePermissionDto);
   }
 
@@ -54,6 +55,6 @@ export class PermissionsController {
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('permission:view')
   async findAllModules() {
-    return this.permissionService.findAllModules()
+    return this.permissionService.findAllModules();
   }
 }

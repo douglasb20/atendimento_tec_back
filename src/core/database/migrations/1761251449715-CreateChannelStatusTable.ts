@@ -1,10 +1,10 @@
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
-export class CreateAtendimentosStatusTable1726357464159 implements MigrationInterface {
+export class CreateChannelStatusTable1761251449715 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.createTable(
       new Table({
-        name: 'atendimento_status',
+        name: 'channel_status',
         columns: [
           {
             name: 'id',
@@ -14,29 +14,31 @@ export class CreateAtendimentosStatusTable1726357464159 implements MigrationInte
             generationStrategy: 'increment',
           },
           {
-            name: 'descricao',
+            name: 'name',
             type: 'varchar',
-            length: '25',
+            length: '100',
+            isNullable: false,
           },
         ],
       }),
+      true,
     );
 
-    const hasTable = await queryRunner.hasTable('atendimento_status');
-
+    const hasTable = await queryRunner.hasTable('channel_status');
     if (hasTable) {
       await queryRunner.query(
         'INSERT INTO \
-        atendimento_status(descricao) \
-        values("Aberto"), \
-        ("Pendente"), \
-        ("Finalizado"), \
-        ("Excluído")',
+        channel_status(id,name) \
+        values(1,"Desconectado"), \
+        (2,"Conectando"), \
+        (3,"Conectado"), \
+        (4,"Sessão expirada"), \
+        (5,"Excluído");',
       );
     }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.dropTable('atendimento_status');
+    await queryRunner.dropTable('channel_status');
   }
 }

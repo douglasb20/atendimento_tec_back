@@ -16,7 +16,6 @@ export class CreateContactsTable1725896694498 implements MigrationInterface {
           {
             name: 'client_id',
             type: 'int',
-            length: '11',
             isNullable: false,
           },
           {
@@ -54,8 +53,8 @@ export class CreateContactsTable1725896694498 implements MigrationInterface {
         columnNames: ['client_id'],
         referencedColumnNames: ['id'],
         referencedTableName: 'clients',
-        onDelete: 'SET NULL',
-        onUpdate: 'SET NULL',
+        onDelete: 'RESTRICT',
+        onUpdate: 'RESTRICT',
       }),
     );
   }

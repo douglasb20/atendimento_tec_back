@@ -2,6 +2,7 @@ import { AtendimentosEntity } from 'atendimentos/entities/atendimento.entity';
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { UserRefreshTokens } from './user-refresh-tokens.entity';
 import { PermissionXUser } from 'permissions/entities/permission-x-user.entity';
+import { AtendimentoChats } from 'atendimento-chat/entities/atendimento-chats.entity';
 
 @Entity('users')
 export class Users {
@@ -38,6 +39,7 @@ export class Users {
   @Column({ default: 1, nullable: true })
   status: number;
 
+  // ======= Relationships =======
   @OneToMany(() => AtendimentosEntity, (atendimentos) => atendimentos.users)
   atendimentos: AtendimentosEntity[];
 
@@ -46,4 +48,7 @@ export class Users {
 
   @OneToMany(() => UserRefreshTokens, (userRefreshTokens) => userRefreshTokens.users)
   userRefreshTokens: UserRefreshTokens[];
+
+  @OneToMany(() => AtendimentoChats, (atendimentoChats) => atendimentoChats.user)
+  atendimentoChats: AtendimentoChats[];
 }

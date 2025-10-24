@@ -7,8 +7,8 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Clients } from 'client/entities/clients.entity';
-import { Contacts } from 'client/entities/contacts.entity';
+import { Clients } from 'clients/entities/clients.entity';
+import { Contacts } from 'clients/entities/contacts.entity';
 import { Users } from 'users/entities/users.entity';
 import { AtendimentoStatusEntity } from './atendimento-status.entity';
 import { AtendimentosServicosEntity } from './atendimento-servico.entity';

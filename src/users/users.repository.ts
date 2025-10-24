@@ -49,7 +49,7 @@ export class UserRepository extends Repository<Users> {
     });
     return await manager.save(Users, updateUser);
   }
-  
+
   async deleteUser(id: number, manager: EntityManager) {
     const user = await this.findById(id);
     if (!user) {

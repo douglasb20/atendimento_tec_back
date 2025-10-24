@@ -25,7 +25,7 @@ export class PermissionsRepository extends Repository<Permissions> {
 
   async findAllPermissions() {
     return this.find({
-      relations: ['permissionModule']
+      relations: ['permissionModule'],
     });
   }
 
@@ -42,12 +42,19 @@ export class PermissionsRepository extends Repository<Permissions> {
     return permissions;
   }
 
-  async createPermission(createPermissionDto: CreatePermissionDto[], manager: EntityManager): Promise<void> {
+  async createPermission(
+    createPermissionDto: CreatePermissionDto[],
+    manager: EntityManager,
+  ): Promise<void> {
     const permissions = this.create(createPermissionDto);
     await manager.save(permissions);
   }
 
-  async updatePermission(id: number, updatePermissionDto: UpdatePermissionDto, manager: EntityManager) {
+  async updatePermission(
+    id: number,
+    updatePermissionDto: UpdatePermissionDto,
+    manager: EntityManager,
+  ) {
     const permission = await this.findOneBy({ id });
     if (!permission) {
       this.logger.error(`Erro de atualizar permissão: Permissão com id "${id}" nao encontrada`);

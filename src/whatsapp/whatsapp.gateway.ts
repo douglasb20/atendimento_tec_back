@@ -12,21 +12,19 @@ import { Server, Socket } from 'socket.io';
   },
 })
 export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect {
-  
   @WebSocketServer()
   server: Server;
 
   private clients = new Map<string, Socket>();
-  
 
   handleConnection(client: Socket) {
     console.log(WhatsappGateway.name);
-    console.log(`🔌 Cliente conectado: ${client.id}`);
+    console.log(`Cliente conectado: ${client.id}`);
     this.clients.set(client.id, client);
   }
 
   handleDisconnect(client: Socket) {
-    console.log(`❌ Cliente desconectado: ${client.id}`);
+    console.log(`Cliente desconectado: ${client.id}`);
     this.clients.delete(client.id);
   }
 

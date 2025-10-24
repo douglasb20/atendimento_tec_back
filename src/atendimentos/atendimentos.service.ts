@@ -7,8 +7,8 @@ import { CreateAtendimentoServicoDto } from './dto/create-atendimento-servico.dt
 import { AtendimentoListResponse } from '@types';
 import { AtendimentosEntity } from './entities/atendimento.entity';
 import { AtendimentosServicosEntity } from './entities/atendimento-servico.entity';
-import { Clients } from 'client/entities/clients.entity';
-import { Contacts } from 'client/entities/contacts.entity';
+import { Clients } from 'clients/entities/clients.entity';
+import { Contacts } from 'clients/entities/contacts.entity';
 import { Users } from 'users/entities/users.entity';
 import { Services } from 'service/entities/service.entity';
 import { AtendimentoStatusEntity } from './entities/atendimento-status.entity';
@@ -245,7 +245,11 @@ export class AtendimentosService {
     return this.queryRunner.manager.save(AtendimentosServicosEntity, servicosNew);
   }
 
-  async filterByDate(userId: number, dataInicio: string, dataFim: string): Promise<AtendimentoListResponse[]> {
+  async filterByDate(
+    userId: number,
+    dataInicio: string,
+    dataFim: string,
+  ): Promise<AtendimentoListResponse[]> {
     const result = await this.atendimentoRepository.filterByDate(userId, dataInicio, dataFim);
     return result;
   }

@@ -96,8 +96,8 @@ export class CreateAtendimentosTable1726357566010 implements MigrationInterface 
           {
             name: 'data_referencia_idx',
             columnNames: ['data_referencia'],
-          }
-        ]
+          },
+        ],
       }),
     );
   }

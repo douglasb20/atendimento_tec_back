@@ -3,8 +3,8 @@ import { AtendimentosEntity } from './entities/atendimento.entity';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { AtendimentoListResponse } from '@types';
 import { AtendimentosServicosEntity } from './entities/atendimento-servico.entity';
-import { Clients } from 'client/entities/clients.entity';
-import { Contacts } from 'client/entities/contacts.entity';
+import { Clients } from 'clients/entities/clients.entity';
+import { Contacts } from 'clients/entities/contacts.entity';
 import { Services } from 'service/entities/service.entity';
 import { Users } from 'users/entities/users.entity';
 import { CreateAtendimentoServicoDto } from './dto/create-atendimento-servico.dto';
@@ -66,7 +66,11 @@ export class AtendimentoRepository extends Repository<AtendimentosEntity> {
     return result;
   }
 
-  async filterByDate(userId: number, dataInicio: string, dataFim: string): Promise<AtendimentoListResponse[]> {
+  async filterByDate(
+    userId: number,
+    dataInicio: string,
+    dataFim: string,
+  ): Promise<AtendimentoListResponse[]> {
     const query = this.queryAtendimento();
     const result = await query
       .where(`at.data_referencia BETWEEN :dataInicio AND :dataFim`, { dataInicio, dataFim })

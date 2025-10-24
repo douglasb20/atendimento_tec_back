@@ -15,7 +15,7 @@ export class Contacts {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'int', nullable: true })
   client_id: number;
 
   @Column({ type: 'varchar', length: 90, nullable: false })

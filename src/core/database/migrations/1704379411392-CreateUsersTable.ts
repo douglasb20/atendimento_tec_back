@@ -49,7 +49,7 @@ export class CreateUsersTable1704379411392 implements MigrationInterface {
             type: 'varchar',
             length: '10',
             isNullable: false,
-            default: 'USER',
+            default: "'USER'",
           },
           {
             name: 'is_superuser',
@@ -68,9 +68,9 @@ export class CreateUsersTable1704379411392 implements MigrationInterface {
       true,
     );
     await queryRunner.query(
-      'INSERT INTO \
+      "INSERT INTO \
       users(name, email, password, role, is_superuser) \
-      values("Douglas", "douglasdev.cn@gmail.com", "$2b$10$u02d66.IaHqUuJ3p42qQF.xrS1VjX3DWwVOTat/zMBu2lzzBFp0Ly", "ADMIN", 1)',
+      values('Douglas', 'douglasdev.cn@gmail.com', '$2b$10$u02d66.IaHqUuJ3p42qQF.xrS1VjX3DWwVOTat/zMBu2lzzBFp0Ly', 'ADMIN', 1)",
     );
   }
 

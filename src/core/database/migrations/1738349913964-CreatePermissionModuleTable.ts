@@ -1,42 +1,40 @@
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
-export class CreateAtendimentosStatusTable1726357464159 implements MigrationInterface {
+export class CreatePermissionModuleTable1738349913964 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.createTable(
       new Table({
-        name: 'atendimento_status',
+        name: 'permission_module',
         columns: [
           {
             name: 'id',
             type: 'int',
-            isPrimary: true,
             isGenerated: true,
+            isPrimary: true,
             generationStrategy: 'increment',
           },
           {
-            name: 'descricao',
+            name: 'nome',
             type: 'varchar',
-            length: '25',
+            length: '60',
           },
         ],
       }),
+      true,
     );
 
-    const hasTable = await queryRunner.hasTable('atendimento_status');
-
+    const hasTable = await queryRunner.hasTable('permission_module');
     if (hasTable) {
       await queryRunner.query(
-        'INSERT INTO \
-        atendimento_status(descricao) \
-        values("Aberto"), \
-        ("Pendente"), \
-        ("Finalizado"), \
-        ("Excluído")',
+        "INSERT INTO permission_module(id, nome) values \
+        (1,'Atendimento'), \
+        (2,'Usuário'), \
+        (3,'Serviços');",
       );
     }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.dropTable('atendimento_status');
+    await queryRunner.dropTable('permission_module');
   }
 }

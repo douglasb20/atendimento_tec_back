@@ -34,8 +34,11 @@ export class PermissionService {
     try {
       await this.queryRunner.startTransaction();
 
-      await this.permissionRepository.createPermission(createPermissionDto, this.queryRunner.manager);
-      
+      await this.permissionRepository.createPermission(
+        createPermissionDto,
+        this.queryRunner.manager,
+      );
+
       await this.queryRunner.commitTransaction();
     } catch (err) {
       await this.queryRunner.rollbackTransaction();
@@ -47,9 +50,13 @@ export class PermissionService {
   async updatePermission(id: number, updatePermissionDto: UpdatePermissionDto) {
     try {
       await this.queryRunner.startTransaction();
-      
-      await this.permissionRepository.updatePermission(id, updatePermissionDto, this.queryRunner.manager);
-      
+
+      await this.permissionRepository.updatePermission(
+        id,
+        updatePermissionDto,
+        this.queryRunner.manager,
+      );
+
       await this.queryRunner.commitTransaction();
     } catch (err) {
       await this.queryRunner.rollbackTransaction();
@@ -57,20 +64,14 @@ export class PermissionService {
       throw new BadRequestException(err.message);
     }
   }
-  
-  
+
   // =============== Modules =============
 
   async findAllModules() {
     return this.permissionRepository.findAllModules();
   }
 
-  async createModule() {
-    
-  }
+  async createModule() {}
 
-  async updateModule() {
-    
-  }
-  
+  async updateModule() {}
 }

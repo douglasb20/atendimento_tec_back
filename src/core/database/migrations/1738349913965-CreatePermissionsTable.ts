@@ -36,20 +36,24 @@ export class CreatePermissionsTable1738349913965 implements MigrationInterface {
             referencedColumnNames: ['id'],
             referencedTableName: 'permission_module',
             onDelete: 'RESTRICT',
-            onUpdate: 'RESTRICT'
-          }
-        ]
+            onUpdate: 'RESTRICT',
+          },
+        ],
       }),
     );
     if (await queryRunner.hasTable('permissions')) {
       await queryRunner.query(
-        'INSERT INTO \
-        permissions(label, module, name) \
-        values("Visualizar usuário", "Usuário", "user:view"), \
-        ("Cadastrar usuário", "Usuário", "user:add"), \
-        ("Alterar usuário", "Usuário", "user:update"), \
-        ("Deletar usuário", "Usuário", "user:delete"), \
-        ',
+        "INSERT INTO permissions (id, label, permission_module_id, name) VALUES \
+                (1, 'Alterar Atendimento', 1, 'atendimento:update'), \
+                (2, 'Adicionar Atendimento', 1, 'atendimento:add'), \
+                (3, 'Visualizar Atendimento', 1, 'atendimento:view'), \
+                (4, 'Remover Atendimento', 1, 'atendimento:delete'), \
+                (5, 'Visualizar usuário', 2, 'user:view'), \
+                (6, 'Cadastrar usuário', 2, 'user:add'), \
+                (7, 'Alterar usuário', 2, 'user:update'), \
+                (8, 'Remover usuário', 2, 'user:delete'), \
+                (9, 'Adicionar serviço', 3, 'service:add'), \
+                (10, 'Atualizar serviço', 3, 'service:update');",
       );
     }
   }
