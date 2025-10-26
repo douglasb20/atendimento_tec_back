@@ -9,10 +9,14 @@ import { Channels } from './entities/channels.entity';
 import { ChannelsService } from './channels.service';
 import { ChannelsController } from './channels.controller';
 import { ChannelsRepository } from './channels.repository';
+import { WhatsappModule } from 'whatsapp/whatsapp.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([AtendimentoChats, AtendimentoChatMessages, ChannelStatus, Channels])],
+  imports: [
+    TypeOrmModule.forFeature([AtendimentoChats, AtendimentoChatMessages, ChannelStatus, Channels]),
+    WhatsappModule,
+  ],
   controllers: [ChannelsController],
   providers: [ChannelsService, ChannelsRepository],
 })
-export class ChannelsModule { }
+export class ChannelsModule {}

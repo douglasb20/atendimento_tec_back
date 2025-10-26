@@ -4,7 +4,7 @@ import { SendMessageDto } from './dto/send-message.dto';
 
 @Controller('atendimento-chat')
 export class AtendimentoChatController {
-  constructor(private readonly atendimentoChatService: AtendimentoChatService) { }
+  constructor(private readonly atendimentoChatService: AtendimentoChatService) {}
 
   @Post('send-message')
   @HttpCode(HttpStatus.OK)

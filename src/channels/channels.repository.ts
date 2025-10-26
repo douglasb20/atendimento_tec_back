@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Not, Repository } from 'typeorm';
 import { Channels } from './entities/channels.entity';
 
 @Injectable()
@@ -11,6 +11,6 @@ export class ChannelsRepository extends Repository<Channels> {
 
   async findActives() {
     this.logger.log('Initializing ChannelsRepository');
-    return this.findBy({ channel_status_id: 1 });
+    return this.findBy({ channel_status_id: Not(5), deleted_at: null });
   }
 }

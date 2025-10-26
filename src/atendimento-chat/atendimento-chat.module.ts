@@ -11,8 +11,16 @@ import { AtendimentoChatMessages } from './entities/atendimento-chat-messages.en
 import { Users } from 'users/entities/users.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([AtendimentoChats, AtendimentoChatMessages, AtendimentoChatStatus, Channels, Users])],
+  imports: [
+    TypeOrmModule.forFeature([
+      AtendimentoChats,
+      AtendimentoChatMessages,
+      AtendimentoChatStatus,
+      Channels,
+      Users,
+    ]),
+  ],
   controllers: [AtendimentoChatController],
   providers: [AtendimentoChatService, AtendimentoChatsRepository],
 })
-export class AtendimentoChatModule { }
+export class AtendimentoChatModule {}

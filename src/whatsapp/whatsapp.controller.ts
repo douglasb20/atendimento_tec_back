@@ -13,6 +13,4 @@ export class WhatsappController {
     console.log('Webhook received:', payload);
     return { status: 'received' };
   }
-
-
 }

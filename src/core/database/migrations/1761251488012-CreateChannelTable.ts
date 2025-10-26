@@ -78,7 +78,7 @@ export class CreateChannelsTable1761251488012 implements MigrationInterface {
             referencedColumnNames: ['id'],
             onDelete: 'RESTRICT',
             onUpdate: 'RESTRICT',
-          }
+          },
         ],
       }),
       true,

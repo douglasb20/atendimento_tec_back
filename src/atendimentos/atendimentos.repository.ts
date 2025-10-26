@@ -166,8 +166,8 @@ export class AtendimentoRepository extends Repository<AtendimentosEntity> {
         'cli.cnpj as cli_cnpj',
         'u.name as user_nome',
         'u.email as user_email',
-        'cont.nome_contato as contact_nome',
-        'cont.telefone_contato as contact_telefone',
+        'cont.nome as contact_nome',
+        'cont.telefone as contact_telefone',
         'as.descricao as status_descricao',
       ])
       .addSelect(

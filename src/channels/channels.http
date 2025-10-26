@@ -1,0 +1,21 @@
+# @name login
+POST {{url}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "douglasdev.cn@gmail.com",
+  "password": 1234
+}
+###
+
+@authToken = {{login.response.body.$.access_token}}
+
+@endpoint = /channels
+
+#### 1) Get all channels
+GET {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+
+#### 2) Start a session
+GET {{url}}{{endpoint}}/start/1
+Authorization: Bearer {{authToken}}

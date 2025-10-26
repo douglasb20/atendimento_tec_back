@@ -1,12 +1,10 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, OneToMany } from "typeorm";
-import { ChannelStatus } from "./channel-status.entity";
-import { AtendimentoChats } from "atendimento-chat/entities/atendimento-chats.entity";
-import { AtendimentoChatMessages } from "atendimento-chat/entities/atendimento-chat-messages.entity";
-
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { ChannelStatus } from './channel-status.entity';
+import { AtendimentoChats } from 'atendimento-chat/entities/atendimento-chats.entity';
+import { AtendimentoChatMessages } from 'atendimento-chat/entities/atendimento-chat-messages.entity';
 
 @Entity('channels')
 export class Channels {
-
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -31,23 +29,26 @@ export class Channels {
   @Column({ type: 'datetime', nullable: true })
   disconnected_at: Date | null;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   @Column({ type: 'datetime', nullable: true, default: null, onUpdate: 'CURRENT_TIMESTAMP' })
   updated_at: Date | null;
-  @Column({ type: 'datetime', nullable: true, default: null})
+  @Column({ type: 'datetime', nullable: true, default: null })
   deleted_at: Date | null;
 
   // == Relations ==
 
-  @ManyToOne(() => ChannelStatus, channelStatus => channelStatus.channels)
+  @ManyToOne(() => ChannelStatus, (channelStatus) => channelStatus.channels, { eager: true })
   @JoinColumn({ name: 'channel_status_id' })
   channelStatus: ChannelStatus;
 
-  @OneToMany(() => AtendimentoChats, atendimentoChat => atendimentoChat.channels)
+  @OneToMany(() => AtendimentoChats, (atendimentoChat) => atendimentoChat.channels)
   atendimentoChats: AtendimentoChats[];
 
-  @OneToMany(() => AtendimentoChatMessages, atendimentoChatMessage => atendimentoChatMessage.channels)
+  @OneToMany(
+    () => AtendimentoChatMessages,
+    (atendimentoChatMessage) => atendimentoChatMessage.channels,
+  )
   atendimentoChatMessages: AtendimentoChatMessages[];
 }

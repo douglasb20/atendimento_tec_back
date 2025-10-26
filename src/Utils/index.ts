@@ -41,3 +41,6 @@ export async function ToBase64(filePath: string) {
 
   return Buffer.from(file).toString('base64');
 }
+
+export const sleep = async (ms: number) =>
+  await new Promise((resolve) => setTimeout(resolve, ms * 1000));
