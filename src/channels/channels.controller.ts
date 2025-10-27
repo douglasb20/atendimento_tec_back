@@ -15,7 +15,14 @@ export class ChannelsController {
     return this.channelsService.getActiveChannels();
   }
 
-  @Get("/start/:channelId")
+  @Get("/:channelId")
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @HttpCode(HttpStatus.OK)
+  async findChannel(@Param('channelId') channelId: number) {
+    return this.channelsService.findChannel(channelId);
+  }
+
+  @Get("/:channelId/start")
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @HttpCode(HttpStatus.OK)
   async startSession(@Param('channelId') channelId: number) {

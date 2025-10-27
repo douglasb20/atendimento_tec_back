@@ -1,10 +1,19 @@
 import {
-  WebSocketGateway,
-  WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { verify } from 'jsonwebtoken';
+
+import { AuthService } from 'auth/auth.service';
+import { JwtPayload } from '@types';
+
+type ClientInfo = {
+  socket: Socket;
+  user_id: number;
+}
 
 @WebSocketGateway({
   cors: {
@@ -12,15 +21,44 @@ import { Server, Socket } from 'socket.io';
   },
 })
 export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect {
+
+  constructor(
+    private readonly authService: AuthService,
+  ) {}
+
   @WebSocketServer()
   server: Server;
 
-  private clients = new Map<string, Socket>();
+  private clients = new Map<string, ClientInfo>();
 
-  handleConnection(client: Socket) {
-    console.log(WhatsappGateway.name);
-    console.log(`Cliente conectado: ${client.id}`);
-    this.clients.set(client.id, client);
+  async handleConnection(client: Socket) {
+    const token = client.handshake.auth.token;
+
+    if (!token) {
+      console.log(`Cliente ${client.id} desconectado: Token não fornecido.`);
+      client.disconnect();
+      return;
+    }
+
+    try {
+      // @ts-ignore
+      const payload = verify(token, process.env.ACCESS_JWT_SECRET as PublicKey) as JwtPayload;
+      
+      const user = await this.authService.validateUser(payload);
+
+      
+
+      console.log(`Cliente conectado: ${client.id}`);
+      this.clients.set(client.id, {
+        socket: client,
+        user_id: user.id
+      });
+    } catch (error) {
+      console.log(`Cliente ${client.id} desconectado: ${error.message}`);
+      client.disconnect();
+      return;
+    }
+
   }
 
   handleDisconnect(client: Socket) {
@@ -34,6 +72,6 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   emitToClient(clientId: string, event: string, data: any) {
     const client = this.clients.get(clientId);
-    if (client) client.emit(event, data);
+    if (client) client.socket.emit(event, data);
   }
 }

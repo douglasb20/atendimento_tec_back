@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Users } from 'users/entities/users.entity';
 import { PermissionService } from './permission.service';

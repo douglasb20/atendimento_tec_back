@@ -5,13 +5,13 @@ import { format } from 'date-fns';
 import { Request } from 'express';
 
 import { Users } from 'users/entities/users.entity';
-import { JwtPayload } from './models/jwt-payload.model';
 import { ConfigMailerService } from 'core/mailer/configmailer.service';
 import { UpdateUserDto } from 'users/dto/update-user.dto';
 import { UserRepository } from 'users/users.repository';
 import { DataSource, LessThan, QueryRunner } from 'typeorm';
 import { UserRefreshTokens } from 'users/entities/user-refresh-tokens.entity';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { JwtPayload } from '@types';
 
 type TokenResponse = {
   access_token: string;
@@ -109,8 +109,8 @@ export class AuthService {
         this.logger.error('Erro de validação: Tipo de token inválido');
         throw new UnauthorizedException('Tipo de token inválido');
       }
-      const user = await this.validadeUser(payload);
-      const userRefresh = await this.validadeRefresh(refreshToken);
+      const user = await this.validateUser(payload);
+      const userRefresh = await this.validateRefresh(refreshToken);
 
       if (!user || !userRefresh) {
         this.logger.error('Erro de validação: Refresh token inválido');
@@ -146,7 +146,7 @@ export class AuthService {
     await this.query.manager.save(UserRefreshTokens, newUserRefresh);
   }
 
-  public async validadeRefresh(refreshToken: string): Promise<UserRefreshTokens> {
+  public async validateRefresh(refreshToken: string): Promise<UserRefreshTokens> {
     const userRefresh = await this.query.manager.findOneBy(UserRefreshTokens, {
       refresh_token: refreshToken,
     });
@@ -157,7 +157,7 @@ export class AuthService {
     return userRefresh;
   }
 
-  public async validadeUser(jwtPayload: JwtPayload): Promise<Users> {
+  public async validateUser(jwtPayload: JwtPayload): Promise<Users> {
     const user = await this.usersRepository.findById(jwtPayload.sub);
     if (!user) {
       this.logger.error('Erro de validação: Usuário não encontrado');

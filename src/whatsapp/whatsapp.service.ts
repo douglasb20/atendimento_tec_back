@@ -1,54 +1,71 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 
-import { WhatsappGateway } from './whatsapp.gateway';
-import { SessionStartResponse, QrCodeResponse, ErrorResponse, WhatsappWebhookPayload, DataTypeWhatsapp } from '@types';
+import { DataTypeWhatsapp, ErrorResponse, QrCodeResponse, SessionStartResponse, WhatsappWebhookPayload } from '@types';
+import { sleep } from 'Utils';
 
 @Injectable()
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
+  private axiosInstance: AxiosInstance;
 
   constructor(
-    private readonly whatsappGateway: WhatsappGateway,
     private readonly eventEmitter: EventEmitter2,
-  ) { }
-  
+  ) {
+    this.axiosInstance = axios.create({
+      baseURL: process.env.URL_WHATSAPP_API,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.WHATSAPP_API_KEY || '',
+      },
+    });
+  }
+
   async processWebhook(payload: WhatsappWebhookPayload) {
     this.logger.log('Processando webhook do WhatsApp...');
-    try {
-      const { dataType } = payload;
+    const { dataType } = payload;
 
-      switch (dataType) {
-        case DataTypeWhatsapp.MESSAGE_CREATE:
-        case DataTypeWhatsapp.MESSAGE_EDIT:
-        case DataTypeWhatsapp.MESSAGE_ACK:
-        case DataTypeWhatsapp.MESSAGE_REACTION:
-          this.eventEmitter.emit('whatsapp.message', payload);
-          break;
-      }
-      this.whatsappGateway.emitEvent('whatsapp:message', payload);
-    } catch (error) {
-      this.logger.error('Erro ao processar webhook do WhatsApp:', error);
+    switch (dataType) {
+      case DataTypeWhatsapp.MESSAGE_CREATE:
+      case DataTypeWhatsapp.MESSAGE_EDIT:
+      case DataTypeWhatsapp.MESSAGE_ACK:
+      case DataTypeWhatsapp.MESSAGE_REACTION:
+      case DataTypeWhatsapp.MESSAGE_REVOKED_EVERYONE:
+        this.eventEmitter.emit('whatsapp.message', payload);
+        break;
+      case DataTypeWhatsapp.QR_RECEIVED:
+        this.eventEmitter.emit('whatsapp.qr_code_received', payload);
+        break;
+      case DataTypeWhatsapp.AUTHENTICATED:
+        this.eventEmitter.emit('whatsapp.authenticated', payload);
+        break;
+      case DataTypeWhatsapp.DISCONNECTED:
+        // await this.requestDisconnection(payload.sessionId);
+        this.eventEmitter.emit('whatsapp.disconnected', payload);
+        break;
     }
+    // this.whatsappGateway.emitEvent('whatsapp:message', payload);
+
   }
 
   async requestConnection(sessionId: string) {
     try {
-      const urlStatus = `${process.env.URL_WHATSAPP_API}/session/status/${sessionId}`;
-      const { data: statusData } = await axios.get<SessionStartResponse>(urlStatus);
+      const urlStatus = `/session/status/${sessionId}`;
+      const { data: statusData } = await this.axiosInstance.get<SessionStartResponse>(urlStatus);
 
       if (!statusData.success) {
         if (statusData.message === 'session_not_found') {
-          const urlStart = `${process.env.URL_WHATSAPP_API}/session/start/${sessionId}`;
-          const { data } = await axios.get<SessionStartResponse>(urlStart);
+          const urlStart = `/session/start/${sessionId}`;
+          const { data } = await this.axiosInstance.get<SessionStartResponse>(urlStart);
 
           if (!data.success) {
             this.logger.log(`Falha ao iniciar sessão para o WhatsApp: ${(data as unknown as ErrorResponse).error}`);
             throw new InternalServerErrorException(`Falha ao iniciar sessão para o WhatsApp: ${(data as unknown as ErrorResponse).error}`);
           }
           this.logger.log(`Sessão do WhatsApp iniciada com sucesso: ${data.message}`);
-        }
+        } 
+        await this.eventEmitter.emitAsync('whatsapp.session_started', { sessionId });
       }
     } catch (error) {
       this.logger.error('Erro ao solicitar conexão do WhatsApp:', error.response?.data.error || error.message);
@@ -58,17 +75,14 @@ export class WhatsappService {
 
   async requestQrCode(sessionId: string) {
     try {
-      const url = `${process.env.URL_WHATSAPP_API}/session/qr/${sessionId}`;
-      const { data: qrCodeData } = await axios.get<QrCodeResponse>(url);
+      const url = `/session/qr/${sessionId}`;
+      const { data: qrCodeData } = await this.axiosInstance.get<QrCodeResponse>(url);
 
-      console.log(qrCodeData);
+      const MESSAGE_SESSION_NOT_FOUND = 'qr code not ready or already scanned';
 
-      if (!qrCodeData.success) {
-        // this.logger.log(`Falha ao gerar QR Code para o WhatsApp: ${(qrCodeData as unknown as ErrorResponse).error}`);
-        throw new InternalServerErrorException(`Falha ao gerar QR Code para o WhatsApp: ${(qrCodeData as unknown as ErrorResponse).error}`);
+      if (!qrCodeData.success && qrCodeData.message === MESSAGE_SESSION_NOT_FOUND) {
+        return;
       }
-
-      this.logger.log(`QR Code gerado com sucesso: ${qrCodeData.qr}`);
 
       return qrCodeData.qr;
 
@@ -79,7 +93,14 @@ export class WhatsappService {
   }
 
   async requestDisconnection(sessionId: string) {
-    console.log('Desconectando sessão do WhatsApp:', sessionId);
+    try {
+      await sleep(5);
+      const url = `/session/terminate/${sessionId}`;
+      await this.axiosInstance.get<SessionStartResponse>(url);
+    } catch (error) {
+      this.logger.error('Erro ao solicitar desconexão do WhatsApp:', error.response?.data.error || error.message);
+      throw new InternalServerErrorException('Falha ao se comunicar com a API do WhatsApp.');
+    }
   }
 
   async sendMessage(sessionId: string, to: string, message: string) {
@@ -90,7 +111,7 @@ export class WhatsappService {
       content: message,
     };
 
-    const url = `${process.env.URL_WHATSAPP_API}/client/sendMessage/${sessionId}`;
+    const url = `/client/sendMessage/${sessionId}`;
     try {
       const response = await axios.post(url, dataPost);
       this.logger.log(`Mensagem enviada com sucesso: ${response.data}`);

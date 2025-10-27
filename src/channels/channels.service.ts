@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ChannelsRepository } from './channels.repository';
 import { WhatsappService } from 'whatsapp/whatsapp.service';
+
 // import { QueryRunner } from 'typeorm';
 
 @Injectable()
@@ -10,40 +11,36 @@ export class ChannelsService {
   constructor(
     private readonly channelsRepository: ChannelsRepository,
     private readonly whatsappService: WhatsappService,
-  ) {}
+  ) { }
 
   async getActiveChannels() {
     return this.channelsRepository.findActives();
   }
 
-  async startSession(channelId: number) {
+  async findChannel(channelId: number) {
     const channel = await this.channelsRepository.findOneBy({ id: channelId });
     if (!channel) {
-      this.logger.error(`Erro de conectar canal: Canal não localizado com este id`);
+      this.logger.error(`Erro ao localizar canal: Canal não encontrado com este id`);
+      throw new NotFoundException('Canal não encontrado com este id');
+    }
+    return channel;
+  }
+
+  async startSession(channelId: number) {
+    const channel = await this.findChannel(channelId);
+    if (!channel) { 
       throw new NotFoundException('Canal não localizado com este id');
     }
 
     await this.whatsappService.requestConnection(channel.session_id);
-    await this.requestQrCode(channelId);
-  }
+    const qrCode = await this.whatsappService.requestQrCode(channel.session_id);
 
-  async requestQrCode(channelId: number) {
-    const channel = await this.channelsRepository.findOneBy({ id: channelId });
-    if (!channel) {
-      this.logger.error(`Erro ao solicitar QR Code: Canal não localizado com este id`);
-      throw new NotFoundException('Canal não localizado com este id');
+    if (qrCode) {
+      this.channelsRepository.update(channel.id, { qr_code: qrCode });
     }
   }
+
 
   // ====== Webhook Processing ======
 
-  async qrCodeReceived(sessionId: string, qrCode: string) {
-    const channel = await this.channelsRepository.findOneBy({ session_id: sessionId });
-    if (!channel) {
-      this.logger.error(`Erro ao receber QR Code: Canal não localizado com este id`);
-      throw new NotFoundException('Canal não localizado com este id');
-    }
-
-    await this.channelsRepository.update({ session_id: sessionId }, { qr_code: qrCode, channel_status_id: 2 });
-  }
 }

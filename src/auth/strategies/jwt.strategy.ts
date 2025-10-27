@@ -4,7 +4,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 
 import { AuthService } from '../auth.service';
 import { SigninDto } from 'users/dto/signin.dto';
-import { JwtPayload } from '../models/jwt-payload.model';
+import { JwtPayload } from '@types';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -20,7 +20,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     if (jwtPayload.type !== 'access') {
       throw new UnauthorizedException('Invalid token type');
     }
-    const user = await this.authService.validadeUser(jwtPayload);
+    const user = await this.authService.validateUser(jwtPayload);
     return user;
   }
 }

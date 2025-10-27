@@ -6,10 +6,11 @@ import { AtendimentoChatMessages } from 'atendimento-chat/entities/atendimento-c
 import { ChannelStatus } from './entities/channel-status.entity';
 import { Channels } from './entities/channels.entity';
 
+import { WhatsappModule } from 'whatsapp/whatsapp.module';
 import { ChannelsService } from './channels.service';
 import { ChannelsController } from './channels.controller';
 import { ChannelsRepository } from './channels.repository';
-import { WhatsappModule } from 'whatsapp/whatsapp.module';
+import { ChannelsListener } from './channels.listener';
 
 @Module({
   imports: [
@@ -17,6 +18,6 @@ import { WhatsappModule } from 'whatsapp/whatsapp.module';
     WhatsappModule,
   ],
   controllers: [ChannelsController],
-  providers: [ChannelsService, ChannelsRepository],
+  providers: [ChannelsService, ChannelsRepository, ChannelsListener],
 })
 export class ChannelsModule {}
