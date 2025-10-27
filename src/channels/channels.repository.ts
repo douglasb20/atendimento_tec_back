@@ -4,7 +4,6 @@ import { Channels } from './entities/channels.entity';
 
 @Injectable()
 export class ChannelsRepository extends Repository<Channels> {
-
   private readonly logger = new Logger(ChannelsRepository.name);
   constructor(dataSource: DataSource) {
     super(Channels, dataSource.manager);

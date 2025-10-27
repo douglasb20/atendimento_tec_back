@@ -13,7 +13,7 @@ import { JwtPayload } from '@types';
 type ClientInfo = {
   socket: Socket;
   user_id: number;
-}
+};
 
 @WebSocketGateway({
   cors: {
@@ -21,10 +21,7 @@ type ClientInfo = {
   },
 })
 export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect {
-
-  constructor(
-    private readonly authService: AuthService,
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
   @WebSocketServer()
   server: Server;
@@ -43,22 +40,19 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
     try {
       // @ts-ignore
       const payload = verify(token, process.env.ACCESS_JWT_SECRET as PublicKey) as JwtPayload;
-      
-      const user = await this.authService.validateUser(payload);
 
-      
+      const user = await this.authService.validateUser(payload);
 
       console.log(`Cliente conectado: ${client.id}`);
       this.clients.set(client.id, {
         socket: client,
-        user_id: user.id
+        user_id: user.id,
       });
     } catch (error) {
       console.log(`Cliente ${client.id} desconectado: ${error.message}`);
       client.disconnect();
       return;
     }
-
   }
 
   handleDisconnect(client: Socket) {

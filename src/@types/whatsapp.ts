@@ -1,5 +1,3 @@
-
-
 export enum DataTypeWhatsapp {
   AUTHENTICATED = 'authenticated',
   AUTHENTICATION_FAILURE = 'auth_failure',
@@ -25,7 +23,7 @@ export enum DataTypeWhatsapp {
   STATE_CHANGED = 'change_state',
   BATTERY_CHANGED = 'change_battery',
   REMOTE_SESSION_SAVED = 'remote_session_saved',
-  CALL = 'call'
+  CALL = 'call',
 }
 
 export enum MessageTypes {
@@ -78,216 +76,215 @@ export enum MessageAck {
 }
 
 export type MessageId = {
-  fromMe: boolean,
-  remote: string,
-  id: string,
-  _serialized: string,
-}
+  fromMe: boolean;
+  remote: string;
+  id: string;
+  _serialized: string;
+};
 
 export type InviteV4Data = {
-  inviteCode: string,
-  inviteCodeExp: number,
-  groupId: string,
-  groupName?: string,
-  fromId: string,
-  toId: string
-}
-
+  inviteCode: string;
+  inviteCodeExp: number;
+  groupId: string;
+  groupName?: string;
+  fromId: string;
+  toId: string;
+};
 
 export type MessageMedia = {
   /** MIME type of the attachment */
-  mimetype: string
+  mimetype: string;
   /** Base64-encoded data of the file */
-  data: string
+  data: string;
   /** Document file name. Value can be null */
-  filename?: string | null
+  filename?: string | null;
   /** Document file size in bytes. Value can be null. */
-  filesize?: number | null
-}
+  filesize?: number | null;
+};
 
 export type MessageSendOptions = {
   /** Show links preview. Has no effect on multi-device accounts. */
-  linkPreview?: boolean
+  linkPreview?: boolean;
   /** Send audio as voice message with a generated waveform */
-  sendAudioAsVoice?: boolean
+  sendAudioAsVoice?: boolean;
   /** Send video as gif */
-  sendVideoAsGif?: boolean
+  sendVideoAsGif?: boolean;
   /** Send media as sticker */
-  sendMediaAsSticker?: boolean
+  sendMediaAsSticker?: boolean;
   /** Send media as document */
-  sendMediaAsDocument?: boolean
+  sendMediaAsDocument?: boolean;
   /** Send media as quality HD */
-  sendMediaAsHd?: boolean
+  sendMediaAsHd?: boolean;
   /** Send photo/video as a view once message */
-  isViewOnce?: boolean
+  isViewOnce?: boolean;
   /** Automatically parse vCards and send them as contacts */
-  parseVCards?: boolean
+  parseVCards?: boolean;
   /** Image or videos caption */
-  caption?: string
+  caption?: string;
   /** Id of the message that is being quoted (or replied to) */
-  quotedMessageId?: string
+  quotedMessageId?: string;
   /** User IDs to mention in the message */
-  mentions?: string[]
+  mentions?: string[];
   /** An array of object that handle group mentions */
   groupMentions?: {
     /** The name of a group to mention (can be custom) */
-    subject: string,
+    subject: string;
     /** The group ID, e.g.: 'XXXXXXXXXX@g.us' */
-    id: string
-  }[]
+    id: string;
+  }[];
   /** Send 'seen' status */
-  sendSeen?: boolean
+  sendSeen?: boolean;
   /** Bot Wid when doing a bot mention like @Meta AI */
-  invokedBotWid?: string
+  invokedBotWid?: string;
   /** Media to be sent */
-  media?: MessageMedia
+  media?: MessageMedia;
   /** Extra options */
-  extra?: any
+  extra?: any;
   /** Sticker name, if sendMediaAsSticker is true */
-  stickerName?: string
+  stickerName?: string;
   /** Sticker author, if sendMediaAsSticker is true */
-  stickerAuthor?: string
+  stickerAuthor?: string;
   /** Sticker categories, if sendMediaAsSticker is true */
-  stickerCategories?: string[],
+  stickerCategories?: string[];
   /** Should the bot send a quoted message without the quoted message if it fails to get the quote?
    * @default true (enabled) */
-  ignoreQuoteErrors?: boolean
+  ignoreQuoteErrors?: boolean;
   /**
    * Should the bot wait for the message send result?
    * @default false
    */
-  waitUntilMsgSent?: boolean
-}
+  waitUntilMsgSent?: boolean;
+};
 
 export type Message = {
   /** ACK status for the message */
-  ack: MessageAck,
+  ack: MessageAck;
   /** If the message was sent to a group, this field will contain the user that sent the message. */
-  author?: string,
+  author?: string;
   /** String that represents from which device type the message was sent */
-  deviceType: string,
+  deviceType: string;
   /** Message content */
-  body: string,
+  body: string;
   /** Indicates if the message was a broadcast */
-  broadcast: boolean,
+  broadcast: boolean;
   /** Indicates if the message was a status update */
-  isStatus: boolean,
+  isStatus: boolean;
   /** Indicates if the message is a Gif */
-  isGif: boolean,
+  isGif: boolean;
   /** Indicates if the message will disappear after it expires */
-  isEphemeral: boolean,
+  isEphemeral: boolean;
   /** ID for the Chat that this message was sent to, except if the message was sent by the current user */
-  from: string,
+  from: string;
   /** Indicates if the message was sent by the current user */
-  fromMe: boolean,
+  fromMe: boolean;
   /** Indicates if the message has media available for download */
-  hasMedia: boolean,
+  hasMedia: boolean;
   /** Indicates if the message was sent as a reply to another message */
-  hasQuotedMsg: boolean,
+  hasQuotedMsg: boolean;
   /** Indicates whether there are reactions to the message */
-  hasReaction: boolean,
+  hasReaction: boolean;
   /** Indicates the duration of the message in seconds */
-  duration: string,
+  duration: string;
   /** ID that represents the message */
-  id: MessageId,
+  id: MessageId;
   /** Indicates if the message was forwarded */
-  isForwarded: boolean,
+  isForwarded: boolean;
   /**
    * Indicates how many times the message was forwarded.
    * The maximum value is 127.
    */
-  forwardingScore: number,
+  forwardingScore: number;
   /** Indicates if the message was starred */
-  isStarred: boolean,
+  isStarred: boolean;
   /** Location information contained in the message, if the message is type "location" */
-  location: Location,
+  location: Location;
   /** List of vCards contained in the message */
-  vCards: string[],
+  vCards: string[];
   /** Invite v4 info */
-  inviteV4?: InviteV4Data,
+  inviteV4?: InviteV4Data;
   /** MediaKey that represents the sticker 'ID' */
-  mediaKey?: string,
+  mediaKey?: string;
   /** Indicates the mentions in the message body. */
-  mentionedIds: string[],
+  mentionedIds: string[];
   /** Indicates whether there are group mentions in the message body */
   groupMentions: {
     groupSubject: string;
     groupJid: string;
-  }[],
+  }[];
   /** Unix timestamp for when the message was created */
-  timestamp: number,
+  timestamp: number;
   /**
    * ID for who this message is for.
    * If the message is sent by the current user, it will be the Chat to which the message is being sent.
    * If the message is sent by another user, it will be the ID for the current user.
    */
-  to: string,
+  to: string;
   /** Message type */
-  type: MessageTypes,
+  type: MessageTypes;
   /** Links included in the message. */
   links: Array<{
-    link: string,
-    isSuspicious: boolean
-  }>,
+    link: string;
+    isSuspicious: boolean;
+  }>;
   /** Order ID */
-  orderId: string,
+  orderId: string;
   /** title */
-  title?: string,
+  title?: string;
   /** description*/
-  description?: string,
+  description?: string;
   /** Business Owner JID */
-  businessOwnerJid?: string,
+  businessOwnerJid?: string;
   /** Product JID */
-  productId?: string,
+  productId?: string;
   /** Last edit time */
-  latestEditSenderTimestampMs?: number,
+  latestEditSenderTimestampMs?: number;
   /** Last edit message author */
-  latestEditMsgKey?: MessageId,
+  latestEditMsgKey?: MessageId;
   /**
    * Protocol message key.
    * Can be used to retrieve the ID of an original message that was revoked.
    */
-  protocolMessageKey?: MessageId,
+  protocolMessageKey?: MessageId;
   /** Message buttons */
-  dynamicReplyButtons?: object,
+  dynamicReplyButtons?: object;
   /** Selected button ID */
-  selectedButtonId?: string,
+  selectedButtonId?: string;
   /** Selected list row ID */
-  selectedRowId?: string,
+  selectedRowId?: string;
   /** Returns message in a raw format */
-  rawData: object,
-  pollName: string,
+  rawData: object;
+  pollName: string;
   /** Avaiaible poll voting options */
-  pollOptions: string[],
+  pollOptions: string[];
   /** False for a single choice poll, true for a multiple choice poll */
-  allowMultipleAnswers: boolean,
+  allowMultipleAnswers: boolean;
   /** The start time of the event in timestamp (10 digits) */
-  eventStartTime: number,
+  eventStartTime: number;
   /** The end time of the event in timestamp (10 digits) */
-  eventEndTime?: number,
+  eventEndTime?: number;
   /** The event description */
-  eventDescription?: string,
+  eventDescription?: string;
   /** The location of the event */
   eventLocation?: {
     degreesLatitude: number;
     degreesLongitude: number;
     name: string;
-  },
+  };
   /** WhatsApp call link (video call or voice call) */
-  eventJoinLink?: string,
+  eventJoinLink?: string;
   /** Indicates if an event should be sent as an already canceled */
-  isEventCaneled: boolean,
+  isEventCaneled: boolean;
   /** The custom message secret, can be used as an event ID */
-  messageSecret?: Array<number>,
-}
+  messageSecret?: Array<number>;
+};
 
 type ResultResponse = {
   success: boolean;
-}
+};
 
 export type ErrorResponse = ResultResponse & {
   error: string;
-}
+};
 export type SessionStartResponse = ResultResponse & {
   message: string;
 };
@@ -295,7 +292,7 @@ export type SessionStartResponse = ResultResponse & {
 export type QrCodeResponse = ResultResponse & {
   qr: string;
   message?: string;
-}
+};
 
 export type WhatsappWebhookPayload<T = any> = {
   dataType: DataTypeWhatsapp;

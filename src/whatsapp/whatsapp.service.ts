@@ -2,7 +2,13 @@ import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import axios, { AxiosInstance } from 'axios';
 
-import { DataTypeWhatsapp, ErrorResponse, QrCodeResponse, SessionStartResponse, WhatsappWebhookPayload } from '@types';
+import {
+  DataTypeWhatsapp,
+  ErrorResponse,
+  QrCodeResponse,
+  SessionStartResponse,
+  WhatsappWebhookPayload,
+} from '@types';
 import { sleep } from 'Utils';
 
 @Injectable()
@@ -10,9 +16,7 @@ export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
   private axiosInstance: AxiosInstance;
 
-  constructor(
-    private readonly eventEmitter: EventEmitter2,
-  ) {
+  constructor(private readonly eventEmitter: EventEmitter2) {
     this.axiosInstance = axios.create({
       baseURL: process.env.URL_WHATSAPP_API,
       headers: {
@@ -46,7 +50,6 @@ export class WhatsappService {
         break;
     }
     // this.whatsappGateway.emitEvent('whatsapp:message', payload);
-
   }
 
   async requestConnection(sessionId: string) {
@@ -60,15 +63,22 @@ export class WhatsappService {
           const { data } = await this.axiosInstance.get<SessionStartResponse>(urlStart);
 
           if (!data.success) {
-            this.logger.log(`Falha ao iniciar sessão para o WhatsApp: ${(data as unknown as ErrorResponse).error}`);
-            throw new InternalServerErrorException(`Falha ao iniciar sessão para o WhatsApp: ${(data as unknown as ErrorResponse).error}`);
+            this.logger.log(
+              `Falha ao iniciar sessão para o WhatsApp: ${(data as unknown as ErrorResponse).error}`,
+            );
+            throw new InternalServerErrorException(
+              `Falha ao iniciar sessão para o WhatsApp: ${(data as unknown as ErrorResponse).error}`,
+            );
           }
           this.logger.log(`Sessão do WhatsApp iniciada com sucesso: ${data.message}`);
-        } 
+        }
         await this.eventEmitter.emitAsync('whatsapp.session_started', { sessionId });
       }
     } catch (error) {
-      this.logger.error('Erro ao solicitar conexão do WhatsApp:', error.response?.data.error || error.message);
+      this.logger.error(
+        'Erro ao solicitar conexão do WhatsApp:',
+        error.response?.data.error || error.message,
+      );
       throw new InternalServerErrorException('Falha ao se comunicar com a API do WhatsApp.');
     }
   }
@@ -85,9 +95,11 @@ export class WhatsappService {
       }
 
       return qrCodeData.qr;
-
     } catch (error) {
-      this.logger.error('Erro ao solicitar conexão do WhatsApp:', error.response?.data.error || error.message);
+      this.logger.error(
+        'Erro ao solicitar conexão do WhatsApp:',
+        error.response?.data.error || error.message,
+      );
       throw new InternalServerErrorException('Falha ao se comunicar com a API do WhatsApp.');
     }
   }
@@ -97,8 +109,13 @@ export class WhatsappService {
       await sleep(5);
       const url = `/session/terminate/${sessionId}`;
       await this.axiosInstance.get<SessionStartResponse>(url);
+
+      await this.eventEmitter.emitAsync('whatsapp.disconnected', { sessionId });
     } catch (error) {
-      this.logger.error('Erro ao solicitar desconexão do WhatsApp:', error.response?.data.error || error.message);
+      this.logger.error(
+        'Erro ao solicitar desconexão do WhatsApp:',
+        error.response?.data.error || error.message,
+      );
       throw new InternalServerErrorException('Falha ao se comunicar com a API do WhatsApp.');
     }
   }

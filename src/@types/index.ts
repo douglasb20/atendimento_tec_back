@@ -7,7 +7,6 @@ export interface JwtPayload {
   type: string;
 }
 
-
 export enum ChannelStatus {
   DISCONNECTED = 1,
   CONNECTING = 2,
@@ -38,4 +37,3 @@ export type AtendimentoListResponse = {
   atendimento_status_id: number;
   atendimentosServicos: AtendimentosServicosEntity[];
 };
-

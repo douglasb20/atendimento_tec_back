@@ -1,10 +1,9 @@
-import { Injectable, Logger } from "@nestjs/common";
-import { OnEvent } from "@nestjs/event-emitter";
+import { Injectable, Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 
-import { ChannelStatus, WhatsappWebhookPayload } from "@types";
-import { ChannelsRepository } from "./channels.repository";
-import { WhatsappGateway } from "whatsapp/whatsapp.gateway";
-
+import { ChannelStatus, WhatsappWebhookPayload } from '@types';
+import { ChannelsRepository } from './channels.repository';
+import { WhatsappGateway } from 'whatsapp/whatsapp.gateway';
 
 @Injectable()
 export class ChannelsListener {
@@ -14,16 +13,18 @@ export class ChannelsListener {
     // @ts-ignore
     private readonly whatsappGateway: WhatsappGateway,
     private readonly channelsRepository: ChannelsRepository,
-  ) { }
+  ) {}
 
   @OnEvent('whatsapp.session_started', { async: true })
   async sessionStarted(payload: WhatsappWebhookPayload) {
     const { sessionId } = payload;
     const channel = await this.channelsRepository.findBySessionId(sessionId);
-    console.log("Veio pra ca")
+    console.log('Veio pra ca');
 
     try {
-      await this.channelsRepository.update(channel.id, { channel_status_id: ChannelStatus.CONNECTING });
+      await this.channelsRepository.update(channel.id, {
+        channel_status_id: ChannelStatus.CONNECTING,
+      });
       this.whatsappGateway.emitEvent('whatsapp:channel_status', { channel_id: channel.id });
     } catch (error) {
       this.logger.error('Erro ao processar início de sessão do canal WhatsApp:', error);
@@ -34,15 +35,21 @@ export class ChannelsListener {
   @OnEvent('whatsapp.qr_code_received')
   async qrCodeReceived(payload: WhatsappWebhookPayload<{ qr: string }>) {
     // @ts-ignore
-    const { sessionId, data: { qr } } = payload;
+    const {
+      sessionId,
+      data: { qr },
+    } = payload;
     const channel = await this.channelsRepository.findBySessionId(sessionId);
 
-    if (channel.channel_status_id !== ChannelStatus.CONNECTING) { 
+    if (channel.channel_status_id !== ChannelStatus.CONNECTING) {
       return;
     }
 
     try {
-      await this.channelsRepository.update(channel.id, { qr_code: qr, channel_status_id: ChannelStatus.CONNECTING });
+      await this.channelsRepository.update(channel.id, {
+        qr_code: qr,
+        channel_status_id: ChannelStatus.CONNECTING,
+      });
       this.whatsappGateway.emitEvent('whatsapp:channel_status', { channel_id: channel.id });
     } catch (error) {
       this.logger.error('Erro ao processar QR Code recebido do canal WhatsApp:', error);
@@ -56,7 +63,12 @@ export class ChannelsListener {
     const channel = await this.channelsRepository.findBySessionId(sessionId);
 
     try {
-      await this.channelsRepository.update(channel.id, { qr_code: null, connected_at: new Date(), disconnected_at: null, channel_status_id: ChannelStatus.CONNECTED });
+      await this.channelsRepository.update(channel.id, {
+        qr_code: null,
+        connected_at: new Date(),
+        disconnected_at: null,
+        channel_status_id: ChannelStatus.CONNECTED,
+      });
       this.whatsappGateway.emitEvent('whatsapp:channel_status', { channel_id: channel.id });
     } catch (error) {
       this.logger.error('Erro ao processar autenticação do canal WhatsApp:', error);
@@ -70,7 +82,12 @@ export class ChannelsListener {
     const channel = await this.channelsRepository.findBySessionId(sessionId);
 
     try {
-      await this.channelsRepository.update(channel.id, { qr_code: null, disconnected_at: new Date(), connected_at: null, channel_status_id: ChannelStatus.DISCONNECTED });
+      await this.channelsRepository.update(channel.id, {
+        qr_code: null,
+        disconnected_at: new Date(),
+        connected_at: null,
+        channel_status_id: ChannelStatus.DISCONNECTED,
+      });
       this.whatsappGateway.emitEvent('whatsapp:channel_status', { channel_id: channel.id });
     } catch (error) {
       this.logger.error('Erro ao processar desconexão do canal WhatsApp:', error);

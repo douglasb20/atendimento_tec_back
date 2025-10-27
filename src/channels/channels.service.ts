@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { ChannelsRepository } from './channels.repository';
 import { WhatsappService } from 'whatsapp/whatsapp.service';
+import { ChannelsRepository } from './channels.repository';
 
 // import { QueryRunner } from 'typeorm';
 
@@ -11,7 +11,7 @@ export class ChannelsService {
   constructor(
     private readonly channelsRepository: ChannelsRepository,
     private readonly whatsappService: WhatsappService,
-  ) { }
+  ) {}
 
   async getActiveChannels() {
     return this.channelsRepository.findActives();
@@ -28,7 +28,7 @@ export class ChannelsService {
 
   async startSession(channelId: number) {
     const channel = await this.findChannel(channelId);
-    if (!channel) { 
+    if (!channel) {
       throw new NotFoundException('Canal não localizado com este id');
     }
 
@@ -40,7 +40,14 @@ export class ChannelsService {
     }
   }
 
+  async closeSession(channelId: number) {
+    const channel = await this.findChannel(channelId);
+    if (!channel) {
+      throw new NotFoundException('Canal não localizado com este id');
+    }
+
+    await this.whatsappService.requestDisconnection(channel.session_id);
+  }
 
   // ====== Webhook Processing ======
-
 }
