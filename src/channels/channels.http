@@ -23,3 +23,12 @@ Authorization: Bearer {{authToken}}
 #### 3) Start a session
 GET {{url}}{{endpoint}}/1/start
 Authorization: Bearer {{authToken}}
+
+#### 4) Create a new channel
+POST {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Suporte"
+}

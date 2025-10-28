@@ -1,6 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { WhatsappService } from 'whatsapp/whatsapp.service';
 import { ChannelsRepository } from './channels.repository';
+import { CreateOrChannelDto } from './dto/create-or-channel.dto';
+import { ChannelStatus } from '@types';
+import { Channels } from './entities/channels.entity';
 
 // import { QueryRunner } from 'typeorm';
 
@@ -13,11 +16,40 @@ export class ChannelsService {
     private readonly whatsappService: WhatsappService,
   ) {}
 
-  async getActiveChannels() {
+  async getActiveChannels(): Promise<Channels[]> {
     return this.channelsRepository.findActives();
   }
 
-  async findChannel(channelId: number) {
+  async createChannel(createChannelDto: CreateOrChannelDto): Promise<Channels> {
+    const channel = this.channelsRepository.create({
+      ...createChannelDto
+    });
+
+    await this.channelsRepository.save(channel);
+    return channel;
+  }
+  
+  async updateChannel(channelId: number, createChannelDto: CreateOrChannelDto): Promise<Channels> {
+    const channel = await this.findChannel(channelId);
+    const channelUpdated = this.channelsRepository.create({
+      ...channel,
+      ...createChannelDto
+    });
+    await this.channelsRepository.save(channelUpdated);
+    return channel;
+  }
+
+  async removeChannel(channelId: number): Promise<void> {
+    const channel = await this.findChannel(channelId);
+    const channelRemoved = this.channelsRepository.create({
+      ...channel,
+      channel_status_id: ChannelStatus.DELETED,
+      deleted_at: new Date()
+    });
+    await this.channelsRepository.save(channelRemoved);
+  }
+
+  async findChannel(channelId: number): Promise<Channels> {
     const channel = await this.channelsRepository.findOneBy({ id: channelId });
     if (!channel) {
       this.logger.error(`Erro ao localizar canal: Canal não encontrado com este id`);
@@ -26,7 +58,7 @@ export class ChannelsService {
     return channel;
   }
 
-  async startSession(channelId: number) {
+  async startSession(channelId: number): Promise<void> {
     const channel = await this.findChannel(channelId);
     if (!channel) {
       throw new NotFoundException('Canal não localizado com este id');

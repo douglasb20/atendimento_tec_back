@@ -75,6 +75,28 @@ export enum MessageAck {
   ACK_PLAYED = 4,
 }
 
+export type ContactId = {
+  server: string;
+  user: string;
+  _serialized: string;
+};
+
+export type ClientInfo = {
+  /**
+   * Current user ID
+   * @deprecated Use .wid instead
+   */
+  me: ContactId;
+  /** Current user ID */
+  wid: ContactId;
+  /** Platform the phone is running on */
+  platform: string;
+  /** Name configured to be shown in push notifications */
+  pushname: string;
+
+  /** Get current battery percentage and charging status for the attached device */
+};
+
 export type MessageId = {
   fromMe: boolean;
   remote: string;
@@ -289,6 +311,10 @@ export type SessionStartResponse = ResultResponse & {
   message: string;
 };
 
+export type GetClientInfoResponse = ResultResponse & {
+  sessionInfo: ClientInfo;
+};
+
 export type QrCodeResponse = ResultResponse & {
   qr: string;
   message?: string;
@@ -296,6 +322,6 @@ export type QrCodeResponse = ResultResponse & {
 
 export type WhatsappWebhookPayload<T = any> = {
   dataType: DataTypeWhatsapp;
-  data: T;
+  data?: T | null;
   sessionId: string;
 };

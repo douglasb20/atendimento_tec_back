@@ -1,4 +1,14 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { v4 } from 'uuid';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+  BeforeInsert,
+} from 'typeorm';
+
 import { ChannelStatus } from './channel-status.entity';
 import { AtendimentoChats } from 'atendimento-chat/entities/atendimento-chats.entity';
 import { AtendimentoChatMessages } from 'atendimento-chat/entities/atendimento-chat-messages.entity';
@@ -39,7 +49,7 @@ export class Channels {
 
   // == Relations ==
 
-  @ManyToOne(() => ChannelStatus, (channelStatus) => channelStatus.channels, { eager: true })
+  @ManyToOne(() => ChannelStatus, (channelStatus) => channelStatus.channels)
   @JoinColumn({ name: 'channel_status_id' })
   channelStatus: ChannelStatus;
 
@@ -51,4 +61,11 @@ export class Channels {
     (atendimentoChatMessage) => atendimentoChatMessage.channels,
   )
   atendimentoChatMessages: AtendimentoChatMessages[];
+
+  @BeforeInsert()
+  generateSessionId() {
+    if (!this.session_id) {
+      this.session_id = v4().toUpperCase();
+    }
+  }
 }

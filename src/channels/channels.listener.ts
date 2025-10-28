@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
-import { ChannelStatus, WhatsappWebhookPayload } from '@types';
+import { ChannelStatus, GetClientInfoResponse, WhatsappWebhookPayload } from '@types';
 import { ChannelsRepository } from './channels.repository';
 import { WhatsappGateway } from 'whatsapp/whatsapp.gateway';
 
@@ -19,7 +19,6 @@ export class ChannelsListener {
   async sessionStarted(payload: WhatsappWebhookPayload) {
     const { sessionId } = payload;
     const channel = await this.channelsRepository.findBySessionId(sessionId);
-    console.log('Veio pra ca');
 
     try {
       await this.channelsRepository.update(channel.id, {
@@ -58,7 +57,7 @@ export class ChannelsListener {
   }
 
   @OnEvent('whatsapp.authenticated')
-  async channelAuthenticated(payload: WhatsappWebhookPayload) {
+  async channelAuthenticated(payload: WhatsappWebhookPayload, clientInfo: GetClientInfoResponse) {
     const { sessionId } = payload;
     const channel = await this.channelsRepository.findBySessionId(sessionId);
 
@@ -68,6 +67,7 @@ export class ChannelsListener {
         connected_at: new Date(),
         disconnected_at: null,
         channel_status_id: ChannelStatus.CONNECTED,
+        phone_number: clientInfo.sessionInfo.wid.user.slice(-10),
       });
       this.whatsappGateway.emitEvent('whatsapp:channel_status', { channel_id: channel.id });
     } catch (error) {
@@ -87,6 +87,7 @@ export class ChannelsListener {
         disconnected_at: new Date(),
         connected_at: null,
         channel_status_id: ChannelStatus.DISCONNECTED,
+        phone_number: null,
       });
       this.whatsappGateway.emitEvent('whatsapp:channel_status', { channel_id: channel.id });
     } catch (error) {

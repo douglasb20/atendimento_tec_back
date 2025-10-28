@@ -5,6 +5,7 @@ import axios, { AxiosInstance } from 'axios';
 import {
   DataTypeWhatsapp,
   ErrorResponse,
+  GetClientInfoResponse,
   QrCodeResponse,
   SessionStartResponse,
   WhatsappWebhookPayload,
@@ -42,10 +43,10 @@ export class WhatsappService {
         this.eventEmitter.emit('whatsapp.qr_code_received', payload);
         break;
       case DataTypeWhatsapp.AUTHENTICATED:
-        this.eventEmitter.emit('whatsapp.authenticated', payload);
+        const clientInfo = await this.getClientInfo(payload.sessionId);
+        this.eventEmitter.emit('whatsapp.authenticated', payload, clientInfo);
         break;
       case DataTypeWhatsapp.DISCONNECTED:
-        // await this.requestDisconnection(payload.sessionId);
         this.eventEmitter.emit('whatsapp.disconnected', payload);
         break;
     }
@@ -114,6 +115,21 @@ export class WhatsappService {
     } catch (error) {
       this.logger.error(
         'Erro ao solicitar desconexão do WhatsApp:',
+        error.response?.data.error || error.message,
+      );
+      throw new InternalServerErrorException('Falha ao se comunicar com a API do WhatsApp.');
+    }
+  }
+
+  async getClientInfo(sessionId: string) {
+    try {
+      await sleep(2);
+      const url = `/client/getClassInfo/${sessionId}`;
+      const { data: clientInfo } = await this.axiosInstance.get<GetClientInfoResponse>(url);
+      return clientInfo;
+    } catch (error) {
+      this.logger.error(
+        'Erro ao obter informações do cliente do WhatsApp:',
         error.response?.data.error || error.message,
       );
       throw new InternalServerErrorException('Falha ao se comunicar com a API do WhatsApp.');

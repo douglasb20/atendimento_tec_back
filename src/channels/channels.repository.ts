@@ -10,11 +10,14 @@ export class ChannelsRepository extends Repository<Channels> {
   }
 
   async findActives() {
-    return this.findBy({ channel_status_id: Not(5), deleted_at: null });
+    return this.find({
+      where: { channel_status_id: Not(5), deleted_at: null },
+      relations: ['channelStatus'],
+    });
   }
 
   async findBySessionId(session_id: string) {
-    const channel = await this.findOneBy({ session_id });
+    const channel = await this.findOne({ where: { session_id }, relations: ['channelStatus'] });
     if (!channel) {
       this.logger.error(`Canal não encontrado com session_id: ${session_id}`);
       throw new NotFoundException(`Canal não encontrado com session_id: ${session_id}`);
