@@ -63,5 +63,4 @@ export class ClientController {
   async findOne(@Param('client_id') client_id: string) {
     return await this.clientService.findOne(Number(client_id));
   }
-
 }

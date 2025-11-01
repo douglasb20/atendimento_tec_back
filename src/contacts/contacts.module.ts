@@ -12,4 +12,4 @@ import { ContactRepository } from './contacts.repository';
   providers: [ContactsService, ContactRepository],
   exports: [ContactsService],
 })
-export class ContactsModule { }
+export class ContactsModule {}

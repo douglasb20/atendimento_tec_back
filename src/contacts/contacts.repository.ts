@@ -28,7 +28,12 @@ export class ContactRepository extends Repository<Contacts> {
   //   return await manager.save(ContactsEntity, contact);
   // }
 
-  async updateContact(id: number, updateContactDto: UpdateContactsDto, manager: EntityManager, client_id: number = null) {
+  async updateContact(
+    id: number,
+    updateContactDto: UpdateContactsDto,
+    manager: EntityManager,
+    client_id: number = null,
+  ) {
     const contact = await this.findById(id);
     if (!contact) {
       this.logger.error(`Erro de atualizar contato: Contato não localizado com este id`);

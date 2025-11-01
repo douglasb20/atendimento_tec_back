@@ -33,7 +33,10 @@ export class ClientService {
         createClientDto?.contacts !== null &&
         createClientDto?.contacts?.length !== 0
       ) {
-        client.contacts = await this.contactsService.saveContactsFromClient(createClientDto.contacts, client);
+        client.contacts = await this.contactsService.saveContactsFromClient(
+          createClientDto.contacts,
+          client,
+        );
       }
 
       await this.query.commitTransaction();

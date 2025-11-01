@@ -44,7 +44,7 @@ export class Channels {
 
   @Column({ type: 'timestamp', nullable: true, default: null, onUpdate: 'CURRENT_TIMESTAMP' })
   updated_at: Date | null;
-  
+
   @Column({ type: 'timestamp', nullable: true, default: null })
   deleted_at: Date | null;
 

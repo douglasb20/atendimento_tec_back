@@ -8,7 +8,6 @@ import { UpdateContactsDto } from './dto/update-contacts.dto';
 
 @Injectable()
 export class ContactsService {
-
   private query: QueryRunner;
   private readonly logger = new Logger(ContactsService.name);
 
@@ -43,11 +42,20 @@ export class ContactsService {
     }
   }
 
-  async updateContact(updateContactDto: UpdateContactsDto, contact_id: number, client_id: number = null) {
+  async updateContact(
+    updateContactDto: UpdateContactsDto,
+    contact_id: number,
+    client_id: number = null,
+  ) {
     try {
       await this.query.startTransaction();
 
-      const contact = await this.contactRepository.updateContact(contact_id, updateContactDto, this.query.manager, client_id);
+      const contact = await this.contactRepository.updateContact(
+        contact_id,
+        updateContactDto,
+        this.query.manager,
+        client_id,
+      );
 
       await this.query.commitTransaction();
       return { ...contact, ...updateContactDto };
