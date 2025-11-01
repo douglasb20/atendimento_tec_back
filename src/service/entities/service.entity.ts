@@ -1,4 +1,4 @@
-import { AtendimentosServicosEntity } from 'atendimentos/entities/atendimento-servico.entity';
+import { SupportServices } from 'supports/entities/support-services.entity';
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('services')
@@ -20,6 +20,6 @@ export class Services {
 
   // ============= RELATIONS ================
 
-  @OneToMany(() => AtendimentosServicosEntity, (atendimentoServico) => atendimentoServico.service)
-  atendimentosServicos: AtendimentosServicosEntity[];
+  @OneToMany(() => SupportServices, (supportServices) => supportServices.services)
+  supportServices: SupportServices[];
 }

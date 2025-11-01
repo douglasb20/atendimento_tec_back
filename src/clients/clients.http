@@ -29,11 +29,11 @@ Content-Type: application/json
   "nome": "MegaMix",
   "contacts":[
     {
-      "nome_contato": "Ariel",
-      "telefone_contato": "64984550047"
+      "name": "Ariel",
+      "phone": "64984550047"
     },
     {
-      "nome_contato": "Eduardo"
+      "name": "Eduardo"
     }
   ]
 }
@@ -47,11 +47,11 @@ Content-Type: application/json
   "nome": "MegaMix",
   "contacts":[
     {
-      "nome_contato": "Ariel",
-      "telefone_contato": "64984550047"
+      "name": "Ariel",
+      "phone": "64984550047"
     },
     {
-      "nome_contato": "Eduardo"
+      "name": "Eduardo"
     }
   ]
 }

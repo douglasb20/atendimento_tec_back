@@ -15,12 +15,13 @@ import { LogSistemaInterceptor } from './core/logSistema/log-sistema.interceptor
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ClientModule } from './clients/clients.module';
-import { AtendimentosModule } from './atendimentos/atendimentos.module';
+import { SupportsModule } from './supports/supports.module';
 import { ServicesModule } from './service/services.module';
 import { PermissionsModule } from 'permissions/permissions.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
-import { AtendimentoChatModule } from './atendimento-chat/atendimento-chat.module';
+import { SupportChatModule } from './support-chats/support-chats.module';
 import { ChannelsModule } from './channels/channels.module';
+import { ContactsModule } from './contacts/contacts.module';
 
 const destPath = path.join(__dirname, '..', '..', '/files');
 @Global()
@@ -46,13 +47,14 @@ const destPath = path.join(__dirname, '..', '..', '/files');
     UsersModule,
     DatabaseModule,
     ClientModule,
-    AtendimentosModule,
+    SupportsModule,
     ServicesModule,
     LogSistemaModule,
     PermissionsModule,
     WhatsappModule,
-    AtendimentoChatModule,
+    SupportChatModule,
     ChannelsModule,
+    ContactsModule,
   ],
   exports: [MulterModule, QueryStorageService],
   providers: [

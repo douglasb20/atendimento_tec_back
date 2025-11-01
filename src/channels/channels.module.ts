@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { AtendimentoChats } from 'atendimento-chat/entities/atendimento-chats.entity';
-import { AtendimentoChatMessages } from 'atendimento-chat/entities/atendimento-chat-messages.entity';
+import { SupportChats } from 'support-chats/entities/support-chats.entity';
+import { SupportChatMessages } from 'support-chats/entities/support-chat-messages.entity';
 import { ChannelStatus } from './entities/channel-status.entity';
 import { Channels } from './entities/channels.entity';
 
@@ -14,7 +14,7 @@ import { ChannelsListener } from './channels.listener';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AtendimentoChats, AtendimentoChatMessages, ChannelStatus, Channels]),
+    TypeOrmModule.forFeature([SupportChats, SupportChatMessages, ChannelStatus, Channels]),
     WhatsappModule,
   ],
   controllers: [ChannelsController],

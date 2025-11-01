@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
-import { CreateContactsDto } from './create-contacts.dto';
+import { CreateContactsDto } from '../../contacts/dto/create-contacts.dto';
 
 export class CreateClientDto {
   @IsString()

@@ -37,7 +37,7 @@ export class WhatsappService {
       case DataTypeWhatsapp.MESSAGE_ACK:
       case DataTypeWhatsapp.MESSAGE_REACTION:
       case DataTypeWhatsapp.MESSAGE_REVOKED_EVERYONE:
-        this.eventEmitter.emit('whatsapp.message', payload);
+        this.eventEmitter.emit('whatsapp.messages', payload);
         break;
       case DataTypeWhatsapp.QR_RECEIVED:
         this.eventEmitter.emit('whatsapp.qr_code_received', payload);
@@ -146,7 +146,7 @@ export class WhatsappService {
 
     const url = `/client/sendMessage/${sessionId}`;
     try {
-      const response = await axios.post(url, dataPost);
+      const response = await this.axiosInstance.post(url, dataPost);
       this.logger.log(`Mensagem enviada com sucesso: ${response.data}`);
     } catch (error) {
       this.logger.error('Falha ao enviar mensagem:', error.response?.data || error.message);

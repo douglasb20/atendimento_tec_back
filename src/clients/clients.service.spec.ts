@@ -1,26 +1,26 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ClientService } from './clients.service';
 import { Clients } from './entities/clients.entity';
-import { Contacts } from './entities/contacts.entity';
+import { Contacts } from '../contacts/entities/contacts.entity';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AtendimentosEntity } from 'atendimentos/entities/atendimento.entity';
+import { Supports } from 'supports/entities/supports.entity';
 import { Users } from 'users/entities/users.entity';
-import { AtendimentoStatusEntity } from 'atendimentos/entities/atendimento-status.entity';
+import { SupportStatus } from 'supports/entities/support-status.entity';
 import { CreateClientDto } from './dto/create-client.dto';
 
 describe('ClientService', () => {
   let module: TestingModule;
   let service: ClientService;
-  // let clientsRepository: Repository<ClientsEntity>;
-  // let contactsRepository: Repository<ContactsEntity>;
+  // let clientsRepository: Repository<Clients>;
+  // let contactsRepository: Repository<Contacts>;
   let dataSource: DataSource;
   let data: CreateClientDto;
 
   const dataSourceTest: DataSourceOptions = {
     type: 'sqlite',
     database: ':memory:',
-    entities: [Clients, Contacts, AtendimentosEntity, Users, AtendimentoStatusEntity],
+    entities: [Clients, Contacts, Supports, Users, SupportStatus],
     synchronize: true,
   };
 
@@ -28,14 +28,14 @@ describe('ClientService', () => {
     module = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRoot({ ...dataSourceTest, autoLoadEntities: true }),
-        TypeOrmModule.forFeature([Clients, Contacts, AtendimentosEntity]),
+        TypeOrmModule.forFeature([Clients, Contacts, Supports]),
       ],
       providers: [ClientService],
     }).compile();
 
     service = module.get<ClientService>(ClientService);
-    // clientsRepository = module.get<Repository<ClientsEntity>>(getRepositoryToken(ClientsEntity));
-    // contactsRepository = module.get<Repository<ContactsEntity>>(getRepositoryToken(ContactsEntity));
+    // clientsRepository = module.get<Repository<Clients>>(getRepositoryToken(Clients));
+    // contactsRepository = module.get<Repository<Contacts>>(getRepositoryToken(Contacts));
     dataSource = module.get<DataSource>(DataSource);
 
     data = {
@@ -67,7 +67,7 @@ describe('ClientService', () => {
   it('should create a new client with contact', async () => {
     const newData: CreateClientDto = {
       ...data,
-      contacts: [{ nome_contato: 'Douglas A. Silva', telefone_contato: '64992698043' }],
+      contacts: [{ name: 'Douglas A. Silva', phone: '64992698043' }],
     };
     const result = await service.createClient(newData);
 
@@ -76,7 +76,7 @@ describe('ClientService', () => {
     expect(result.cnpj).toEqual(data.cnpj);
     expect(result.created_at).toBeDefined();
     expect(result.status).toEqual(1);
-    expect(result.contacts[0].nome_contato).toEqual(newData.contacts[0].nome_contato);
-    expect(result.contacts[0].telefone_contato).toEqual(newData.contacts[0].telefone_contato);
+    expect(result.contacts[0].name).toEqual(newData.contacts[0].name);
+    expect(result.contacts[0].phone).toEqual(newData.contacts[0].phone);
   });
 });

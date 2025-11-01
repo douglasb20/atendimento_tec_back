@@ -1,4 +1,4 @@
-import { AtendimentosServicosEntity } from 'atendimentos/entities/atendimento-servico.entity';
+import { SupportServices } from 'supports/entities/support-services.entity';
 export * from './whatsapp';
 
 export interface JwtPayload {
@@ -15,7 +15,7 @@ export enum ChannelStatus {
   DELETED = 5,
 }
 
-export type AtendimentoListResponse = {
+export type SupportListResponse = {
   id: number;
   client_id: number;
   contact_id: number;
@@ -32,8 +32,8 @@ export type AtendimentoListResponse = {
   user_nome: string;
   user_email: string;
   contact_nome: string;
-  contact_telefone: string;
+  contact_phone: string;
   status_descricao: string;
-  atendimento_status_id: number;
-  atendimentosServicos: AtendimentosServicosEntity[];
+  support_status_id: number;
+  supportServices: SupportServices[];
 };

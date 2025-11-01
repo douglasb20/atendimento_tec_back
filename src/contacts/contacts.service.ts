@@ -1,0 +1,67 @@
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Clients } from 'clients/entities/clients.entity';
+import { DataSource, QueryRunner } from 'typeorm';
+import { CreateContactsDto } from './dto/create-contacts.dto';
+import { Contacts } from './entities/contacts.entity';
+import { ContactRepository } from './contacts.repository';
+import { UpdateContactsDto } from './dto/update-contacts.dto';
+
+@Injectable()
+export class ContactsService {
+
+  private query: QueryRunner;
+  private readonly logger = new Logger(ContactsService.name);
+
+  constructor(
+    private contactRepository: ContactRepository,
+    private dataSource: DataSource,
+  ) {
+    this.query = this.dataSource.createQueryRunner();
+  }
+
+  async saveContactsFromClient(contacts: CreateContactsDto[], client: Clients) {
+    const contactsNew = contacts.map((contact) => ({
+      ...contact,
+      ...(contact.id !== undefined && { id: Number(contact.id) }),
+      client_id: client.id,
+    })) as Contacts[];
+
+    return await this.query.manager.save(Contacts, contactsNew);
+  }
+
+  async deleteContact(contact_id: number) {
+    try {
+      await this.query.startTransaction();
+
+      await this.contactRepository.deleteContact(contact_id, this.query.manager);
+
+      await this.query.commitTransaction();
+    } catch (err) {
+      await this.query.rollbackTransaction();
+      this.logger.error(err.message);
+      throw new BadRequestException(err.message);
+    }
+  }
+
+  async updateContact(updateContactDto: UpdateContactsDto, contact_id: number, client_id: number = null) {
+    try {
+      await this.query.startTransaction();
+
+      const contact = await this.contactRepository.updateContact(contact_id, updateContactDto, this.query.manager, client_id);
+
+      await this.query.commitTransaction();
+      return { ...contact, ...updateContactDto };
+    } catch (err) {
+      await this.query.rollbackTransaction();
+      this.logger.error(err.message);
+      throw new BadRequestException(err.message);
+    }
+  }
+
+  async getAllContactsByClients(client_id: number) {
+    return this.contactRepository.findBy({
+      client_id: client_id,
+      status: 1,
+    });
+  }
+}

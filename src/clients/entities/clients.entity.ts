@@ -1,6 +1,6 @@
+import { Contacts } from 'contacts/entities/contacts.entity';
+import { Supports } from 'supports/entities/supports.entity';
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
-import { Contacts } from './contacts.entity';
-import { AtendimentosEntity } from 'atendimentos/entities/atendimento.entity';
 
 @Entity('clients')
 export class Clients {
@@ -16,12 +16,15 @@ export class Clients {
   @CreateDateColumn({ type: 'timestamp' })
   created_at: Date;
 
+  @Column({ type: 'timestamp', nullable: true, default: null, onUpdate: 'CURRENT_TIMESTAMP' })
+  updated_at: Date | null;
+
   @Column({ default: 1, nullable: true })
   status: number;
 
   @OneToMany(() => Contacts, (contacts) => contacts.clients)
   contacts: Contacts[];
 
-  @OneToMany(() => AtendimentosEntity, (atendimentos) => atendimentos.clients)
-  atendimentos: AtendimentosEntity[];
+  @OneToMany(() => Supports, (supports) => supports.clients)
+  supports: Supports[];
 }

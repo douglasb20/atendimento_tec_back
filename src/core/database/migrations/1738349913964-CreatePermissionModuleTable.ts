@@ -29,7 +29,10 @@ export class CreatePermissionModuleTable1738349913964 implements MigrationInterf
         "INSERT INTO permission_module(id, nome) values \
         (1,'Atendimento'), \
         (2,'Usuário'), \
-        (3,'Serviços');",
+        (3,'Serviços'), \
+        (4,'Canais'), \
+        (5,'Atendimento-chat'), \
+        (6,'Mensagens');",
       );
     }
   }

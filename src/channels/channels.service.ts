@@ -22,18 +22,18 @@ export class ChannelsService {
 
   async createChannel(createChannelDto: CreateOrChannelDto): Promise<Channels> {
     const channel = this.channelsRepository.create({
-      ...createChannelDto
+      ...createChannelDto,
     });
 
     await this.channelsRepository.save(channel);
     return channel;
   }
-  
+
   async updateChannel(channelId: number, createChannelDto: CreateOrChannelDto): Promise<Channels> {
     const channel = await this.findChannel(channelId);
     const channelUpdated = this.channelsRepository.create({
       ...channel,
-      ...createChannelDto
+      ...createChannelDto,
     });
     await this.channelsRepository.save(channelUpdated);
     return channel;
@@ -44,7 +44,7 @@ export class ChannelsService {
     const channelRemoved = this.channelsRepository.create({
       ...channel,
       channel_status_id: ChannelStatus.DELETED,
-      deleted_at: new Date()
+      deleted_at: new Date(),
     });
     await this.channelsRepository.save(channelRemoved);
   }

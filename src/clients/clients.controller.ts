@@ -10,13 +10,12 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { Permissions } from 'permissions/permissions.decorator';
+import { PermissionGuard } from 'permissions/permissions.guard';
 import { ClientService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
-import { AuthGuard } from '@nestjs/passport';
-import { UpdateContactsDto } from './dto/update-contacts.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
-import { PermissionGuard } from 'permissions/permissions.guard';
-import { Permissions } from 'permissions/permissions.decorator';
 
 @Controller('clients')
 export class ClientController {
@@ -65,34 +64,4 @@ export class ClientController {
     return await this.clientService.findOne(Number(client_id));
   }
 
-  @Delete(':client_id/contact/:contact_id')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('contact:delete')
-  @HttpCode(HttpStatus.OK)
-  async deleteContact(
-    @Param('client_id') client_id: string,
-    @Param('contact_id') contact_id: string,
-  ) {
-    return this.clientService.deleteContact(client_id, contact_id);
-  }
-
-  @Patch(':client_id/contact/:contact_id')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('contact:update')
-  @HttpCode(HttpStatus.OK)
-  async updateContact(
-    @Body() updateContactDto: UpdateContactsDto,
-    @Param('client_id') client_id: string,
-    @Param('contact_id') contact_id: string,
-  ) {
-    return this.clientService.updateContact(updateContactDto, client_id, contact_id);
-  }
-
-  @Get(':client_id/contact')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('contact:view_by_client')
-  @HttpCode(HttpStatus.OK)
-  async getAllContactsByClients(@Param('client_id') client_id: string) {
-    return this.clientService.getAllContactsByClients(client_id);
-  }
 }

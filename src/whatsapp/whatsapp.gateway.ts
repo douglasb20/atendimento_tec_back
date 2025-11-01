@@ -1,6 +1,8 @@
 import {
+  MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
@@ -58,6 +60,11 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
   handleDisconnect(client: Socket) {
     console.log(`Cliente desconectado: ${client.id}`);
     this.clients.delete(client.id);
+  }
+
+  @SubscribeMessage('')
+  handleChatOpened(@MessageBody() data: any) {
+    console.log('Chat aberto:', data);
   }
 
   emitEvent(event: string, data: any) {

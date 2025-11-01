@@ -32,6 +32,13 @@ export class CreateClientsTable1725885677231 implements MigrationInterface {
             default: 'CURRENT_TIMESTAMP',
           },
           {
+            name: 'updated_at',
+            type: 'datetime',
+            isNullable: true,
+            default: null,
+            onUpdate: 'CURRENT_TIMESTAMP',
+          },
+          {
             name: 'status',
             type: 'tinyint',
             length: '1',

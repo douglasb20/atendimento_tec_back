@@ -10,8 +10,8 @@ import {
 } from 'typeorm';
 
 import { ChannelStatus } from './channel-status.entity';
-import { AtendimentoChats } from 'atendimento-chat/entities/atendimento-chats.entity';
-import { AtendimentoChatMessages } from 'atendimento-chat/entities/atendimento-chat-messages.entity';
+import { SupportChats } from 'support-chats/entities/support-chats.entity';
+import { SupportChatMessages } from 'support-chats/entities/support-chat-messages.entity';
 
 @Entity('channels')
 export class Channels {
@@ -44,6 +44,7 @@ export class Channels {
 
   @Column({ type: 'timestamp', nullable: true, default: null, onUpdate: 'CURRENT_TIMESTAMP' })
   updated_at: Date | null;
+  
   @Column({ type: 'timestamp', nullable: true, default: null })
   deleted_at: Date | null;
 
@@ -53,14 +54,11 @@ export class Channels {
   @JoinColumn({ name: 'channel_status_id' })
   channelStatus: ChannelStatus;
 
-  @OneToMany(() => AtendimentoChats, (atendimentoChat) => atendimentoChat.channels)
-  atendimentoChats: AtendimentoChats[];
+  @OneToMany(() => SupportChats, (supportChat) => supportChat.channels)
+  supportChats: SupportChats[];
 
-  @OneToMany(
-    () => AtendimentoChatMessages,
-    (atendimentoChatMessage) => atendimentoChatMessage.channels,
-  )
-  atendimentoChatMessages: AtendimentoChatMessages[];
+  @OneToMany(() => SupportChatMessages, (supportChatMessage) => supportChatMessage.channels)
+  supportChatMessages: SupportChatMessages[];
 
   @BeforeInsert()
   generateSessionId() {
