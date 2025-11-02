@@ -23,17 +23,19 @@ import { SupportChatModule } from './support-chats/support-chats.module';
 import { ChannelsModule } from './channels/channels.module';
 import { ContactsModule } from './contacts/contacts.module';
 
-const destPath = path.join(__dirname, '..', '..', '/files');
+const destPath = path.resolve(__dirname, '..', '..', 'files', 'tmp');
 @Global()
 @Module({
   imports: [
     MulterModule.register({
-      dest: destPath,
-      limits: { fileSize: 1048576 * 5 /* 5mb */ },
+      // dest: destPath,
+      limits: { fileSize: 1048576 * 100 /* 100mb */ },
       storage: diskStorage({
+        destination: destPath, // Define onde salvar
         filename(_, file, callback) {
-          const extension = file.mimetype.split('/')[1];
-          const fileName = `fileUploaded_${Date.now()}.${extension}`;
+          const extension = path.extname(file.originalname);
+          const guessedExt = extension || `.${file.mimetype?.split('/')[1] || 'bin'}`;
+          const fileName = `upload_${Date.now()}${guessedExt}`;
           callback(null, fileName);
         },
       }),

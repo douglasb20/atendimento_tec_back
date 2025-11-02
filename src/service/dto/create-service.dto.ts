@@ -9,5 +9,5 @@ export class CreateServiceDto {
   @IsOptional()
   @Transform(({ value }) => parseFloat(value))
   @IsNumber({}, { message: (opt) => `Campo ${opt.property} aceita somente formato numérico` })
-  valor_servico: number;
+  service_price: number;
 }

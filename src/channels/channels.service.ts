@@ -17,7 +17,8 @@ export class ChannelsService {
   ) {}
 
   async getActiveChannels(): Promise<Channels[]> {
-    return this.channelsRepository.findActives();
+    const channels = await this.channelsRepository.findActives();
+    return channels;
   }
 
   async createChannel(createChannelDto: CreateOrChannelDto): Promise<Channels> {

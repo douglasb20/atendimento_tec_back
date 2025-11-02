@@ -21,6 +21,8 @@
     "migration:run": "npm run build && npx typeorm migration:run -d ./dist/src/core/database/orm-cli-config.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.922.0",
+    "@aws-sdk/s3-request-presigner": "^3.922.0",
     "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/common": "^11.0.10",
     "@nestjs/config": "^4.0.0",

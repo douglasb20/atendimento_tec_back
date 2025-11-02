@@ -58,8 +58,7 @@ export class UsersController {
   }
 
   @Get('/info')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('user:view')
+  @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
   async userInfo(@Req() req: Request) {
     const user: Users = req.user as Users;

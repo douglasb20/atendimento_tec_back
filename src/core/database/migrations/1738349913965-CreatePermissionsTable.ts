@@ -44,30 +44,36 @@ export class CreatePermissionsTable1738349913965 implements MigrationInterface {
     if (await queryRunner.hasTable('permissions')) {
       await queryRunner.query(
         "INSERT INTO permissions (id, label, permission_module_id, name) VALUES \
-                (1, 'Visualizar Support', 1, 'support:view'), \
-                (2, 'Adicionar Support', 1, 'support:add'), \
-                (3, 'Alterar Support', 1, 'support:update'), \
-                (4, 'Remover Support', 1, 'support:delete'), \
-                (5, 'Visualizar usuário', 2, 'user:view'), \
+                (1, 'Visualizar atendimentos', 1, 'support:view'), \
+                (2, 'Adicionar atendimento', 1, 'support:add'), \
+                (3, 'Alterar atendimento', 1, 'support:update'), \
+                (4, 'Remover atendimento', 1, 'support:delete'), \
+                (5, 'Visualizar usuários', 2, 'user:view'), \
                 (6, 'Adicionar usuário', 2, 'user:add'), \
                 (7, 'Alterar usuário', 2, 'user:update'), \
                 (8, 'Remover usuário', 2, 'user:delete'), \
-                (9, 'Visualizar serviço', 3, 'service:view'), \
+                (9, 'Visualizar serviços', 3, 'service:view'), \
                 (10, 'Adicionar serviço', 3, 'service:add'), \
                 (11, 'Atualizar serviço', 3, 'service:update'), \
                 (12, 'Remover serviço', 3, 'service:delete'), \
-                (13, 'Visualizar canal', 4, 'channel:view'), \
+                (13, 'Visualizar canais', 4, 'channel:view'), \
                 (14, 'Adicionar canal', 4, 'channel:add'), \
                 (15, 'Atualizar canal', 4, 'channel:update'), \
                 (16, 'Remover canal', 4, 'channel:delete'), \
-                (17, 'Visualizar atendimento-chat', 5, 'support.chat:view'), \
-                (18, 'Adicionar atendimento-chat', 5, 'support.chat:add'), \
-                (19, 'Atualizar atendimento-chat', 5, 'support.chat:update'), \
-                (20, 'Remover atendimento-chat', 5, 'support.chat:delete'), \
-                (21, 'Visualizar mensagens', 5, 'message:view'), \
-                (22, 'Adicionar mensagens', 5, 'message:add'), \
-                (23, 'Atualizar mensagens', 5, 'message:update'), \
-                (24, 'Remover mensagens', 5, 'message:delete');",
+                (17, 'Visualizar conversas', 5, 'support.chat:view'), \
+                (18, 'Adicionar conversa', 5, 'support.chat:add'), \
+                (19, 'Atualizar conversa', 5, 'support.chat:update'), \
+                (20, 'Remover conversa', 5, 'support.chat:delete'), \
+                (21, 'Atualizar mensagem', 6, 'message:update'), \
+                (22, 'Remover mensagem', 6, 'message:delete'), \
+                (23, 'Visualizar clientes', 7, 'client:view'), \
+                (24, 'Adicionar cliente', 7, 'client:add'), \
+                (25, 'Atualizar cliente', 7, 'client:update'), \
+                (26, 'Remover cliente', 7, 'client:delete'), \
+                (27, 'Visualizar contatos', 8, 'contact:view'), \
+                (28, 'Adicionar contato', 8, 'contact:add'), \
+                (29, 'Atualizar contato', 8, 'contact:update'), \
+                (30, 'Remover contato', 8, 'contact:delete');",
       );
     }
   }

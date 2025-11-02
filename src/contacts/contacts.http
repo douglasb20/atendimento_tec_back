@@ -10,7 +10,7 @@ Content-Type: application/json
 
 @authToken = {{login.response.body.$.access_token}}
 
-@endpoint = /clients/3/contact
+@endpoint = /contacts
 
 #### 1) Get all contacts
 GET {{url}}{{endpoint}}

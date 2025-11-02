@@ -32,7 +32,9 @@ export class CreatePermissionModuleTable1738349913964 implements MigrationInterf
         (3,'Serviços'), \
         (4,'Canais'), \
         (5,'Atendimento-chat'), \
-        (6,'Mensagens');",
+        (6,'Mensagens'), \
+        (7,'Clientes'), \
+        (8,'Contatos');",
       );
     }
   }

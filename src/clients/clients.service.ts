@@ -7,7 +7,6 @@ import { UpdateClientDto } from './dto/update-client.dto';
 import { Clients } from './entities/clients.entity';
 
 import { ContactRepository } from 'contacts/contacts.repository';
-import { ContactsService } from 'contacts/contacts.service';
 
 @Injectable()
 export class ClientService {
@@ -16,7 +15,6 @@ export class ClientService {
   constructor(
     private clientRepository: ClientRepository,
     private contactRepository: ContactRepository,
-    private readonly contactsService: ContactsService,
     private dataSource: DataSource,
   ) {
     this.query = this.dataSource.createQueryRunner();
@@ -27,17 +25,6 @@ export class ClientService {
       await this.query.startTransaction();
 
       const client = await this.clientRepository.createClient(createClientDto, this.query.manager);
-
-      if (
-        'contacts' in createClientDto &&
-        createClientDto?.contacts !== null &&
-        createClientDto?.contacts?.length !== 0
-      ) {
-        client.contacts = await this.contactsService.saveContactsFromClient(
-          createClientDto.contacts,
-          client,
-        );
-      }
 
       await this.query.commitTransaction();
       return client;
@@ -63,13 +50,7 @@ export class ClientService {
         cnpj: updateClientDto.cnpj,
       };
 
-      const addedClient = await this.query.manager.save(Clients, clientNew);
-
-      if ('contacts' in updateClientDto && updateClientDto?.contacts) {
-        if (updateClientDto?.contacts.length > 0) {
-          await this.contactsService.saveContactsFromClient(updateClientDto.contacts, addedClient);
-        }
-      }
+      await this.query.manager.save(Clients, clientNew);
 
       await this.query.commitTransaction();
     } catch (err) {

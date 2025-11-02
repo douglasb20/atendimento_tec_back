@@ -16,7 +16,7 @@ export class PermissionsRepository extends Repository<Permissions> {
     const permission = await this.createQueryBuilder('p')
       .innerJoinAndSelect('permission_x_user', 'pxu', 'pxu.permission_id = p.id')
       .select('p.*')
-      .where('p.name = :permissionName', { permissionName })
+      .where('p.name in (:...permissionName)', { permissionName })
       .andWhere('pxu.user_id = :userId', { userId: user_id })
       .getExists();
 

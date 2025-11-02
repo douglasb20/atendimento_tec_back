@@ -27,7 +27,7 @@ Content-Type: application/json
 
 {
   "name": "Instalação Roteador2",
-  "valor_servico": "40.00"
+  "service_price": "40.00"
 }
 
 #### 4) Update service
@@ -37,7 +37,7 @@ Content-Type: application/json
 
 {
   "name": "Instalação Roteador",
-  "valor_servico": "45.00"
+  "service_price": "45.00"
 }
 
 #### 5) Delete service

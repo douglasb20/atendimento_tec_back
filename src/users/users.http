@@ -3,7 +3,7 @@ POST {{url}}/auth/signin
 Content-Type: application/json
 
 {
-  "email": "rayene@teste.com",
+  "email": "douglasdev.cn@gmail.com",
   "password": 1234
 }
 ###

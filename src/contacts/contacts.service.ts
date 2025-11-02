@@ -18,6 +18,10 @@ export class ContactsService {
     this.query = this.dataSource.createQueryRunner();
   }
 
+  async getAllContacts() {
+    return this.contactRepository.findBy({ status: 1 });
+  }
+
   async saveContactsFromClient(contacts: CreateContactsDto[], client: Clients) {
     const contactsNew = contacts.map((contact) => ({
       ...contact,

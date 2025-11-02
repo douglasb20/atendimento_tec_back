@@ -20,7 +20,7 @@ export class CreateServicesTable1739075239283 implements MigrationInterface {
             isNullable: false,
           },
           {
-            name: 'valor_servico',
+            name: 'service_price',
             type: 'decimal',
             length: '5,2',
             isNullable: false,

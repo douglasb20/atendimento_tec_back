@@ -20,6 +20,14 @@ import { UpdateContactsDto } from './dto/update-contacts.dto';
 export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}
 
+  @Get()
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('contact:view')
+  @HttpCode(HttpStatus.OK)
+  async getAllContacts() {
+    return this.contactsService.getAllContacts();
+  }
+
   @Delete('/contact/:contact_id')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('contact:delete')

@@ -1,6 +1,4 @@
-import { Type } from 'class-transformer';
-import { IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
-import { CreateContactsDto } from '../../contacts/dto/create-contacts.dto';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateClientDto {
   @IsString()
@@ -10,8 +8,4 @@ export class CreateClientDto {
   @IsOptional()
   @IsString()
   cnpj?: string;
-
-  @ValidateNested({ each: true })
-  @Type(() => CreateContactsDto)
-  contacts?: CreateContactsDto[];
 }
