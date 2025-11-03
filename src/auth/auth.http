@@ -18,3 +18,8 @@ Content-Type: application/json
 {
   "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjMwMDEiLCJzdWIiOjEsImlkIjoxLCJ0eXBlIjoicmVmcmVzaCIsImlhdCI6MTc0MTUzMjczMSwiZXhwIjoxNzQxNTYxNTMxfQ.uwF2-lDU0JRgu72YlAFCboMYgxqVOxGX1KrDsJ1dKXE"
 }
+
+#### 2) Add new user
+
+POST {{url}}{{endpoint}}/forgotten_password/douglasdev.cn@gmail.com
+Content-Type: application/json

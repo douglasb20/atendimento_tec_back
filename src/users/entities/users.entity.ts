@@ -21,6 +21,9 @@ export class Users {
   @Column({ default: null, nullable: true, type: 'decimal' })
   valor_hora: number;
 
+  @Column({ default: null, type: 'varchar', length: 200, nullable: true })
+  avatar_url: string;
+
   @Column({ default: 0 })
   is_requestpassword: number;
 

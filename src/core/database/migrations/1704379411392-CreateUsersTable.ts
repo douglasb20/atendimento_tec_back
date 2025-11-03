@@ -28,6 +28,18 @@ export class CreateUsersTable1704379411392 implements MigrationInterface {
             type: 'varchar',
           },
           {
+            name: 'valor_hora',
+            type: 'decimal',
+            precision: 5,
+            scale: 2,
+            default: 0.00,
+          },
+          {
+            name: 'avatar_url',
+            type: 'varchar',
+            length: '200',
+          },
+          {
             name: 'is_requestpassword',
             type: 'tinyint',
             length: '1',

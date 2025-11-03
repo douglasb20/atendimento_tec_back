@@ -6,24 +6,40 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { UsersService } from './users.service';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
+import { UsersService } from './users.service';
 
+import { Permissions } from 'permissions/permissions.decorator';
+import { PermissionGuard } from 'permissions/permissions.guard';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { Users } from './entities/users.entity';
-import { PermissionGuard } from 'permissions/permissions.guard';
-import { Permissions } from 'permissions/permissions.decorator';
+// @ts-ignore
+import { Users } from './entities/users.entity'; 
+import { SignAvatarDto } from './dto/sign-avatar.dto';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService
+  ) { }
+
+  @Get('/info')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async userInfo(@Req() req: Request) {
+    const user: Users = req.user as Users;
+    const permissions = await this.usersService.permissionsByUser(user.id);
+
+    user['permissions'] = permissions.map((e) => e.name);
+    return user;
+  }
 
   @Get()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
@@ -31,6 +47,22 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   async findAll() {
     return this.usersService.findAll();
+  }
+
+  @Get(':id')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('user:view') 
+  @HttpCode(HttpStatus.OK)
+  async findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.findOne(id);
+  }
+
+  @Post('/sign-avatar')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('user:update')
+  @HttpCode(HttpStatus.OK)
+  async signAvatar(@Body() signAvatarDto: SignAvatarDto) {
+    return this.usersService.signAvatar(signAvatarDto);
   }
 
   @Post()
@@ -55,16 +87,5 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   async deleteUser(@Param('id') id: string) {
     return this.usersService.deleteUser(Number(id));
-  }
-
-  @Get('/info')
-  @UseGuards(AuthGuard('jwt'))
-  @HttpCode(HttpStatus.OK)
-  async userInfo(@Req() req: Request) {
-    const user: Users = req.user as Users;
-    const permissions = await this.usersService.permissionsByUser(user.id);
-
-    user['permissions'] = permissions.map((e) => e.name);
-    return user;
   }
 }

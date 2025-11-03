@@ -8,10 +8,11 @@ import { Supports } from 'supports/entities/supports.entity';
 import { UserRepository } from './users.repository';
 import { UserRefreshTokens } from './entities/user-refresh-tokens.entity';
 import { PermissionsRepository } from 'permissions/permissions.repository';
+import { StorageService } from 'storage/storage.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Users, Supports, UserRefreshTokens]), ConfigMailerModule],
   controllers: [UsersController],
-  providers: [UsersService, UserRepository, PermissionsRepository],
+  providers: [UsersService, UserRepository, PermissionsRepository, StorageService],
 })
 export class UsersModule {}

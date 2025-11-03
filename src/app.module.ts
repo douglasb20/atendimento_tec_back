@@ -22,6 +22,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { SupportChatModule } from './support-chats/support-chats.module';
 import { ChannelsModule } from './channels/channels.module';
 import { ContactsModule } from './contacts/contacts.module';
+import { StorageModule } from './storage/storage.module';
 
 const destPath = path.resolve(__dirname, '..', '..', 'files', 'tmp');
 @Global()
@@ -57,6 +58,7 @@ const destPath = path.resolve(__dirname, '..', '..', 'files', 'tmp');
     SupportChatModule,
     ChannelsModule,
     ContactsModule,
+    StorageModule,
   ],
   exports: [MulterModule, QueryStorageService],
   providers: [

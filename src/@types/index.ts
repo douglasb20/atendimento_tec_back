@@ -37,3 +37,19 @@ export type SupportListResponse = {
   support_status_id: number;
   supportServices: SupportServices[];
 };
+
+type FieldsSignature = {
+  acl: string;
+  bucket: string;
+  'X-Amz-Algorithm': string;
+  'X-Amz-Credential': string;
+  'X-Amz-Date': string;
+  key: string;
+  Policy: string;
+  'X-Amz-Signature': string;
+}
+
+export type SignatureResponse = {
+  url: string;
+  fields: FieldsSignature;
+}

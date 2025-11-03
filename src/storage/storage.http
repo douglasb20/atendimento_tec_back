@@ -1,0 +1,17 @@
+# @name login
+POST {{url}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "douglasdev.cn@gmail.com",
+  "password": 1234
+}
+###
+
+@authToken = {{login.response.body.$.access_token}}
+
+@endpoint = /storage
+
+#### 1) Get presigned GET URL
+GET {{url}}{{endpoint}}/presigned-get-url
+Authorization: Bearer {{authToken}}

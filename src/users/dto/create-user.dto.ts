@@ -15,6 +15,10 @@ export class CreateUserDto {
   password: string;
 
   @IsOptional()
+  @IsString({ message: (opt) => `Campo ${opt.property} aceita somente formato string` })
+  avatar_url?: string;
+
+  @IsOptional()
   @Transform(({ value }) => parseFloat(value))
   @IsNumber({}, { message: (opt) => `Campo ${opt.property} aceita somente formato numérico` })
   valor_hora?: number;

@@ -6,7 +6,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 const algorithm = 'aes-256-cbc'; //Using AES encryption
-const key = crypto.randomBytes(32);
+const key = Buffer.from(process.env.CRYPTO_KEY, 'hex');
 
 //Encrypting text
 export const encrypt = (text: string) => {
@@ -29,6 +29,16 @@ export const decrypt = (encryptedData: string) => {
   decrypted = Buffer.concat([decrypted, decipher.final()]);
   return decrypted.toString();
 };
+
+export function gerarCodigoSeguro(qtd_chars: number = 8): string {
+  const chars = 'abcdefghijklmnopqrstuvwxABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < qtd_chars; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
 
 export const move_file = async (oldPath: string, newPath: string) => {
   const mv = promisify(rename);

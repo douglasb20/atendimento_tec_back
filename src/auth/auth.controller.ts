@@ -1,8 +1,8 @@
 import { Body, Controller, HttpCode, HttpStatus, Param, Post, Req } from '@nestjs/common';
 import { Request } from 'express';
 
-import { AuthService } from './auth.service';
 import { SigninDto } from 'users/dto/signin.dto';
+import { AuthService } from './auth.service';
 
 @Controller('auth')
 export class AuthController {
@@ -16,6 +16,7 @@ export class AuthController {
 
   @Post('/forgotten_password/:email')
   @HttpCode(HttpStatus.OK)
+  // @ts-ignore
   async forgottenPassword(@Param('email') email: string) {
     return this.authService.forgottenPassword(email);
   }
