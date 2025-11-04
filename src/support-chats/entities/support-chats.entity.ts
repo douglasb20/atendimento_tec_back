@@ -24,14 +24,15 @@ export class SupportChats {
   @Column({ name: 'protocol', type: 'varchar', length: 50 })
   protocol: string;
 
+  @Column({ name: 'unread_count', type: 'int', width: 3, default: 0 })
+  unread_count: number;
+
   @Column({ name: 'last_message', type: 'text', nullable: true })
   last_message: string;
 
   @Column({ name: 'is_waiting', type: 'tinyint', width: 1, default: 1 })
   is_waiting: number;
 
-  @Column({ name: 'is_read', type: 'tinyint', width: 1, default: 0 })
-  is_read: number;
 
   @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;

@@ -11,13 +11,14 @@ import {
   WhatsappWebhookPayload,
 } from '@types';
 import { sleep } from 'Utils';
+import { WhatsappGateway } from './whatsapp.gateway';
 
 @Injectable()
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
   private axiosInstance: AxiosInstance;
 
-  constructor(private readonly eventEmitter: EventEmitter2) {
+  constructor(private readonly eventEmitter: EventEmitter2, private readonly whatsappGateway: WhatsappGateway) {
     this.axiosInstance = axios.create({
       baseURL: process.env.URL_WHATSAPP_API,
       headers: {
@@ -33,24 +34,31 @@ export class WhatsappService {
 
     switch (dataType) {
       case DataTypeWhatsapp.MESSAGE_CREATE:
+        this.eventEmitter.emit('whatsapp.message_create', payload);
+        break;
       case DataTypeWhatsapp.MESSAGE_EDIT:
       case DataTypeWhatsapp.MESSAGE_ACK:
       case DataTypeWhatsapp.MESSAGE_REACTION:
       case DataTypeWhatsapp.MESSAGE_REVOKED_EVERYONE:
-        this.eventEmitter.emit('whatsapp.messages', payload);
+        // this.eventEmitter.emit('whatsapp.messages', payload);
         break;
       case DataTypeWhatsapp.QR_RECEIVED:
-        this.eventEmitter.emit('whatsapp.qr_code_received', payload);
+        this.eventEmitter.emit('whatsapp.qr_code_received', payload); // channels.listener
         break;
       case DataTypeWhatsapp.AUTHENTICATED:
-        const clientInfo = await this.getClientInfo(payload.sessionId);
-        this.eventEmitter.emit('whatsapp.authenticated', payload, clientInfo);
+        this.eventEmitter.emit('whatsapp.authenticated', payload); // channels.listener
+      case DataTypeWhatsapp.READY:
+        this.eventEmitter.emit('whatsapp.ready', payload); // channels.listener
         break;
       case DataTypeWhatsapp.DISCONNECTED:
-        this.eventEmitter.emit('whatsapp.disconnected', payload);
+        this.eventEmitter.emit('whatsapp.disconnected', payload); // channels.listener
         break;
     }
     // this.whatsappGateway.emitEvent('whatsapp:message', payload);
+  }
+
+  emitEvent(event: string, payload: any) {
+    this.whatsappGateway.emitEvent(event, payload);
   }
 
   async requestConnection(sessionId: string) {
@@ -73,7 +81,7 @@ export class WhatsappService {
           }
           this.logger.log(`Sessão do WhatsApp iniciada com sucesso: ${data.message}`);
         }
-        await this.eventEmitter.emitAsync('whatsapp.session_started', { sessionId });
+        this.eventEmitter.emit('whatsapp.session_started', { sessionId });
       }
     } catch (error) {
       this.logger.error(
@@ -123,7 +131,6 @@ export class WhatsappService {
 
   async getClientInfo(sessionId: string) {
     try {
-      await sleep(2);
       const url = `/client/getClassInfo/${sessionId}`;
       const { data: clientInfo } = await this.axiosInstance.get<GetClientInfoResponse>(url);
       return clientInfo;

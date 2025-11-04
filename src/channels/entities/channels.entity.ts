@@ -21,7 +21,7 @@ export class Channels {
   @Column({ type: 'varchar', length: 100, nullable: false })
   name: string;
 
-  @Column({ type: 'varchar', length: 20, nullable: false })
+  @Column({ type: 'varchar', length: 20, nullable: true })
   phone_number: string;
 
   @Column({ type: 'char', length: 36, nullable: true })

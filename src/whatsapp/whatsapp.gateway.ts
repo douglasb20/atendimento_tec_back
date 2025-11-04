@@ -40,8 +40,7 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
 
     try {
-      // @ts-ignore
-      const payload = verify(token, process.env.ACCESS_JWT_SECRET as PublicKey) as JwtPayload;
+      const payload = verify(token, process.env.ACCESS_JWT_SECRET) as unknown as JwtPayload;
 
       const user = await this.authService.validateUser(payload);
 

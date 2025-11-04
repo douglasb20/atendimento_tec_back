@@ -41,6 +41,12 @@ export class CreateSupportChatsTable1761251493663 implements MigrationInterface 
             isNullable: false,
           },
           {
+            name: 'unread_count',
+            type: 'int',
+            length: '3',
+            default: '0',
+          },
+          {
             name: 'last_message',
             type: 'text',
             isNullable: true,
@@ -50,12 +56,6 @@ export class CreateSupportChatsTable1761251493663 implements MigrationInterface 
             type: 'tinyint',
             length: '1',
             default: '1',
-          },
-          {
-            name: 'is_read',
-            type: 'tinyint',
-            length: '1',
-            default: '0',
           },
           {
             name: 'created_at',

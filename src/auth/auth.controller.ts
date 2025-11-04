@@ -16,7 +16,6 @@ export class AuthController {
 
   @Post('/forgotten_password/:email')
   @HttpCode(HttpStatus.OK)
-  // @ts-ignore
   async forgottenPassword(@Param('email') email: string) {
     return this.authService.forgottenPassword(email);
   }

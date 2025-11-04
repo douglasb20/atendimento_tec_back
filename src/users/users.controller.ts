@@ -20,7 +20,6 @@ import { Permissions } from 'permissions/permissions.decorator';
 import { PermissionGuard } from 'permissions/permissions.guard';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-// @ts-ignore
 import { Users } from './entities/users.entity'; 
 import { SignAvatarDto } from './dto/sign-avatar.dto';
 
@@ -35,10 +34,8 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   async userInfo(@Req() req: Request) {
     const user: Users = req.user as Users;
-    const permissions = await this.usersService.permissionsByUser(user.id);
-
-    user['permissions'] = permissions.map((e) => e.name);
-    return user;
+    const userInfo = await this.usersService.userInfo(user.id);
+    return userInfo;
   }
 
   @Get()

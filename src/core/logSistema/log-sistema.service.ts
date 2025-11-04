@@ -24,8 +24,10 @@ export class LogSistemaService {
   }
 
   async salvarLog(logdata: LogdataType) {
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
+    await qr.startTransaction();
     try {
-      await this.queryRunner.startTransaction();
       const log = this.logSistemaRepository.create({
         rota: logdata.rota,
         user_id: logdata.id_usuario,
@@ -39,10 +41,12 @@ export class LogSistemaService {
       });
 
       await this.logSistemaRepository.saveLog(log, this.queryRunner.manager);
-      await this.queryRunner.commitTransaction();
+      await qr.commitTransaction();
     } catch (err) {
-      await this.queryRunner.rollbackTransaction();
+      await qr.rollbackTransaction();
       throw err;
+    } finally {
+      await qr.release();
     }
   }
 }

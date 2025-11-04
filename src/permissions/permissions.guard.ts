@@ -15,6 +15,9 @@ export class PermissionGuard implements CanActivate {
     if (!user) {
       throw new UnauthorizedException('Usuário não autenticado');
     }
+    if(requiredPermission === '') {
+      return true; // Se não há permissão necessária, permite o acesso
+    }
 
     const hasPermission = await this.permissionService.hasPermission(
       user.id, // Id do usuário autenticado

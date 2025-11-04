@@ -23,13 +23,15 @@ export class CreateChannelsTable1761251488012 implements MigrationInterface {
             name: 'phone_number',
             type: 'varchar',
             length: '20',
-            isNullable: false,
+            isNullable: true,
+            default: null
           },
           {
             name: 'session_id',
             type: 'char',
             length: '36',
             isNullable: true,
+            default: null
           },
           {
             name: 'channel_status_id',

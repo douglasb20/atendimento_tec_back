@@ -8,23 +8,18 @@ import {
   Param,
   Patch,
   Post,
-  UploadedFile,
-  UseGuards,
-  UseInterceptors,
+  UseGuards
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 
+import { Permissions } from 'permissions/permissions.decorator';
 import { PermissionGuard } from 'permissions/permissions.guard';
 import { ChannelsService } from './channels.service';
 import { CreateOrChannelDto } from './dto/create-or-channel.dto';
-import { Permissions } from 'permissions/permissions.decorator';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { IMAGES_PATH } from 'Constants';
-import { move_file } from 'Utils';
 
 @Controller('channels')
 export class ChannelsController {
-  constructor(private readonly channelsService: ChannelsService) {}
+  constructor(private readonly channelsService: ChannelsService) { }
 
   @Get()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
@@ -85,16 +80,4 @@ export class ChannelsController {
     return this.channelsService.removeChannel(channelId);
   }
 
-  @Post('/upload')
-  @UseInterceptors(FileInterceptor('file1'))
-  @HttpCode(HttpStatus.OK)
-  async upload(@UploadedFile() file: Express.Multer.File, @Body() body: { name: string }) {
-    console.log('file', file);
-    console.log('body', body.name);
-    await move_file(file.path, IMAGES_PATH + file.filename);
-    return {
-      file,
-      body,
-    };
-  }
 }

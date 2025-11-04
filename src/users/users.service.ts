@@ -39,7 +39,7 @@ export class UsersService {
 
   async signAvatar(signAvatarDto: SignAvatarDto): Promise<PresignedPost> {
     try {
-      if(signAvatarDto?.user_id){
+      if (signAvatarDto?.user_id) {
         await this.usersRepository.findById(signAvatarDto.user_id);
       }
 
@@ -110,7 +110,12 @@ export class UsersService {
     }
   }
 
-  async permissionsByUser(user_id: number) {
-    return this.permissionsRepository.permissionByUser(user_id);
+  async userInfo(user_id: number) {
+    const user = await this.usersRepository.findById(user_id);
+    const permissions = await this.permissionsRepository.permissionByUser(user_id);
+    if (user.avatar_url) {
+      user.avatar_url = await this.storageService.generateViewUrl(user.avatar_url,6);
+    }
+    return { ...user, permissions };
   }
 }

@@ -45,14 +45,14 @@ export class StorageService {
     };
   }
 
-  async generateViewUrl(key: string, durationSeconds = 1): Promise<string> {
+  async generateViewUrl(key: string, durationHours = 1): Promise<string> {
 
     const command = new GetObjectCommand({
       Bucket: process.env.WASABI_BUCKET!,
       Key: key,
     });
 
-    const url = await getSignedUrl(this.s3, command, { expiresIn: durationSeconds * 3600 });
+    const url = await getSignedUrl(this.s3, command, { expiresIn: durationHours * 3600 });
     return url;
   }
 

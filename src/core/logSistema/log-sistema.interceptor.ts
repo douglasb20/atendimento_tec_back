@@ -13,6 +13,7 @@ export class LogSistemaInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
+    this.queryStorage.startRequest();
     const user = request.user; // Usuário capturado pelo Passport-JWT
     const queries = this.queryStorage.getQueries(); // Pega todas as queries armazenadas
 

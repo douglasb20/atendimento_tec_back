@@ -19,7 +19,7 @@ export class WhatsappController {
     }
     try {
       await this.whatsappService.processWebhook(payload);
-      console.log('Webhook recebido:', payload);
+      console.log( payload);
       return { status: 'received' };
     } catch (error) {
       throw error;
