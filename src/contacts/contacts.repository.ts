@@ -4,8 +4,8 @@ import { UpdateContactsDto } from 'contacts/dto/update-contacts.dto';
 import { Contacts } from 'contacts/entities/contacts.entity';
 
 @Injectable()
-export class ContactRepository extends Repository<Contacts> {
-  private readonly logger = new Logger(ContactRepository.name);
+export class ContactsRepository extends Repository<Contacts> {
+  private readonly logger = new Logger(ContactsRepository.name);
   constructor(dataSource: DataSource) {
     super(Contacts, dataSource.manager);
   }

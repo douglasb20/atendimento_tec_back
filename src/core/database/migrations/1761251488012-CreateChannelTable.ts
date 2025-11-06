@@ -24,14 +24,14 @@ export class CreateChannelsTable1761251488012 implements MigrationInterface {
             type: 'varchar',
             length: '20',
             isNullable: true,
-            default: null
+            default: null,
           },
           {
             name: 'session_id',
             type: 'char',
             length: '36',
             isNullable: true,
-            default: null
+            default: null,
           },
           {
             name: 'channel_status_id',

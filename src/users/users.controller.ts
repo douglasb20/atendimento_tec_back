@@ -20,14 +20,12 @@ import { Permissions } from 'permissions/permissions.decorator';
 import { PermissionGuard } from 'permissions/permissions.guard';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { Users } from './entities/users.entity'; 
+import { Users } from './entities/users.entity';
 import { SignAvatarDto } from './dto/sign-avatar.dto';
 
 @Controller('users')
 export class UsersController {
-  constructor(
-    private readonly usersService: UsersService
-  ) { }
+  constructor(private readonly usersService: UsersService) {}
 
   @Get('/info')
   @UseGuards(AuthGuard('jwt'))
@@ -48,7 +46,7 @@ export class UsersController {
 
   @Get(':id')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('user:view') 
+  @Permissions('user:view')
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.findOne(id);

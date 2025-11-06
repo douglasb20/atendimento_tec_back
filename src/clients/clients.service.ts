@@ -6,7 +6,7 @@ import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { Clients } from './entities/clients.entity';
 
-import { ContactRepository } from 'contacts/contacts.repository';
+import { ContactsRepository } from 'contacts/contacts.repository';
 
 @Injectable()
 export class ClientService {
@@ -14,7 +14,7 @@ export class ClientService {
   private readonly logger = new Logger(ClientService.name);
   constructor(
     private clientRepository: ClientRepository,
-    private contactRepository: ContactRepository,
+    private contactRepository: ContactsRepository,
     private dataSource: DataSource,
   ) {
     this.query = this.dataSource.createQueryRunner();

@@ -1,4 +1,3 @@
-
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
@@ -7,10 +6,7 @@ import { ChannelsService } from './channels.service';
 
 @Injectable()
 export class ChannelsListener {
-
-  constructor(
-    private readonly channelsService: ChannelsService,
-  ) {}
+  constructor(private readonly channelsService: ChannelsService) {}
 
   @OnEvent('whatsapp.session_started')
   async sessionStarted(payload: WhatsappWebhookPayload) {
@@ -25,7 +21,7 @@ export class ChannelsListener {
 
   @OnEvent('whatsapp.authenticated')
   async channelAuthenticated(payload: WhatsappWebhookPayload) {
-    await this.channelsService.handleChannelAuthenticated(payload); 
+    await this.channelsService.handleChannelAuthenticated(payload);
   }
 
   @OnEvent('whatsapp.disconnected')

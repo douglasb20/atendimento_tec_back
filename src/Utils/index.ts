@@ -1,6 +1,6 @@
 import { rename, readFile } from 'node:fs';
 import { promisify } from 'node:util';
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -38,7 +38,6 @@ export function gerarCodigoSeguro(qtd_chars: number = 8): string {
   }
   return result;
 }
-
 
 export const move_file = async (oldPath: string, newPath: string) => {
   const mv = promisify(rename);

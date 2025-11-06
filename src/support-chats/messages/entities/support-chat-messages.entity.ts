@@ -1,5 +1,5 @@
 import { Column, Entity, Generated, JoinColumn, ManyToOne } from 'typeorm';
-import { SupportChats } from './support-chats.entity';
+import { SupportChats } from '../../entities/support-chats.entity';
 import { Channels } from 'channels/entities/channels.entity';
 
 @Entity('support_chat_messages')

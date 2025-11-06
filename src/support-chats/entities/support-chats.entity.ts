@@ -1,10 +1,10 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
-import { SupportChatMessages } from './support-chat-messages.entity';
+import { SupportChatMessages } from '../messages/entities/support-chat-messages.entity';
 import { SupportChatStatus } from './support-chat-status.entity';
 import { Users } from 'users/entities/users.entity';
 import { Channels } from 'channels/entities/channels.entity';
 
-@Entity('support-chats')
+@Entity('support_chats')
 export class SupportChats {
   @PrimaryGeneratedColumn('increment', { type: 'bigint', unsigned: true })
   id: number;
@@ -32,7 +32,6 @@ export class SupportChats {
 
   @Column({ name: 'is_waiting', type: 'tinyint', width: 1, default: 1 })
   is_waiting: number;
-
 
   @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;

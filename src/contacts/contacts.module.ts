@@ -4,12 +4,13 @@ import { ContactsController } from './contacts.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Clients } from 'clients/entities/clients.entity';
 import { Contacts } from './entities/contacts.entity';
-import { ContactRepository } from './contacts.repository';
+import { ContactsRepository } from './contacts.repository';
+import { WhatsappModule } from 'whatsapp/whatsapp.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Clients, Contacts])],
+  imports: [TypeOrmModule.forFeature([Clients, Contacts]), WhatsappModule],
   controllers: [ContactsController],
-  providers: [ContactsService, ContactRepository],
-  exports: [ContactsService],
+  providers: [ContactsService, ContactsRepository],
+  exports: [ContactsService, ContactsRepository],
 })
 export class ContactsModule {}

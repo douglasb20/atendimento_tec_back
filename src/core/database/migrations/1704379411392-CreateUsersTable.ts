@@ -32,7 +32,7 @@ export class CreateUsersTable1704379411392 implements MigrationInterface {
             type: 'decimal',
             precision: 5,
             scale: 2,
-            default: 0.00,
+            default: 0.0,
           },
           {
             name: 'avatar_url',

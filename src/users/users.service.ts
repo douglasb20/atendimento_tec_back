@@ -1,7 +1,7 @@
 import { PresignedPost } from '@aws-sdk/s3-presigned-post';
 import { Injectable, Logger, Scope } from '@nestjs/common';
 import { DataSource, QueryRunner } from 'typeorm';
-import { v4 as uuidV4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 
 import { PermissionsRepository } from 'permissions/permissions.repository';
 import { StorageService } from 'storage/storage.service';
@@ -43,7 +43,7 @@ export class UsersService {
         await this.usersRepository.findById(signAvatarDto.user_id);
       }
 
-      const avatarName = `${signAvatarDto.key}/${uuidV4()}.${signAvatarDto.fileType.split('/')[1]}`;
+      const avatarName = `${signAvatarDto.key}/${randomUUID()}.${signAvatarDto.fileType.split('/')[1]}`;
 
       const avatar_url = await this.storageService.createPresignedPost(avatarName);
 
@@ -114,7 +114,7 @@ export class UsersService {
     const user = await this.usersRepository.findById(user_id);
     const permissions = await this.permissionsRepository.permissionByUser(user_id);
     if (user.avatar_url) {
-      user.avatar_url = await this.storageService.generateViewUrl(user.avatar_url,6);
+      user.avatar_url = await this.storageService.generateViewUrl(user.avatar_url, 6);
     }
     return { ...user, permissions };
   }

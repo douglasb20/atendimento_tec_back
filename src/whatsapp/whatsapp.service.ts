@@ -6,7 +6,9 @@ import {
   DataTypeWhatsapp,
   ErrorResponse,
   GetClientInfoResponse,
+  NumberIdResponse,
   QrCodeResponse,
+  ResultResponse,
   SessionStartResponse,
   WhatsappWebhookPayload,
 } from '@types';
@@ -18,7 +20,10 @@ export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
   private axiosInstance: AxiosInstance;
 
-  constructor(private readonly eventEmitter: EventEmitter2, private readonly whatsappGateway: WhatsappGateway) {
+  constructor(
+    private readonly eventEmitter: EventEmitter2,
+    private readonly whatsappGateway: WhatsappGateway,
+  ) {
     this.axiosInstance = axios.create({
       baseURL: process.env.URL_WHATSAPP_API,
       headers: {
@@ -141,6 +146,36 @@ export class WhatsappService {
       );
       throw new InternalServerErrorException('Falha ao se comunicar com a API do WhatsApp.');
     }
+  }
+
+  async getRemoteJidByPhone(sessionId: string, phone: string): Promise<string> {
+    try {
+      const url = `/client/getRemoteJid/${sessionId}/${phone}`;
+      const { data: remoteJidData } = await this.axiosInstance.get<NumberIdResponse>(url);
+      return remoteJidData.result._serialized;
+    } catch (error) {
+      this.logger.error(
+        'Erro ao obter JID remoto do WhatsApp:',
+        error.response?.data.error || error.message,
+      );
+      throw new InternalServerErrorException('Falha ao se comunicar com a API do WhatsApp.');
+    }
+  }
+
+  async getFormattedNumber(sessionId: string, remote_jid: string): Promise<string> {
+    const url = `/contact/getFormattedNumber/${sessionId}`;
+
+    const dataPost = {
+      contactId: remote_jid,
+    };
+
+    const { data } = await this.axiosInstance.post<ResultResponse & { result: string }>(
+      url,
+      dataPost,
+    );
+    const formattedNumber = data.result;
+    const phone = formattedNumber.split(' ').slice(1).join('').replace('-', '');
+    return phone;
   }
 
   async sendMessage(sessionId: string, to: string, message: string) {

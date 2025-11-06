@@ -8,7 +8,7 @@ import {
   Param,
   Patch,
   Post,
-  UseGuards
+  UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 
@@ -19,7 +19,7 @@ import { CreateOrChannelDto } from './dto/create-or-channel.dto';
 
 @Controller('channels')
 export class ChannelsController {
-  constructor(private readonly channelsService: ChannelsService) { }
+  constructor(private readonly channelsService: ChannelsService) {}
 
   @Get()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
@@ -79,5 +79,4 @@ export class ChannelsController {
   async removeChannel(@Param('channelId') channelId: number) {
     return this.channelsService.removeChannel(channelId);
   }
-
 }

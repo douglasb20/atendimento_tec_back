@@ -3,8 +3,7 @@ import { StorageService } from './storage.service';
 
 @Controller('storage')
 export class StorageController {
-
-  constructor(private readonly storageService: StorageService) { }
+  constructor(private readonly storageService: StorageService) {}
 
   @Post('/presigned-url')
   async getPresignedUrl() {

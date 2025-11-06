@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ChannelStatus, WhatsappWebhookPayload } from '@types';
 import { DataSource, QueryRunner } from 'typeorm';
-import { v4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import { WhatsappService } from 'whatsapp/whatsapp.service';
 import { ChannelsRepository } from './channels.repository';
 import { CreateOrChannelDto } from './dto/create-or-channel.dto';
@@ -22,6 +22,11 @@ export class ChannelsService {
   async getActiveChannels(): Promise<Channels[]> {
     const channels = await this.channelsRepository.findActives();
     return channels;
+  }
+
+  async getChannelBySessionId(sessionId: string): Promise<Channels> {
+    const channel = await this.channelsRepository.findBySessionId(sessionId);
+    return channel;
   }
 
   async createChannel(createChannelDto: CreateOrChannelDto): Promise<Channels> {
@@ -70,7 +75,7 @@ export class ChannelsService {
 
     // garante que exista um session_id
     if (!channel.session_id) {
-      await this.channelsRepository.update(channel.id, { session_id: v4().toUpperCase() });
+      await this.channelsRepository.update(channel.id, { session_id: randomUUID().toUpperCase() });
       const reloaded = await this.channelsRepository.findOneBy({ id: channel.id });
       channel.session_id = reloaded!.session_id;
     }
@@ -106,7 +111,7 @@ export class ChannelsService {
     const channel = await this.channelsRepository.findBySessionId(sessionId);
     try {
       await this.query.startTransaction();
-      await this.channelsRepository.update(channel.id, {
+      await this.query.manager.update(Channels, channel.id, {
         channel_status_id: ChannelStatus.CONNECTING,
       });
       await this.query.commitTransaction();
@@ -131,7 +136,7 @@ export class ChannelsService {
 
     try {
       await this.query.startTransaction();
-      await this.channelsRepository.update(channel.id, {
+      await this.query.manager.update(Channels, channel.id, {
         qr_code: qr,
         channel_status_id: ChannelStatus.CONNECTING,
       });
@@ -145,7 +150,6 @@ export class ChannelsService {
   }
 
   async handleChannelAuthenticated(payload: WhatsappWebhookPayload): Promise<void> {
-
     const { sessionId } = payload;
     const channel = await this.channelsRepository.findBySessionId(sessionId);
 
@@ -170,9 +174,11 @@ export class ChannelsService {
     try {
       if (channel.channel_status_id === ChannelStatus.CONNECTED && channel.phone_number === null) {
         const clientInfo = await this.whatsappService.getClientInfo(sessionId);
-        await this.channelsRepository.update(channel.id, {
-          phone_number: clientInfo.sessionInfo.wid.user.slice(-10),
-        });
+        if (clientInfo) {
+          await this.channelsRepository.update(channel.id, {
+            phone_number: clientInfo.sessionInfo.wid.user.slice(-10),
+          });
+        }
         this.handleChannelStatus(channel.id);
       }
     } catch (error) {
@@ -181,7 +187,9 @@ export class ChannelsService {
     }
   }
 
-  async handleChannelDisconnected(payload: WhatsappWebhookPayload<{ reason: string }>): Promise<void> {
+  async handleChannelDisconnected(
+    payload: WhatsappWebhookPayload<{ reason: string }>,
+  ): Promise<void> {
     const { sessionId } = payload;
     const channel = await this.channelsRepository.findBySessionId(sessionId);
 

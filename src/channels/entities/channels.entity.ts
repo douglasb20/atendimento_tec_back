@@ -1,4 +1,4 @@
-import { v4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import {
   Entity,
   Column,
@@ -11,7 +11,7 @@ import {
 
 import { ChannelStatus } from './channel-status.entity';
 import { SupportChats } from 'support-chats/entities/support-chats.entity';
-import { SupportChatMessages } from 'support-chats/entities/support-chat-messages.entity';
+import { SupportChatMessages } from 'support-chats/messages/entities/support-chat-messages.entity';
 
 @Entity('channels')
 export class Channels {
@@ -63,7 +63,7 @@ export class Channels {
   @BeforeInsert()
   generateSessionId() {
     if (!this.session_id) {
-      this.session_id = v4().toUpperCase();
+      this.session_id = randomUUID().toUpperCase();
     }
   }
 }

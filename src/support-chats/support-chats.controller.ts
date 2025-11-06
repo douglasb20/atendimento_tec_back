@@ -1,8 +1,8 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
-import { SupportChatsService } from './support-chats.service';
 import { SendMessageDto } from './dto/send-message.dto';
+import { SupportChatsService } from './support-chats.service';
 
 @Controller('support-chats')
 export class SupportChatsController {
@@ -18,10 +18,5 @@ export class SupportChatsController {
       `*${req.user['name']}:*\n${sendMessageDto.message}`,
     );
     return { status: 'message sent' };
-  }
-
-  @Get('test')
-  async test() {
-    return this.supportChatsService.test();
   }
 }

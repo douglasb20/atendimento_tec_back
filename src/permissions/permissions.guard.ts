@@ -15,7 +15,7 @@ export class PermissionGuard implements CanActivate {
     if (!user) {
       throw new UnauthorizedException('Usuário não autenticado');
     }
-    if(requiredPermission === '') {
+    if (requiredPermission === '') {
       return true; // Se não há permissão necessária, permite o acesso
     }
 
@@ -32,7 +32,7 @@ export class PermissionGuard implements CanActivate {
   }
 
   // Função para obter a permissão necessária a partir dos metadados
-  private getRequiredPermission(handler: Function): string {
+  private getRequiredPermission(handler: any): string {
     const permissions = Reflect.getMetadata('permissions', handler);
     return permissions || '';
   }

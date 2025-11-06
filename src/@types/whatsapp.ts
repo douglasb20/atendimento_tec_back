@@ -188,7 +188,7 @@ export type Message = {
   /** Message content */
   body: string;
   /** Indicates if the message was a broadcast */
-  broadcast: boolean;
+  broadcast?: boolean;
   /** Indicates if the message was a status update */
   isStatus: boolean;
   /** Indicates if the message is a Gif */
@@ -300,7 +300,7 @@ export type Message = {
   messageSecret?: Array<number>;
 };
 
-type ResultResponse = {
+export type ResultResponse = {
   success: boolean;
 };
 
@@ -320,8 +320,25 @@ export type QrCodeResponse = ResultResponse & {
   message?: string;
 };
 
+export type NumberIdResponse = ResultResponse & {
+  result: {
+    server: string;
+    user: string;
+    _serialized: string;
+  };
+};
+
 export type WhatsappWebhookPayload<T = any> = {
   dataType: DataTypeWhatsapp;
   data?: T | null;
   sessionId: string;
+};
+
+export type MessageData = Message & {
+  _data: {
+    notifyName: string;
+  };
+};
+export type MessagePayload = {
+  message: MessageData;
 };

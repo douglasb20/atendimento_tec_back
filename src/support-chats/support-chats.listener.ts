@@ -1,21 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
-import { WhatsappWebhookPayload } from '@types';
-import { WhatsappGateway } from 'whatsapp/whatsapp.gateway';
+import { MessagePayload, WhatsappWebhookPayload } from '@types';
+import { SupportChatsService } from './support-chats.service';
 
 @Injectable()
 export class SupportChatsListener {
   private readonly logger = new Logger(SupportChatsListener.name);
 
-  constructor(
-    private readonly whatsappGateway: WhatsappGateway,
-  ) {}
+  constructor(private readonly supportChatsService: SupportChatsService) {}
 
   @OnEvent('whatsapp.message_create', { async: true })
-  async onMessageCreate(payload: WhatsappWebhookPayload) {
+  async onMessageCreate(payload: WhatsappWebhookPayload<MessagePayload>) {
     try {
-      this.whatsappGateway.emitEvent('whatsapp:messages', payload);
+      await this.supportChatsService.onMessageCreate(payload);
     } catch (error) {
       this.logger.error('Erro ao processar mensagens do WhatsApp:', error);
       throw error;

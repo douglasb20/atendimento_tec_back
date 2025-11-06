@@ -3,8 +3,9 @@ import { Clients } from 'clients/entities/clients.entity';
 import { DataSource, QueryRunner } from 'typeorm';
 import { CreateContactsDto } from './dto/create-contacts.dto';
 import { Contacts } from './entities/contacts.entity';
-import { ContactRepository } from './contacts.repository';
+import { ContactsRepository } from './contacts.repository';
 import { UpdateContactsDto } from './dto/update-contacts.dto';
+import { WhatsappService } from 'whatsapp/whatsapp.service';
 
 @Injectable()
 export class ContactsService {
@@ -12,7 +13,8 @@ export class ContactsService {
   private readonly logger = new Logger(ContactsService.name);
 
   constructor(
-    private contactRepository: ContactRepository,
+    private contactRepository: ContactsRepository,
+    private whatsappService: WhatsappService,
     private dataSource: DataSource,
   ) {
     this.query = this.dataSource.createQueryRunner();
@@ -75,5 +77,24 @@ export class ContactsService {
       client_id: client_id,
       status: 1,
     });
+  }
+
+  async findOrCreateByRemoteJid({
+    sessionId,
+    remote_jid,
+    name,
+  }: {
+    sessionId: string;
+    remote_jid: string;
+    name: string;
+  }) {
+    let contact = await this.contactRepository.findOneBy({ remote_jid });
+
+    if (!contact) {
+      const phone = await this.whatsappService.getFormattedNumber(sessionId, remote_jid);
+      contact = this.contactRepository.create({ remote_jid, name, phone, status: 1 });
+      await this.contactRepository.save(contact);
+    }
+    return contact;
   }
 }

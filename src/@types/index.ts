@@ -47,9 +47,9 @@ type FieldsSignature = {
   key: string;
   Policy: string;
   'X-Amz-Signature': string;
-}
+};
 
 export type SignatureResponse = {
   url: string;
   fields: FieldsSignature;
-}
+};

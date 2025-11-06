@@ -16,7 +16,7 @@ export class CreateContactsTable1725896694498 implements MigrationInterface {
           {
             name: 'client_id',
             type: 'int',
-            isNullable: false,
+            isNullable: true,
           },
           {
             name: 'name',

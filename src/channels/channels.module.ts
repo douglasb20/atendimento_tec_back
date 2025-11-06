@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { SupportChats } from 'support-chats/entities/support-chats.entity';
-import { SupportChatMessages } from 'support-chats/entities/support-chat-messages.entity';
+import { SupportChatMessages } from 'support-chats/messages/entities/support-chat-messages.entity';
 import { ChannelStatus } from './entities/channel-status.entity';
 import { Channels } from './entities/channels.entity';
 
@@ -19,5 +19,6 @@ import { ChannelsListener } from './channels.listener';
   ],
   controllers: [ChannelsController],
   providers: [ChannelsService, ChannelsRepository, ChannelsListener],
+  exports: [ChannelsService, ChannelsRepository],
 })
 export class ChannelsModule {}

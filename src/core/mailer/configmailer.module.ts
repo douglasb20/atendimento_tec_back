@@ -5,7 +5,6 @@ import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handleba
 import { ConfigMailerService } from './configmailer.service';
 import * as path from 'node:path';
 
-
 @Module({
   imports: [
     MailerModule.forRootAsync({
@@ -38,4 +37,4 @@ import * as path from 'node:path';
   ],
   providers: [ConfigMailerService],
 })
-export class ConfigMailerModule { }
+export class ConfigMailerModule {}
