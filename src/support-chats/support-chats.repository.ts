@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { SupportChats } from './entities/support-chats.entity';
 import { SupportChatMessages } from './messages/entities/support-chat-messages.entity';
+import { MessageTypes } from '@types';
 
 @Injectable()
 export class SupportChatsRepository extends Repository<SupportChats> {
@@ -19,7 +20,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     this.logger.log(`Updating last message for support chat ID: ${support_chat_id}`);
 
     let lastMessageContent = '';
-    if (lastMessage.type === 'chat' && lastMessage.from_me) {
+    if (lastMessage.type === MessageTypes.TEXT && lastMessage.from_me) {
       lastMessageContent = `*Você:* ${lastMessage.content}`;
     } else {
       lastMessageContent = lastMessage.content;

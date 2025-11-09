@@ -53,3 +53,30 @@ export async function ToBase64(filePath: string) {
 
 export const sleep = async (ms: number) =>
   await new Promise((resolve) => setTimeout(resolve, ms * 1000));
+
+export function getExtension(mimeType: string): string {
+  return mimeType.split(";")[0].split("/")[1];
+}
+
+export function toMMSS(seconds) {
+  const min = Math.floor(seconds / 60);
+  const sec = seconds % 60;
+
+  return `${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+}
+
+export function formatFileSize(bytes) {
+  const kb = 1024;
+  const mb = kb * 1024;
+  const gb = mb * 1024;
+
+  if (bytes < kb) {
+    return `${bytes} B`;
+  } else if (bytes < mb) {
+    return `${(bytes / kb).toFixed(2)} KB`;
+  } else if (bytes < gb) {
+    return `${(bytes / mb).toFixed(2)} MB`;
+  } else {
+    return `${(bytes / gb).toFixed(2)} GB`;
+  }
+}

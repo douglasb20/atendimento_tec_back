@@ -71,12 +71,21 @@ export class CreateSupportChatMessagesTable1761251530976 implements MigrationInt
             type: 'varchar',
             length: '255',
             isNullable: true,
+            default: null,
           },
           {
             name: 'media_type',
             type: 'varchar',
-            length: '15',
+            length: '20',
             isNullable: true,
+            default: null,
+          },
+          {
+            name: 'media_size',
+            type: 'int',
+            length: '11',
+            isNullable: true,
+            default: null,
           },
           {
             name: 'from',
@@ -105,6 +114,13 @@ export class CreateSupportChatMessagesTable1761251530976 implements MigrationInt
             default: '0',
           },
           {
+            name: 'is_gif',
+            type: 'tinyint',
+            length: '1',
+            isNullable: false,
+            default: '0',
+          },
+          {
             name: 'has_reaction',
             type: 'tinyint',
             length: '1',
@@ -115,8 +131,8 @@ export class CreateSupportChatMessagesTable1761251530976 implements MigrationInt
             name: 'reaction',
             type: 'varchar',
             length: '20',
-            isNullable: false,
-            default: '0',
+            isNullable: true,
+            default: '',
           },
           {
             name: 'created_at',

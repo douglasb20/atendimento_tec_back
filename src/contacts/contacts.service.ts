@@ -86,7 +86,7 @@ export class ContactsService {
   }: {
     sessionId: string;
     remote_jid: string;
-    name: string;
+    name?: string;
   }) {
     let contact = await this.contactRepository.findOneBy({ remote_jid });
 

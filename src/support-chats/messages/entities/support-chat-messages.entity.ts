@@ -33,13 +33,16 @@ export class SupportChatMessages {
   content: string | null;
 
   @Column({ name: 'has_media', type: 'tinyint', width: 1, default: 0 })
-  has_media: number;
+  has_media: boolean;
 
   @Column({ name: 'media_url', type: 'varchar', nullable: true, length: 255 })
   media_url: string | null;
 
-  @Column({ name: 'media_type', type: 'varchar', nullable: true, length: 15 })
+  @Column({ name: 'media_type', type: 'varchar', nullable: true, length: 20 })
   media_type: string | null;
+
+  @Column({ name: 'media_size', type: 'int', nullable: true, default: null })
+  media_size: number | null;
 
   @Column({ name: 'from', type: 'varchar', nullable: false, length: 20 })
   from: string;
@@ -48,15 +51,18 @@ export class SupportChatMessages {
   to: string;
 
   @Column({ name: 'is_deleted', type: 'tinyint', width: 1, default: 0 })
-  is_deleted: number;
+  is_deleted: boolean;
 
   @Column({ name: 'is_edited', type: 'tinyint', width: 1, default: 0 })
   is_edited: boolean;
 
-  @Column({ name: 'has_reaction', type: 'varchar', length: 20, default: '0' })
-  has_reaction: string;
+  @Column({ name: 'is_gif', type: 'tinyint', width: 1, default: 0 })
+  is_gif: boolean;
 
-  @Column({ name: 'reaction', type: 'varchar', length: 20, default: '0' })
+  @Column({ name: 'has_reaction', type: 'tinyint', width: 1, default: 0 })
+  has_reaction: boolean;
+
+  @Column({ name: 'reaction', type: 'varchar', length: 20, default: '', nullable: true })
   reaction: string;
 
   @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })

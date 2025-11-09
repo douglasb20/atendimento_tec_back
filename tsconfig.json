@@ -21,6 +21,9 @@
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
     "resolveJsonModule": true,
-    "allowJs": true
+    "allowJs": true,
+    "paths": {
+      "@/*": ["./*"]
+    }
   }
 }

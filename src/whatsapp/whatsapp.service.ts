@@ -6,6 +6,8 @@ import {
   DataTypeWhatsapp,
   ErrorResponse,
   GetClientInfoResponse,
+  MessageMedia,
+  MessageMediaResponse,
   NumberIdResponse,
   QrCodeResponse,
   ResultResponse,
@@ -41,11 +43,20 @@ export class WhatsappService {
       case DataTypeWhatsapp.MESSAGE_CREATE:
         this.eventEmitter.emit('whatsapp.message_create', payload);
         break;
-      case DataTypeWhatsapp.MESSAGE_EDIT:
-      case DataTypeWhatsapp.MESSAGE_ACK:
-      case DataTypeWhatsapp.MESSAGE_REACTION:
       case DataTypeWhatsapp.MESSAGE_REVOKED_EVERYONE:
-        // this.eventEmitter.emit('whatsapp.messages', payload);
+        this.eventEmitter.emit('whatsapp.message_revoke_everyone', payload);
+        break;
+      case DataTypeWhatsapp.MESSAGE_EDIT:
+        this.eventEmitter.emit('whatsapp.message_edit', payload);
+        break;
+      case DataTypeWhatsapp.MESSAGE_REACTION:
+        this.eventEmitter.emit('whatsapp.message_reaction', payload);
+        break;
+      case DataTypeWhatsapp.MESSAGE_ACK:
+        this.eventEmitter.emit('whatsapp.message_ack', payload);
+        break;
+      case DataTypeWhatsapp.UNREAD_COUNT:
+        this.eventEmitter.emit('whatsapp.unread_count', payload);
         break;
       case DataTypeWhatsapp.QR_RECEIVED:
         this.eventEmitter.emit('whatsapp.qr_code_received', payload); // channels.listener
@@ -176,6 +187,18 @@ export class WhatsappService {
     const formattedNumber = data.result;
     const phone = formattedNumber.split(' ').slice(1).join('').replace('-', '');
     return phone;
+  }
+
+  async downloadMedia(sessionId: string, messageId: string, chatId: string): Promise<MessageMedia> {
+    const url = `/message/downloadMedia/${sessionId}`;
+
+    const dataPost = {
+      chatId,
+      messageId,
+    };
+
+    const { data } = await this.axiosInstance.post<MessageMediaResponse>(url, dataPost);
+    return data.messageMedia;
   }
 
   async sendMessage(sessionId: string, to: string, message: string) {

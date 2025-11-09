@@ -2,14 +2,17 @@ export enum DataTypeWhatsapp {
   AUTHENTICATED = 'authenticated',
   AUTHENTICATION_FAILURE = 'auth_failure',
   READY = 'ready',
+  CHAT_REMOVED = 'chat_removed',
+  CHAT_ARCHIVED = 'chat_archived',
   MESSAGE_RECEIVED = 'message',
   MESSAGE_CIPHERTEXT = 'message_ciphertext',
   MESSAGE_CREATE = 'message_create',
-  MESSAGE_REACTION = 'message_reaction',
   MESSAGE_REVOKED_EVERYONE = 'message_revoke_everyone',
   MESSAGE_REVOKED_ME = 'message_revoke_me',
   MESSAGE_ACK = 'message_ack',
   MESSAGE_EDIT = 'message_edit',
+  UNREAD_COUNT = 'unread_count',
+  MESSAGE_REACTION = 'message_reaction',
   MEDIA_UPLOADED = 'media_uploaded',
   CONTACT_CHANGED = 'contact_changed',
   GROUP_JOIN = 'group_join',
@@ -18,12 +21,14 @@ export enum DataTypeWhatsapp {
   GROUP_MEMBERSHIP_REQUEST = 'group_membership_request',
   GROUP_UPDATE = 'group_update',
   QR_RECEIVED = 'qr',
+  CODE_RECEIVED = 'code',
   LOADING_SCREEN = 'loading_screen',
   DISCONNECTED = 'disconnected',
   STATE_CHANGED = 'change_state',
   BATTERY_CHANGED = 'change_battery',
+  INCOMING_CALL = 'call',
   REMOTE_SESSION_SAVED = 'remote_session_saved',
-  CALL = 'call',
+  VOTE_UPDATE = 'vote_update'
 }
 
 export enum MessageTypes {
@@ -37,15 +42,15 @@ export enum MessageTypes {
   LOCATION = 'location',
   CONTACT_CARD = 'vcard',
   CONTACT_CARD_MULTI = 'multi_vcard',
-  REVOKED = 'revoked',
   ORDER = 'order',
+  REVOKED = 'revoked',
   PRODUCT = 'product',
-  PAYMENT = 'payment',
   UNKNOWN = 'unknown',
   GROUP_INVITE = 'groups_v4_invite',
   LIST = 'list',
   LIST_RESPONSE = 'list_response',
   BUTTONS_RESPONSE = 'buttons_response',
+  PAYMENT = 'payment',
   BROADCAST_NOTIFICATION = 'broadcast_notification',
   CALL_LOG = 'call_log',
   CIPHERTEXT = 'ciphertext',
@@ -103,6 +108,24 @@ export type MessageId = {
   id: string;
   _serialized: string;
 };
+
+export type ChatId = {
+  /**
+   * Whatsapp server domain
+   * @example `c.us`
+   */
+  server: string,
+  /**
+   * User whatsapp number
+   * @example `554199999999`
+   */
+  user: string,
+  /**
+   * Serialized id
+   * @example `554199999999@c.us`
+   */
+  _serialized: string,
+}
 
 export type InviteV4Data = {
   inviteCode: string;
@@ -300,6 +323,43 @@ export type Message = {
   messageSecret?: Array<number>;
 };
 
+export type Reaction = {
+  id: MessageId
+  orphan: number
+  orphanReason?: string
+  timestamp: number
+  reaction: string
+  read: boolean
+  msgId: MessageId
+  senderId: string
+  ack?: number
+}
+
+export type Chat = {
+  /** Indicates if the Chat is archived */
+  archived: boolean,
+  /** ID that represents the chat */
+  id: ChatId,
+  /** Indicates if the Chat is a Group Chat */
+  isGroup: boolean,
+  /** Indicates if the Chat is readonly */
+  isReadOnly: boolean,
+  /** Indicates if the Chat is muted */
+  isMuted: boolean,
+  /** Unix timestamp for when the mute expires */
+  muteExpiration: number,
+  /** Title of the chat */
+  name: string,
+  /** Unix timestamp for when the last activity occurred */
+  timestamp: number,
+  /** Amount of messages unread */
+  unreadCount: number,
+  /** Last message of chat */
+  lastMessage: Message,
+  /** Indicates if the Chat is pinned */
+  pinned: boolean,
+}
+
 export type ResultResponse = {
   success: boolean;
 };
@@ -318,6 +378,10 @@ export type GetClientInfoResponse = ResultResponse & {
 export type QrCodeResponse = ResultResponse & {
   qr: string;
   message?: string;
+};
+
+export type MessageMediaResponse = ResultResponse & {
+  messageMedia: MessageMedia;
 };
 
 export type NumberIdResponse = ResultResponse & {
@@ -341,4 +405,18 @@ export type MessageData = Message & {
 };
 export type MessagePayload = {
   message: MessageData;
+};
+
+export type MessageEditPayload = {
+  message: MessageData;
+  newBody: string;
+  prevBody: string;
+};
+
+export type ChatPayload = {
+  chat: Chat;
+};
+
+export type ReactionPayload = {
+  reaction: Reaction;
 };
