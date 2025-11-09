@@ -55,14 +55,14 @@ export const sleep = async (ms: number) =>
   await new Promise((resolve) => setTimeout(resolve, ms * 1000));
 
 export function getExtension(mimeType: string): string {
-  return mimeType.split(";")[0].split("/")[1];
+  return mimeType.split(';')[0].split('/')[1];
 }
 
 export function toMMSS(seconds) {
   const min = Math.floor(seconds / 60);
   const sec = seconds % 60;
 
-  return `${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+  return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
 export function formatFileSize(bytes) {

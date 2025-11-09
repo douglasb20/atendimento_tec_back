@@ -28,7 +28,7 @@ export enum DataTypeWhatsapp {
   BATTERY_CHANGED = 'change_battery',
   INCOMING_CALL = 'call',
   REMOTE_SESSION_SAVED = 'remote_session_saved',
-  VOTE_UPDATE = 'vote_update'
+  VOTE_UPDATE = 'vote_update',
 }
 
 export enum MessageTypes {
@@ -114,18 +114,18 @@ export type ChatId = {
    * Whatsapp server domain
    * @example `c.us`
    */
-  server: string,
+  server: string;
   /**
    * User whatsapp number
    * @example `554199999999`
    */
-  user: string,
+  user: string;
   /**
    * Serialized id
    * @example `554199999999@c.us`
    */
-  _serialized: string,
-}
+  _serialized: string;
+};
 
 export type InviteV4Data = {
   inviteCode: string;
@@ -324,41 +324,41 @@ export type Message = {
 };
 
 export type Reaction = {
-  id: MessageId
-  orphan: number
-  orphanReason?: string
-  timestamp: number
-  reaction: string
-  read: boolean
-  msgId: MessageId
-  senderId: string
-  ack?: number
-}
+  id: MessageId;
+  orphan: number;
+  orphanReason?: string;
+  timestamp: number;
+  reaction: string;
+  read: boolean;
+  msgId: MessageId;
+  senderId: string;
+  ack?: number;
+};
 
 export type Chat = {
   /** Indicates if the Chat is archived */
-  archived: boolean,
+  archived: boolean;
   /** ID that represents the chat */
-  id: ChatId,
+  id: ChatId;
   /** Indicates if the Chat is a Group Chat */
-  isGroup: boolean,
+  isGroup: boolean;
   /** Indicates if the Chat is readonly */
-  isReadOnly: boolean,
+  isReadOnly: boolean;
   /** Indicates if the Chat is muted */
-  isMuted: boolean,
+  isMuted: boolean;
   /** Unix timestamp for when the mute expires */
-  muteExpiration: number,
+  muteExpiration: number;
   /** Title of the chat */
-  name: string,
+  name: string;
   /** Unix timestamp for when the last activity occurred */
-  timestamp: number,
+  timestamp: number;
   /** Amount of messages unread */
-  unreadCount: number,
+  unreadCount: number;
   /** Last message of chat */
-  lastMessage: Message,
+  lastMessage: Message;
   /** Indicates if the Chat is pinned */
-  pinned: boolean,
-}
+  pinned: boolean;
+};
 
 export type ResultResponse = {
   success: boolean;

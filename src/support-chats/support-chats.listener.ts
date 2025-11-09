@@ -1,7 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
-import { ChatPayload, MessageEditPayload, MessagePayload, ReactionPayload, WhatsappWebhookPayload } from '@types';
+import {
+  ChatPayload,
+  MessageEditPayload,
+  MessagePayload,
+  ReactionPayload,
+  WhatsappWebhookPayload,
+} from '@types';
 import { SupportChatsService } from './support-chats.service';
 
 @Injectable()
@@ -49,7 +55,7 @@ export class SupportChatsListener {
       throw error;
     }
   }
-  
+
   @OnEvent('whatsapp.message_edit', { async: true })
   async onMessageEdit(payload: WhatsappWebhookPayload<MessageEditPayload>) {
     try {

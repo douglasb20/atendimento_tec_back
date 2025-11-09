@@ -3,7 +3,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ChannelsService } from '@/channels/channels.service';
 import { ContactsService } from '@/contacts/contacts.service';
 import { WhatsappService } from '@/whatsapp/whatsapp.service';
-import { ChatPayload, MessageEditPayload, MessagePayload, ReactionPayload, WhatsappWebhookPayload } from '@types';
+import {
+  ChatPayload,
+  MessageEditPayload,
+  MessagePayload,
+  ReactionPayload,
+  WhatsappWebhookPayload,
+} from '@types';
 
 import { MessagesService } from './messages/messages.service';
 import { ProtocolCountersRepository } from './protocol-counters.repository';
@@ -20,7 +26,7 @@ export class SupportChatsService {
     private readonly contactsService: ContactsService,
     private readonly supportChatsRepository: SupportChatsRepository,
     private readonly protocolCountersRepository: ProtocolCountersRepository,
-  ) { }
+  ) {}
 
   async sendMessage(to: string, message: string) {
     this.logger.log(`Enviando mensagem de para ${to} com mensagem: ${message}`);
@@ -57,7 +63,7 @@ export class SupportChatsService {
       this.logger.error(`Erro ao processar mensagem: ${err.message}`);
     }
   }
-''
+
   async onMessageAck(payload: WhatsappWebhookPayload<MessagePayload>) {
     try {
       const { sessionId, data } = payload;
@@ -72,10 +78,7 @@ export class SupportChatsService {
 
       const supportChat = await this.findOrOpen(contact.id, channel.id);
 
-      const savedMessage = await this.messagesService.saveMessageAck(
-        supportChat.id,
-        data.message,
-      );
+      const savedMessage = await this.messagesService.saveMessageAck(supportChat.id, data.message);
 
       if (savedMessage) {
         this.whatsappService.emitEvent('whatsapp:message_ack', savedMessage);
@@ -152,10 +155,14 @@ export class SupportChatsService {
 
       const supportChat = await this.findOrOpen(contact.id, channel.id);
 
-      await this.supportChatsRepository.update(supportChat.id, { unread_count: data.chat.unreadCount || 0 });
+      await this.supportChatsRepository.update(supportChat.id, {
+        unread_count: data.chat.unreadCount || 0,
+      });
 
-      this.whatsappService.emitEvent('whatsapp:unread_count', { chatId: data.chat.id._serialized, unreadCount: data.chat.unreadCount || 0 });
-
+      this.whatsappService.emitEvent('whatsapp:unread_count', {
+        chatId: data.chat.id._serialized,
+        unreadCount: data.chat.unreadCount || 0,
+      });
     } catch (err) {
       this.logger.error(`Erro ao processar mensagem: ${err.message}`);
     }

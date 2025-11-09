@@ -16,7 +16,7 @@ export class MessagesService {
     private readonly messagesRepository: MessagesRepository,
     private readonly whatsappService: WhatsappService,
     private readonly storageService: StorageService,
-  ) { }
+  ) {}
 
   async saveIncoming(channel: Channels, support_chat_id: number, messagePayload: MessageData) {
     let savedMessage: SupportChatMessages;
@@ -41,7 +41,11 @@ export class MessagesService {
         break;
       case MessageTypes.CONTACT_CARD:
       case MessageTypes.CONTACT_CARD_MULTI:
-        savedMessage = await this.processContactCardMessage(channel, support_chat_id, messagePayload);
+        savedMessage = await this.processContactCardMessage(
+          channel,
+          support_chat_id,
+          messagePayload,
+        );
         break;
     }
 
@@ -59,7 +63,6 @@ export class MessagesService {
       ack: messagePayload.ack,
     });
 
-
     return this.saveMessage(updatedMessage);
   }
 
@@ -74,7 +77,6 @@ export class MessagesService {
       reaction: reactionPayload.reaction || '',
       has_reaction: !!reactionPayload.reaction,
     });
-
 
     return this.saveMessage(updatedMessage);
   }
@@ -126,7 +128,6 @@ export class MessagesService {
       to: messagePayload.to,
     });
 
-
     return await this.saveMessage(messageToSave);
   }
 
@@ -141,22 +142,34 @@ export class MessagesService {
       message_id: messagePayload.id.id,
       datetime: new Date(messagePayload.timestamp * 1000),
       ack: messagePayload.ack,
-      type: messagePayload.vCards.length > 1 ? MessageTypes.CONTACT_CARD_MULTI : MessageTypes.CONTACT_CARD,
+      type:
+        messagePayload.vCards.length > 1
+          ? MessageTypes.CONTACT_CARD_MULTI
+          : MessageTypes.CONTACT_CARD,
       from_me: messagePayload.fromMe,
       content: JSON.stringify(messagePayload.vCards),
       from: messagePayload.from,
       to: messagePayload.to,
     });
 
-
     return await this.saveMessage(messageToSave);
   }
 
-  async processImageMessage(channel: Channels, support_chat_id: number, messagePayload: MessageData): Promise<SupportChatMessages> {
-    console.log("Processing image message...");
+  async processImageMessage(
+    channel: Channels,
+    support_chat_id: number,
+    messagePayload: MessageData,
+  ): Promise<SupportChatMessages> {
+    console.log('Processing image message...');
 
     const key = `chat/images/${randomUUID()}`;
-    const { presignedUrl, mimeType, mediaSize } = await this.processUploadMedia(channel.session_id, messagePayload.id.remote, messagePayload.id.id, key, 3);
+    const { presignedUrl, mimeType, mediaSize } = await this.processUploadMedia(
+      channel.session_id,
+      messagePayload.id.remote,
+      messagePayload.id.id,
+      key,
+      3,
+    );
 
     const messageToSave = this.messagesRepository.create({
       support_chat_id,
@@ -179,11 +192,21 @@ export class MessagesService {
     return savedMessage;
   }
 
-  async processStickerMessage(channel: Channels, support_chat_id: number, messagePayload: MessageData): Promise<SupportChatMessages> {
-    console.log("Processing image message...");
+  async processStickerMessage(
+    channel: Channels,
+    support_chat_id: number,
+    messagePayload: MessageData,
+  ): Promise<SupportChatMessages> {
+    console.log('Processing image message...');
 
     const key = `chat/images/${randomUUID()}`;
-    const { presignedUrl, mimeType, mediaSize } = await this.processUploadMedia(channel.session_id, messagePayload.id.remote, messagePayload.id.id, key, 3);
+    const { presignedUrl, mimeType, mediaSize } = await this.processUploadMedia(
+      channel.session_id,
+      messagePayload.id.remote,
+      messagePayload.id.id,
+      key,
+      3,
+    );
 
     const messageToSave = this.messagesRepository.create({
       support_chat_id,
@@ -206,11 +229,21 @@ export class MessagesService {
     return savedMessage;
   }
 
-  async processVoiceMessage(channel: Channels, support_chat_id: number, messagePayload: MessageData) {
-    console.log("Processing voice message...");
+  async processVoiceMessage(
+    channel: Channels,
+    support_chat_id: number,
+    messagePayload: MessageData,
+  ) {
+    console.log('Processing voice message...');
 
     const key = `chat/voices/${randomUUID()}`;
-    const { presignedUrl, mimeType, mediaSize } = await this.processUploadMedia(channel.session_id, messagePayload.id.remote, messagePayload.id.id, key, 3);
+    const { presignedUrl, mimeType, mediaSize } = await this.processUploadMedia(
+      channel.session_id,
+      messagePayload.id.remote,
+      messagePayload.id.id,
+      key,
+      3,
+    );
 
     const messageToSave = this.messagesRepository.create({
       support_chat_id,
@@ -225,7 +258,7 @@ export class MessagesService {
       to: messagePayload.to,
       has_media: messagePayload.hasMedia,
       media_url: key,
-      media_type: mimeType.split(";")[0],
+      media_type: mimeType.split(';')[0],
       media_size: mediaSize,
     });
 
@@ -234,11 +267,21 @@ export class MessagesService {
     return savedMessage;
   }
 
-  async processVideoMessage(channel: Channels, support_chat_id: number, messagePayload: MessageData): Promise<SupportChatMessages> {
-    console.log("Processing video message...");
+  async processVideoMessage(
+    channel: Channels,
+    support_chat_id: number,
+    messagePayload: MessageData,
+  ): Promise<SupportChatMessages> {
+    console.log('Processing video message...');
 
     const key = `chat/videos/${randomUUID()}`;
-    const { presignedUrl, mimeType, mediaSize } = await this.processUploadMedia(channel.session_id, messagePayload.id.remote, messagePayload.id.id, key, 3);
+    const { presignedUrl, mimeType, mediaSize } = await this.processUploadMedia(
+      channel.session_id,
+      messagePayload.id.remote,
+      messagePayload.id.id,
+      key,
+      3,
+    );
 
     const messageToSave = this.messagesRepository.create({
       support_chat_id,
@@ -262,11 +305,21 @@ export class MessagesService {
     return savedMessage;
   }
 
-  async processDocumentMessage(channel: Channels, support_chat_id: number, messagePayload: MessageData): Promise<SupportChatMessages> {
-    console.log("Processing document message...");
+  async processDocumentMessage(
+    channel: Channels,
+    support_chat_id: number,
+    messagePayload: MessageData,
+  ): Promise<SupportChatMessages> {
+    console.log('Processing document message...');
 
     const key = `chat/documents/${randomUUID()}`;
-    const { presignedUrl, mimeType, mediaSize } = await this.processUploadMedia(channel.session_id, messagePayload.id.remote, messagePayload.id.id, key, 3);
+    const { presignedUrl, mimeType, mediaSize } = await this.processUploadMedia(
+      channel.session_id,
+      messagePayload.id.remote,
+      messagePayload.id.id,
+      key,
+      3,
+    );
 
     const messageToSave = this.messagesRepository.create({
       support_chat_id,
@@ -290,27 +343,36 @@ export class MessagesService {
   }
 
   // @ts-ignore
-  processReactionMessage(support_chat_id: number, channel_id: number, message: MessageData) {
+  processReactionMessage(support_chat_id: number, channel_id: number, message: MessageData) {}
 
-  }
-
-  async saveMessage(
-    message: SupportChatMessages
-  ): Promise<SupportChatMessages> {
+  async saveMessage(message: SupportChatMessages): Promise<SupportChatMessages> {
     const savedMessage = await this.messagesRepository.save(message);
     return savedMessage;
   }
 
-  async processUploadMedia(sessionId: string, chatId: string, messageId: string, key: string, duration: number): Promise<{ presignedUrl: string; mimeType: string; mediaSize: number }> {
-    console.log("Processing upload media message...");
+  async processUploadMedia(
+    sessionId: string,
+    chatId: string,
+    messageId: string,
+    key: string,
+    duration: number,
+  ): Promise<{ presignedUrl: string; mimeType: string; mediaSize: number }> {
+    console.log('Processing upload media message...');
     const messageMedia = await this.whatsappService.downloadMedia(sessionId, messageId, chatId);
 
     const keyWithExtension = key + '.' + getExtension(messageMedia.mimetype);
 
-    await this.storageService.uploadFileBase64(messageMedia.data, keyWithExtension, messageMedia.mimetype);
+    await this.storageService.uploadFileBase64(
+      messageMedia.data,
+      keyWithExtension,
+      messageMedia.mimetype,
+    );
     const presignedUrl = await this.storageService.generateViewUrl(keyWithExtension, duration);
 
-    return { presignedUrl, mimeType: messageMedia.mimetype, mediaSize: messageMedia?.filesize || 0 };
-
+    return {
+      presignedUrl,
+      mimeType: messageMedia.mimetype,
+      mediaSize: messageMedia?.filesize || 0,
+    };
   }
 }

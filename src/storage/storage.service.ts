@@ -69,7 +69,7 @@ export class StorageService {
     return this.s3.send(command);
   }
 
-  async uploadFileBase64(base64Data: string, key: string, fileType: string) { 
+  async uploadFileBase64(base64Data: string, key: string, fileType: string) {
     const buffer = Buffer.from(base64Data, 'base64');
     return await this.uploadBuffer(buffer, key, fileType);
   }
