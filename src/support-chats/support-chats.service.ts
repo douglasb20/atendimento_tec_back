@@ -50,12 +50,15 @@ export class SupportChatsService {
 
       const savedMessage = await this.messagesService.saveIncoming(
         channel,
-        supportChat.id,
+        supportChat,
         data.message,
       );
 
       if (savedMessage) {
-        await this.supportChatsRepository.updateLastMessage(supportChat.id, savedMessage);
+        await this.supportChatsRepository.updateLastMessage(
+          supportChat.id,
+          savedMessage?.lastMessage,
+        );
 
         this.whatsappService.emitEvent('whatsapp:messages', savedMessage);
       }
@@ -102,13 +105,13 @@ export class SupportChatsService {
 
       const supportChat = await this.findOrOpen(contact.id, channel.id);
 
-      const savedMessage = await this.messagesService.saveMessageEdited(
-        supportChat.id,
-        data.message,
-      );
+      const savedMessage = await this.messagesService.saveMessageEdited(supportChat, data.message);
 
       if (savedMessage) {
-        await this.supportChatsRepository.updateLastMessage(supportChat.id, savedMessage);
+        await this.supportChatsRepository.updateLastMessage(
+          supportChat.id,
+          savedMessage?.lastMessage,
+        );
         this.whatsappService.emitEvent('whatsapp:message_edit', savedMessage);
       }
     } catch (err) {
@@ -130,11 +133,15 @@ export class SupportChatsService {
       const supportChat = await this.findOrOpen(contact.id, channel.id);
 
       const savedMessage = await this.messagesService.saveMessageRevokeEveryone(
-        supportChat.id,
+        supportChat,
         data.message,
       );
 
       if (savedMessage) {
+        await this.supportChatsRepository.updateLastMessage(
+          supportChat.id,
+          savedMessage?.lastMessage,
+        );
         this.whatsappService.emitEvent('whatsapp:message_revoke_everyone', savedMessage);
       }
     } catch (err) {

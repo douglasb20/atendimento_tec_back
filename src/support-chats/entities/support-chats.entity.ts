@@ -3,6 +3,7 @@ import { SupportChatMessages } from '../messages/entities/support-chat-messages.
 import { SupportChatStatus } from './support-chat-status.entity';
 import { Users } from 'users/entities/users.entity';
 import { Channels } from 'channels/entities/channels.entity';
+import { MessageTypes } from '@/@types';
 
 @Entity('support_chats')
 export class SupportChats {
@@ -29,6 +30,12 @@ export class SupportChats {
 
   @Column({ name: 'last_message', type: 'text', nullable: true })
   last_message: string;
+
+  @Column({ name: 'last_message_type', type: 'varchar', length: 45, nullable: true })
+  last_message_type: MessageTypes | null;
+
+  @Column({ name: 'last_message_id', type: 'varchar', length: 50, nullable: true, default: null })
+  last_message_id: string | null;
 
   @Column({ name: 'is_waiting', type: 'tinyint', width: 1, default: 1 })
   is_waiting: number;

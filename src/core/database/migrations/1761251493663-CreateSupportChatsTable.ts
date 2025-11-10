@@ -50,6 +50,21 @@ export class CreateSupportChatsTable1761251493663 implements MigrationInterface 
             name: 'last_message',
             type: 'text',
             isNullable: true,
+            default: null,
+          },
+          {
+            name: 'last_message_type',
+            type: 'varchar',
+            length: '45',
+            isNullable: true,
+            default: null,
+          },
+          {
+            name: 'last_message_id',
+            type: 'varchar',
+            length: '50',
+            isNullable: true,
+            default: null,
           },
           {
             name: 'is_waiting',

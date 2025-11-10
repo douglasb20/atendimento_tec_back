@@ -5,10 +5,10 @@ import axios, { AxiosInstance } from 'axios';
 import {
   DataTypeWhatsapp,
   ErrorResponse,
+  GenericResponse,
   GetClientInfoResponse,
   MessageMedia,
   MessageMediaResponse,
-  NumberIdResponse,
   QrCodeResponse,
   ResultResponse,
   SessionStartResponse,
@@ -159,14 +159,20 @@ export class WhatsappService {
     }
   }
 
-  async getRemoteJidByPhone(sessionId: string, phone: string): Promise<string> {
+  async getProfilePicUrl(sessionId: string, remoteJid: string): Promise<string> {
     try {
-      const url = `/client/getRemoteJid/${sessionId}/${phone}`;
-      const { data: remoteJidData } = await this.axiosInstance.get<NumberIdResponse>(url);
-      return remoteJidData.result._serialized;
+      const url = `/contact/getProfilePicUrl/${sessionId}`;
+      const dataPost = {
+        contactId: remoteJid,
+      };
+      const { data: response } = await this.axiosInstance.post<GenericResponse<string>>(
+        url,
+        dataPost,
+      );
+      return response.result;
     } catch (error) {
       this.logger.error(
-        'Erro ao obter JID remoto do WhatsApp:',
+        'Erro ao obter URL da foto de perfil do WhatsApp:',
         error.response?.data.error || error.message,
       );
       throw new InternalServerErrorException('Falha ao se comunicar com a API do WhatsApp.');
@@ -174,19 +180,27 @@ export class WhatsappService {
   }
 
   async getFormattedNumber(sessionId: string, remote_jid: string): Promise<string> {
-    const url = `/contact/getFormattedNumber/${sessionId}`;
+    try {
+      const url = `/contact/getFormattedNumber/${sessionId}`;
 
-    const dataPost = {
-      contactId: remote_jid,
-    };
+      const dataPost = {
+        contactId: remote_jid,
+      };
 
-    const { data } = await this.axiosInstance.post<ResultResponse & { result: string }>(
-      url,
-      dataPost,
-    );
-    const formattedNumber = data.result;
-    const phone = formattedNumber.split(' ').slice(1).join('').replace('-', '');
-    return phone;
+      const { data } = await this.axiosInstance.post<ResultResponse & { result: string }>(
+        url,
+        dataPost,
+      );
+      const formattedNumber = data.result;
+      const phone = formattedNumber.split(' ').slice(1).join('').replace('-', '');
+      return phone;
+    } catch (error) {
+      this.logger.error(
+        'Erro ao obter número formatado do WhatsApp:',
+        error.response?.data.error || error.message,
+      );
+      throw new InternalServerErrorException('Falha ao se comunicar com a API do WhatsApp.');
+    }
   }
 
   async downloadMedia(sessionId: string, messageId: string, chatId: string): Promise<MessageMedia> {

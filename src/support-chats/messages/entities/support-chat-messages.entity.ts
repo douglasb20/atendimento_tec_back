@@ -1,6 +1,7 @@
 import { Column, Entity, Generated, JoinColumn, ManyToOne } from 'typeorm';
 import { SupportChats } from '../../entities/support-chats.entity';
 import { Channels } from 'channels/entities/channels.entity';
+import { MessageTypes } from '@/@types';
 
 @Entity('support_chat_messages')
 export class SupportChatMessages {
@@ -24,7 +25,7 @@ export class SupportChatMessages {
   ack: number;
 
   @Column({ name: 'type', type: 'varchar', length: 30 })
-  type: string;
+  type: MessageTypes;
 
   @Column({ name: 'from_me', type: 'tinyint', width: 1 })
   from_me: boolean;

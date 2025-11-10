@@ -1,4 +1,6 @@
+import { SupportChatMessages } from '@/support-chats/messages/entities/support-chat-messages.entity';
 import { SupportServices } from 'supports/entities/support-services.entity';
+import { MessageTypes } from './whatsapp';
 export * from './whatsapp';
 
 export interface JwtPayload {
@@ -52,4 +54,12 @@ type FieldsSignature = {
 export type SignatureResponse = {
   url: string;
   fields: FieldsSignature;
+};
+
+export type MessageWithLastMessage = SupportChatMessages & {
+  lastMessage?: {
+    id: string;
+    type: MessageTypes;
+    content: string;
+  };
 };

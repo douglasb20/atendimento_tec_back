@@ -30,6 +30,12 @@ export class CreateContactsTable1725896694498 implements MigrationInterface {
             isNullable: true,
           },
           {
+            name: 'is_avatar_external',
+            type: 'tinyint',
+            length: '1',
+            default: '0',
+          },
+          {
             name: 'tags',
             type: 'varchar',
             length: '150',

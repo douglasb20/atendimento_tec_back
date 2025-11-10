@@ -92,7 +92,15 @@ export class ContactsService {
 
     if (!contact) {
       const phone = await this.whatsappService.getFormattedNumber(sessionId, remote_jid);
-      contact = this.contactRepository.create({ remote_jid, name, phone, status: 1 });
+      const profilePicUrl = await this.whatsappService.getProfilePicUrl(sessionId, remote_jid);
+      contact = this.contactRepository.create({
+        remote_jid,
+        name,
+        phone,
+        avatar_url: profilePicUrl,
+        is_avatar_external: true,
+        status: 1,
+      });
       await this.contactRepository.save(contact);
     }
     return contact;

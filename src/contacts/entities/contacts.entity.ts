@@ -24,6 +24,9 @@ export class Contacts {
   @Column({ type: 'text', nullable: false })
   avatar_url: string;
 
+  @Column({ type: 'tinyint', nullable: false, default: 0 })
+  is_avatar_external: boolean;
+
   @Column({ type: 'varchar', length: 150, nullable: true, default: null })
   tags: string;
 

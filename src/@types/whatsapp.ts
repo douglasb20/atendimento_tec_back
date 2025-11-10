@@ -364,6 +364,10 @@ export type ResultResponse = {
   success: boolean;
 };
 
+export type GenericResponse<T> = ResultResponse & {
+  result: T;
+};
+
 export type ErrorResponse = ResultResponse & {
   error: string;
 };

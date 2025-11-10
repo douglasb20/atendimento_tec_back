@@ -1,33 +1,30 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { MessageWithLastMessage } from '@types';
 import { DataSource, Repository } from 'typeorm';
 import { SupportChats } from './entities/support-chats.entity';
-import { SupportChatMessages } from './messages/entities/support-chat-messages.entity';
-import { MessageTypes } from '@types';
 
 @Injectable()
 export class SupportChatsRepository extends Repository<SupportChats> {
-  private readonly logger = new Logger(SupportChatsRepository.name);
   constructor(dataSource: DataSource) {
     super(SupportChats, dataSource.manager);
   }
 
   async findActives() {
-    this.logger.log('Initializing SupportChatsRepository');
     return this.findBy({ support_chat_status_id: 1 });
   }
 
-  async updateLastMessage(support_chat_id: number, lastMessage: SupportChatMessages) {
-    this.logger.log(`Updating last message for support chat ID: ${support_chat_id}`);
-
-    let lastMessageContent = '';
-    if (lastMessage.type === MessageTypes.TEXT && lastMessage.from_me) {
-      lastMessageContent = `*Você:* ${lastMessage.content}`;
-    } else {
-      lastMessageContent = lastMessage.content;
+  async updateLastMessage(
+    support_chat_id: number,
+    lastMessage: MessageWithLastMessage['lastMessage'],
+  ) {
+    if (!lastMessage) {
+      return;
     }
 
     await this.update(support_chat_id, {
-      last_message: lastMessageContent,
+      last_message: lastMessage.content,
+      last_message_type: lastMessage.type,
+      last_message_id: lastMessage.id,
     });
   }
 }

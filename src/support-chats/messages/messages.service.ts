@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
-import { MessageData, MessageTypes, Reaction } from '@/@types';
+import { MessageData, MessageTypes, MessageWithLastMessage, Reaction } from '@/@types';
 import { WhatsappService } from '@/whatsapp/whatsapp.service';
 import { Channels } from '@/channels/entities/channels.entity';
 import { StorageService } from '@/storage/storage.service';
 
+import { SupportChats } from '../entities/support-chats.entity';
 import { SupportChatMessages } from './entities/support-chat-messages.entity';
 import { MessagesRepository } from './messages.repository';
 import { getExtension, toMMSS } from '@/Utils';
@@ -18,34 +19,30 @@ export class MessagesService {
     private readonly storageService: StorageService,
   ) {}
 
-  async saveIncoming(channel: Channels, support_chat_id: number, messagePayload: MessageData) {
-    let savedMessage: SupportChatMessages;
+  async saveIncoming(channel: Channels, support_chat: SupportChats, messagePayload: MessageData) {
+    let savedMessage: MessageWithLastMessage;
     switch (messagePayload.type) {
       case MessageTypes.TEXT:
-        savedMessage = await this.processTextMessage(channel, support_chat_id, messagePayload);
+        savedMessage = await this.processTextMessage(channel, support_chat, messagePayload);
         break;
       case MessageTypes.IMAGE:
-        savedMessage = await this.processImageMessage(channel, support_chat_id, messagePayload);
+        savedMessage = await this.processImageMessage(channel, support_chat, messagePayload);
         break;
       case MessageTypes.STICKER:
-        savedMessage = await this.processStickerMessage(channel, support_chat_id, messagePayload);
+        savedMessage = await this.processStickerMessage(channel, support_chat, messagePayload);
         break;
       case MessageTypes.VOICE:
-        savedMessage = await this.processVoiceMessage(channel, support_chat_id, messagePayload);
+        savedMessage = await this.processVoiceMessage(channel, support_chat, messagePayload);
         break;
       case MessageTypes.VIDEO:
-        savedMessage = await this.processVideoMessage(channel, support_chat_id, messagePayload);
+        savedMessage = await this.processVideoMessage(channel, support_chat, messagePayload);
         break;
       case MessageTypes.DOCUMENT:
-        savedMessage = await this.processDocumentMessage(channel, support_chat_id, messagePayload);
+        savedMessage = await this.processDocumentMessage(channel, support_chat, messagePayload);
         break;
       case MessageTypes.CONTACT_CARD:
       case MessageTypes.CONTACT_CARD_MULTI:
-        savedMessage = await this.processContactCardMessage(
-          channel,
-          support_chat_id,
-          messagePayload,
-        );
+        savedMessage = await this.processContactCardMessage(channel, support_chat, messagePayload);
         break;
     }
 
@@ -81,9 +78,9 @@ export class MessagesService {
     return this.saveMessage(updatedMessage);
   }
 
-  async saveMessageEdited(support_chat_id: number, messagePayload: MessageData) {
+  async saveMessageEdited(support_chat: SupportChats, messagePayload: MessageData) {
     const messageToUpdate = await this.messagesRepository.findOneBySupportChatIdAndMessageId(
-      support_chat_id,
+      support_chat.id,
       messagePayload.id.id,
     );
 
@@ -93,30 +90,37 @@ export class MessagesService {
       is_edited: true,
     });
 
-    return this.saveMessage(updatedMessage);
+    return this.saveMessage(
+      updatedMessage,
+      support_chat.last_message_id === updatedMessage.message_id ? support_chat : null,
+    );
   }
 
-  async saveMessageRevokeEveryone(support_chat_id: number, messagePayload: MessageData) {
+  async saveMessageRevokeEveryone(support_chat: SupportChats, messagePayload: MessageData) {
     const messageToUpdate = await this.messagesRepository.findOneBySupportChatIdAndMessageId(
-      support_chat_id,
+      support_chat.id,
       messagePayload.protocolMessageKey.id,
     );
 
     const updatedMessage = this.messagesRepository.create({
       ...messageToUpdate,
       is_deleted: true,
+      type: MessageTypes.REVOKED,
     });
 
-    return this.saveMessage(updatedMessage);
+    return this.saveMessage(
+      updatedMessage,
+      support_chat.last_message_id === updatedMessage.message_id ? support_chat : null,
+    );
   }
 
   async processTextMessage(
     channel: Channels,
-    support_chat_id: number,
+    support_chat: SupportChats,
     messagePayload: MessageData,
   ) {
     const messageToSave = this.messagesRepository.create({
-      support_chat_id,
+      support_chat_id: support_chat.id,
       channel_id: channel.id,
       message_id: messagePayload.id.id,
       datetime: new Date(messagePayload.timestamp * 1000),
@@ -128,16 +132,16 @@ export class MessagesService {
       to: messagePayload.to,
     });
 
-    return await this.saveMessage(messageToSave);
+    return await this.saveMessage(messageToSave, support_chat);
   }
 
   async processContactCardMessage(
     channel: Channels,
-    support_chat_id: number,
+    support_chat: SupportChats,
     messagePayload: MessageData,
   ) {
     const messageToSave = this.messagesRepository.create({
-      support_chat_id,
+      support_chat_id: support_chat.id,
       channel_id: channel.id,
       message_id: messagePayload.id.id,
       datetime: new Date(messagePayload.timestamp * 1000),
@@ -152,12 +156,12 @@ export class MessagesService {
       to: messagePayload.to,
     });
 
-    return await this.saveMessage(messageToSave);
+    return await this.saveMessage(messageToSave, support_chat);
   }
 
   async processImageMessage(
     channel: Channels,
-    support_chat_id: number,
+    support_chat: SupportChats,
     messagePayload: MessageData,
   ): Promise<SupportChatMessages> {
     console.log('Processing image message...');
@@ -172,7 +176,7 @@ export class MessagesService {
     );
 
     const messageToSave = this.messagesRepository.create({
-      support_chat_id,
+      support_chat_id: support_chat.id,
       channel_id: channel.id,
       message_id: messagePayload.id.id,
       datetime: new Date(messagePayload.timestamp * 1000),
@@ -187,17 +191,17 @@ export class MessagesService {
       media_type: mimeType,
       media_size: mediaSize,
     });
-    const savedMessage = await this.saveMessage(messageToSave);
+    const savedMessage = await this.saveMessage(messageToSave, support_chat);
     savedMessage.media_url = presignedUrl;
     return savedMessage;
   }
 
   async processStickerMessage(
     channel: Channels,
-    support_chat_id: number,
+    support_chat: SupportChats,
     messagePayload: MessageData,
   ): Promise<SupportChatMessages> {
-    console.log('Processing image message...');
+    console.log('Processing sticker message...');
 
     const key = `chat/images/${randomUUID()}`;
     const { presignedUrl, mimeType, mediaSize } = await this.processUploadMedia(
@@ -209,7 +213,7 @@ export class MessagesService {
     );
 
     const messageToSave = this.messagesRepository.create({
-      support_chat_id,
+      support_chat_id: support_chat.id,
       channel_id: channel.id,
       message_id: messagePayload.id.id,
       datetime: new Date(messagePayload.timestamp * 1000),
@@ -224,14 +228,14 @@ export class MessagesService {
       media_type: mimeType,
       media_size: mediaSize,
     });
-    const savedMessage = await this.saveMessage(messageToSave);
+    const savedMessage = await this.saveMessage(messageToSave, support_chat);
     savedMessage.media_url = presignedUrl;
     return savedMessage;
   }
 
   async processVoiceMessage(
     channel: Channels,
-    support_chat_id: number,
+    support_chat: SupportChats,
     messagePayload: MessageData,
   ) {
     console.log('Processing voice message...');
@@ -246,7 +250,7 @@ export class MessagesService {
     );
 
     const messageToSave = this.messagesRepository.create({
-      support_chat_id,
+      support_chat_id: support_chat.id,
       channel_id: channel.id,
       message_id: messagePayload.id.id,
       datetime: new Date(messagePayload.timestamp * 1000),
@@ -262,14 +266,14 @@ export class MessagesService {
       media_size: mediaSize,
     });
 
-    const savedMessage = await this.saveMessage(messageToSave);
+    const savedMessage = await this.saveMessage(messageToSave, support_chat);
     savedMessage.media_url = presignedUrl;
     return savedMessage;
   }
 
   async processVideoMessage(
     channel: Channels,
-    support_chat_id: number,
+    support_chat: SupportChats,
     messagePayload: MessageData,
   ): Promise<SupportChatMessages> {
     console.log('Processing video message...');
@@ -284,7 +288,7 @@ export class MessagesService {
     );
 
     const messageToSave = this.messagesRepository.create({
-      support_chat_id,
+      support_chat_id: support_chat.id,
       channel_id: channel.id,
       message_id: messagePayload.id.id,
       datetime: new Date(messagePayload.timestamp * 1000),
@@ -300,14 +304,14 @@ export class MessagesService {
       media_size: mediaSize,
       is_gif: messagePayload.isGif,
     });
-    const savedMessage = await this.saveMessage(messageToSave);
+    const savedMessage = await this.saveMessage(messageToSave, support_chat);
     savedMessage.media_url = presignedUrl;
     return savedMessage;
   }
 
   async processDocumentMessage(
     channel: Channels,
-    support_chat_id: number,
+    support_chat: SupportChats,
     messagePayload: MessageData,
   ): Promise<SupportChatMessages> {
     console.log('Processing document message...');
@@ -322,7 +326,7 @@ export class MessagesService {
     );
 
     const messageToSave = this.messagesRepository.create({
-      support_chat_id,
+      support_chat_id: support_chat.id,
       channel_id: channel.id,
       message_id: messagePayload.id.id,
       datetime: new Date(messagePayload.timestamp * 1000),
@@ -337,17 +341,31 @@ export class MessagesService {
       media_type: mimeType,
       media_size: mediaSize,
     });
-    const savedMessage = await this.saveMessage(messageToSave);
+    const savedMessage = await this.saveMessage(messageToSave, support_chat);
     savedMessage.media_url = presignedUrl;
     return savedMessage;
   }
 
-  // @ts-ignore
-  processReactionMessage(support_chat_id: number, channel_id: number, message: MessageData) {}
-
-  async saveMessage(message: SupportChatMessages): Promise<SupportChatMessages> {
+  async saveMessage(
+    message: SupportChatMessages,
+    support_chat: SupportChats = null,
+  ): Promise<MessageWithLastMessage> {
     const savedMessage = await this.messagesRepository.save(message);
-    return savedMessage;
+    const savedMessageWithLastMessage: MessageWithLastMessage = {
+      ...savedMessage,
+      lastMessage: null,
+    };
+    if (support_chat) {
+      savedMessageWithLastMessage.lastMessage = {
+        id: savedMessage.message_id,
+        type: savedMessage.type,
+        content:
+          message.type === MessageTypes.TEXT && message.from_me
+            ? '*Você:* ' + savedMessage.content
+            : savedMessage.content,
+      };
+    }
+    return savedMessageWithLastMessage;
   }
 
   async processUploadMedia(
