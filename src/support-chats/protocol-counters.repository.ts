@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ProtocolCounters } from './entities/protocol-counters.entity';
 
 @Injectable()
@@ -8,7 +8,7 @@ export class ProtocolCountersRepository extends Repository<ProtocolCounters> {
     super(ProtocolCounters, dataSource.createEntityManager());
   }
 
-  async generateProtocol(): Promise<string> {
+  async generateProtocol(manager: EntityManager): Promise<string> {
     let protocol = await this.createQueryBuilder('pc').select('pc.*').getRawOne();
 
     if (!protocol) {
@@ -17,7 +17,7 @@ export class ProtocolCountersRepository extends Repository<ProtocolCounters> {
       protocol.counter++;
     }
 
-    await this.save(protocol);
+    await manager.save(ProtocolCounters, protocol);
 
     const now = new Date();
     const year = now.getFullYear();

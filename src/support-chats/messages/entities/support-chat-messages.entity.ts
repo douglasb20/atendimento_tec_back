@@ -27,13 +27,31 @@ export class SupportChatMessages {
   @Column({ name: 'type', type: 'varchar', length: 30 })
   type: MessageTypes;
 
-  @Column({ name: 'from_me', type: 'tinyint', width: 1 })
+  @Column({
+    name: 'from_me',
+    type: 'tinyint',
+    width: 1,
+    default: 0,
+    transformer: {
+      to: (value: boolean) => (value ? 1 : 0),
+      from: (value: number) => value === 1,
+    },
+  })
   from_me: boolean;
 
   @Column({ name: 'content', type: 'text', nullable: true })
   content: string | null;
 
-  @Column({ name: 'has_media', type: 'tinyint', width: 1, default: 0 })
+  @Column({
+    name: 'has_media',
+    type: 'tinyint',
+    width: 1,
+    default: 0,
+    transformer: {
+      to: (value: boolean) => (value ? 1 : 0),
+      from: (value: number) => value === 1,
+    },
+  })
   has_media: boolean;
 
   @Column({ name: 'media_url', type: 'varchar', nullable: true, length: 255 })
@@ -51,16 +69,52 @@ export class SupportChatMessages {
   @Column({ name: 'to', type: 'varchar', nullable: false, length: 20 })
   to: string;
 
-  @Column({ name: 'is_deleted', type: 'tinyint', width: 1, default: 0 })
+  @Column({
+    name: 'is_deleted',
+    type: 'tinyint',
+    width: 1,
+    default: 0,
+    transformer: {
+      to: (value: boolean) => (value ? 1 : 0),
+      from: (value: number) => value === 1,
+    },
+  })
   is_deleted: boolean;
 
-  @Column({ name: 'is_edited', type: 'tinyint', width: 1, default: 0 })
+  @Column({
+    name: 'is_edited',
+    type: 'tinyint',
+    width: 1,
+    default: 0,
+    transformer: {
+      to: (value: boolean) => (value ? 1 : 0),
+      from: (value: number) => value === 1,
+    },
+  })
   is_edited: boolean;
 
-  @Column({ name: 'is_gif', type: 'tinyint', width: 1, default: 0 })
+  @Column({
+    name: 'is_gif',
+    type: 'tinyint',
+    width: 1,
+    default: 0,
+    transformer: {
+      to: (value: boolean) => (value ? 1 : 0),
+      from: (value: number) => value === 1,
+    },
+  })
   is_gif: boolean;
 
-  @Column({ name: 'has_reaction', type: 'tinyint', width: 1, default: 0 })
+  @Column({
+    name: 'has_reaction',
+    type: 'tinyint',
+    width: 1,
+    default: 0,
+    transformer: {
+      to: (value: boolean) => (value ? 1 : 0),
+      from: (value: number) => value === 1,
+    },
+  })
   has_reaction: boolean;
 
   @Column({ name: 'reaction', type: 'varchar', length: 20, default: '', nullable: true })

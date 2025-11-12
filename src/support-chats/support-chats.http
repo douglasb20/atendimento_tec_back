@@ -12,8 +12,8 @@ Content-Type: application/json
 
 @endpoint = /support-chats
 
-#### 1) Get all channels
-GET {{url}}{{endpoint}}
+#### 1) Get all support chats
+GET {{url}}{{endpoint}}/list
 Authorization: Bearer {{authToken}}
 
 #### 2) Send a message

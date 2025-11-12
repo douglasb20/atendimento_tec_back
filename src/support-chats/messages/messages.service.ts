@@ -10,6 +10,7 @@ import { SupportChats } from '../entities/support-chats.entity';
 import { SupportChatMessages } from './entities/support-chat-messages.entity';
 import { MessagesRepository } from './messages.repository';
 import { getExtension, toMMSS } from '@/Utils';
+import { EntityManager } from 'typeorm';
 
 @Injectable()
 export class MessagesService {
@@ -19,37 +20,81 @@ export class MessagesService {
     private readonly storageService: StorageService,
   ) {}
 
-  async saveIncoming(channel: Channels, support_chat: SupportChats, messagePayload: MessageData) {
+  async saveIncoming(
+    channel: Channels,
+    support_chat: SupportChats,
+    messagePayload: MessageData,
+    manager: EntityManager,
+  ): Promise<MessageWithLastMessage> {
     let savedMessage: MessageWithLastMessage;
     switch (messagePayload.type) {
       case MessageTypes.TEXT:
-        savedMessage = await this.processTextMessage(channel, support_chat, messagePayload);
+        savedMessage = await this.processTextMessage(
+          channel,
+          support_chat,
+          messagePayload,
+          manager,
+        );
         break;
       case MessageTypes.IMAGE:
-        savedMessage = await this.processImageMessage(channel, support_chat, messagePayload);
+        savedMessage = await this.processImageMessage(
+          channel,
+          support_chat,
+          messagePayload,
+          manager,
+        );
         break;
       case MessageTypes.STICKER:
-        savedMessage = await this.processStickerMessage(channel, support_chat, messagePayload);
+        savedMessage = await this.processStickerMessage(
+          channel,
+          support_chat,
+          messagePayload,
+          manager,
+        );
         break;
       case MessageTypes.VOICE:
-        savedMessage = await this.processVoiceMessage(channel, support_chat, messagePayload);
+        savedMessage = await this.processVoiceMessage(
+          channel,
+          support_chat,
+          messagePayload,
+          manager,
+        );
         break;
       case MessageTypes.VIDEO:
-        savedMessage = await this.processVideoMessage(channel, support_chat, messagePayload);
+        savedMessage = await this.processVideoMessage(
+          channel,
+          support_chat,
+          messagePayload,
+          manager,
+        );
         break;
       case MessageTypes.DOCUMENT:
-        savedMessage = await this.processDocumentMessage(channel, support_chat, messagePayload);
+        savedMessage = await this.processDocumentMessage(
+          channel,
+          support_chat,
+          messagePayload,
+          manager,
+        );
         break;
       case MessageTypes.CONTACT_CARD:
       case MessageTypes.CONTACT_CARD_MULTI:
-        savedMessage = await this.processContactCardMessage(channel, support_chat, messagePayload);
+        savedMessage = await this.processContactCardMessage(
+          channel,
+          support_chat,
+          messagePayload,
+          manager,
+        );
         break;
     }
 
     return savedMessage;
   }
 
-  async saveMessageAck(support_chat_id: number, messagePayload: MessageData) {
+  async saveMessageAck(
+    support_chat_id: number,
+    messagePayload: MessageData,
+    manager: EntityManager,
+  ): Promise<MessageWithLastMessage> {
     const messageToUpdate = await this.messagesRepository.findOneBySupportChatIdAndMessageId(
       support_chat_id,
       messagePayload.id.id,
@@ -60,10 +105,14 @@ export class MessagesService {
       ack: messagePayload.ack,
     });
 
-    return this.saveMessage(updatedMessage);
+    return this.saveMessage(updatedMessage, manager);
   }
 
-  async saveMessageReaction(support_chat_id: number, reactionPayload: Reaction) {
+  async saveMessageReaction(
+    support_chat_id: number,
+    reactionPayload: Reaction,
+    manager: EntityManager,
+  ): Promise<MessageWithLastMessage> {
     const messageToUpdate = await this.messagesRepository.findOneBySupportChatIdAndMessageId(
       support_chat_id,
       reactionPayload.msgId.id,
@@ -75,10 +124,14 @@ export class MessagesService {
       has_reaction: !!reactionPayload.reaction,
     });
 
-    return this.saveMessage(updatedMessage);
+    return this.saveMessage(updatedMessage, manager);
   }
 
-  async saveMessageEdited(support_chat: SupportChats, messagePayload: MessageData) {
+  async saveMessageEdited(
+    support_chat: SupportChats,
+    messagePayload: MessageData,
+    manager: EntityManager,
+  ) {
     const messageToUpdate = await this.messagesRepository.findOneBySupportChatIdAndMessageId(
       support_chat.id,
       messagePayload.id.id,
@@ -92,11 +145,16 @@ export class MessagesService {
 
     return this.saveMessage(
       updatedMessage,
+      manager,
       support_chat.last_message_id === updatedMessage.message_id ? support_chat : null,
     );
   }
 
-  async saveMessageRevokeEveryone(support_chat: SupportChats, messagePayload: MessageData) {
+  async saveMessageRevokeEveryone(
+    support_chat: SupportChats,
+    messagePayload: MessageData,
+    manager: EntityManager,
+  ): Promise<MessageWithLastMessage> {
     const messageToUpdate = await this.messagesRepository.findOneBySupportChatIdAndMessageId(
       support_chat.id,
       messagePayload.protocolMessageKey.id,
@@ -110,6 +168,7 @@ export class MessagesService {
 
     return this.saveMessage(
       updatedMessage,
+      manager,
       support_chat.last_message_id === updatedMessage.message_id ? support_chat : null,
     );
   }
@@ -118,7 +177,8 @@ export class MessagesService {
     channel: Channels,
     support_chat: SupportChats,
     messagePayload: MessageData,
-  ) {
+    manager: EntityManager,
+  ): Promise<MessageWithLastMessage> {
     const messageToSave = this.messagesRepository.create({
       support_chat_id: support_chat.id,
       channel_id: channel.id,
@@ -132,38 +192,15 @@ export class MessagesService {
       to: messagePayload.to,
     });
 
-    return await this.saveMessage(messageToSave, support_chat);
-  }
-
-  async processContactCardMessage(
-    channel: Channels,
-    support_chat: SupportChats,
-    messagePayload: MessageData,
-  ) {
-    const messageToSave = this.messagesRepository.create({
-      support_chat_id: support_chat.id,
-      channel_id: channel.id,
-      message_id: messagePayload.id.id,
-      datetime: new Date(messagePayload.timestamp * 1000),
-      ack: messagePayload.ack,
-      type:
-        messagePayload.vCards.length > 1
-          ? MessageTypes.CONTACT_CARD_MULTI
-          : MessageTypes.CONTACT_CARD,
-      from_me: messagePayload.fromMe,
-      content: JSON.stringify(messagePayload.vCards),
-      from: messagePayload.from,
-      to: messagePayload.to,
-    });
-
-    return await this.saveMessage(messageToSave, support_chat);
+    return await this.saveMessage(messageToSave, manager, support_chat);
   }
 
   async processImageMessage(
     channel: Channels,
     support_chat: SupportChats,
     messagePayload: MessageData,
-  ): Promise<SupportChatMessages> {
+    manager: EntityManager,
+  ): Promise<MessageWithLastMessage> {
     console.log('Processing image message...');
 
     const key = `chat/images/${randomUUID()}`;
@@ -191,7 +228,7 @@ export class MessagesService {
       media_type: mimeType,
       media_size: mediaSize,
     });
-    const savedMessage = await this.saveMessage(messageToSave, support_chat);
+    const savedMessage = await this.saveMessage(messageToSave, manager, support_chat);
     savedMessage.media_url = presignedUrl;
     return savedMessage;
   }
@@ -200,7 +237,8 @@ export class MessagesService {
     channel: Channels,
     support_chat: SupportChats,
     messagePayload: MessageData,
-  ): Promise<SupportChatMessages> {
+    manager: EntityManager,
+  ): Promise<MessageWithLastMessage> {
     console.log('Processing sticker message...');
 
     const key = `chat/images/${randomUUID()}`;
@@ -228,7 +266,7 @@ export class MessagesService {
       media_type: mimeType,
       media_size: mediaSize,
     });
-    const savedMessage = await this.saveMessage(messageToSave, support_chat);
+    const savedMessage = await this.saveMessage(messageToSave, manager, support_chat);
     savedMessage.media_url = presignedUrl;
     return savedMessage;
   }
@@ -237,7 +275,8 @@ export class MessagesService {
     channel: Channels,
     support_chat: SupportChats,
     messagePayload: MessageData,
-  ) {
+    manager: EntityManager,
+  ): Promise<MessageWithLastMessage> {
     console.log('Processing voice message...');
 
     const key = `chat/voices/${randomUUID()}`;
@@ -266,7 +305,7 @@ export class MessagesService {
       media_size: mediaSize,
     });
 
-    const savedMessage = await this.saveMessage(messageToSave, support_chat);
+    const savedMessage = await this.saveMessage(messageToSave, manager, support_chat);
     savedMessage.media_url = presignedUrl;
     return savedMessage;
   }
@@ -275,7 +314,8 @@ export class MessagesService {
     channel: Channels,
     support_chat: SupportChats,
     messagePayload: MessageData,
-  ): Promise<SupportChatMessages> {
+    manager: EntityManager,
+  ): Promise<MessageWithLastMessage> {
     console.log('Processing video message...');
 
     const key = `chat/videos/${randomUUID()}`;
@@ -304,7 +344,7 @@ export class MessagesService {
       media_size: mediaSize,
       is_gif: messagePayload.isGif,
     });
-    const savedMessage = await this.saveMessage(messageToSave, support_chat);
+    const savedMessage = await this.saveMessage(messageToSave, manager, support_chat);
     savedMessage.media_url = presignedUrl;
     return savedMessage;
   }
@@ -313,7 +353,8 @@ export class MessagesService {
     channel: Channels,
     support_chat: SupportChats,
     messagePayload: MessageData,
-  ): Promise<SupportChatMessages> {
+    manager: EntityManager,
+  ): Promise<MessageWithLastMessage> {
     console.log('Processing document message...');
 
     const key = `chat/documents/${randomUUID()}`;
@@ -341,16 +382,42 @@ export class MessagesService {
       media_type: mimeType,
       media_size: mediaSize,
     });
-    const savedMessage = await this.saveMessage(messageToSave, support_chat);
+    const savedMessage = await this.saveMessage(messageToSave, manager, support_chat);
     savedMessage.media_url = presignedUrl;
     return savedMessage;
   }
 
+  async processContactCardMessage(
+    channel: Channels,
+    support_chat: SupportChats,
+    messagePayload: MessageData,
+    manager: EntityManager,
+  ): Promise<MessageWithLastMessage> {
+    const messageToSave = this.messagesRepository.create({
+      support_chat_id: support_chat.id,
+      channel_id: channel.id,
+      message_id: messagePayload.id.id,
+      datetime: new Date(messagePayload.timestamp * 1000),
+      ack: messagePayload.ack,
+      type:
+        messagePayload.vCards.length > 1
+          ? MessageTypes.CONTACT_CARD_MULTI
+          : MessageTypes.CONTACT_CARD,
+      from_me: messagePayload.fromMe,
+      content: JSON.stringify(messagePayload.vCards),
+      from: messagePayload.from,
+      to: messagePayload.to,
+    });
+
+    return await this.saveMessage(messageToSave, manager, support_chat);
+  }
+
   async saveMessage(
     message: SupportChatMessages,
+    manager: EntityManager,
     support_chat: SupportChats = null,
   ): Promise<MessageWithLastMessage> {
-    const savedMessage = await this.messagesRepository.save(message);
+    const savedMessage = await manager.save(SupportChatMessages, message);
     const savedMessageWithLastMessage: MessageWithLastMessage = {
       ...savedMessage,
       lastMessage: null,

@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { SendMessageDto } from './dto/send-message.dto';
@@ -18,5 +18,12 @@ export class SupportChatsController {
       `*${req.user['name']}:*\n${sendMessageDto.message}`,
     );
     return { status: 'message sent' };
+  }
+
+  @Get()
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async listAllSupportChats() {
+    return this.supportChatsService.listAllSupportChats();
   }
 }

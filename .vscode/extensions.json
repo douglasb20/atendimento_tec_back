@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "usernamehw.errorlens",
+    "dbaeumer.vscode-eslint",
+    "wix.vscode-import-cost",
+    "mariusalchimavicius.json-to-ts",
+    "esbenp.prettier-vscode",
+    "yoavbls.pretty-ts-errors",
+    "humao.rest-client",
+    "spmeesseman.vscode-taskexplorer"
+  ]
+}

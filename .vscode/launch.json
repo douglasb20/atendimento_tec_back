@@ -5,14 +5,14 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Debug NestJS App",
       "type": "node",
       "request": "launch",
-      "name": "Debug NestJS App",
+      "console": "internalConsole",
+      "outputCapture": "std",
       "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "start:dev"
-      ],
+      // "autoAttachChildProcesses": true,
+      "runtimeArgs": ["run", "start:debug"]
     }
   ]
 }

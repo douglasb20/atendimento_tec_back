@@ -1,11 +1,11 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Clients } from 'clients/entities/clients.entity';
-import { DataSource, QueryRunner } from 'typeorm';
-import { CreateContactsDto } from './dto/create-contacts.dto';
-import { Contacts } from './entities/contacts.entity';
-import { ContactsRepository } from './contacts.repository';
-import { UpdateContactsDto } from './dto/update-contacts.dto';
+import { DataSource, EntityManager, QueryRunner } from 'typeorm';
 import { WhatsappService } from 'whatsapp/whatsapp.service';
+import { ContactsRepository } from './contacts.repository';
+import { CreateContactsDto } from './dto/create-contacts.dto';
+import { UpdateContactsDto } from './dto/update-contacts.dto';
+import { Contacts } from './entities/contacts.entity';
 
 @Injectable()
 export class ContactsService {
@@ -79,21 +79,24 @@ export class ContactsService {
     });
   }
 
-  async findOrCreateByRemoteJid({
-    sessionId,
-    remote_jid,
-    name,
-  }: {
-    sessionId: string;
-    remote_jid: string;
-    name?: string;
-  }) {
-    let contact = await this.contactRepository.findOneBy({ remote_jid });
+  async findOrCreateByRemoteJid(
+    {
+      sessionId,
+      remote_jid,
+      name,
+    }: {
+      sessionId: string;
+      remote_jid: string;
+      name?: string;
+    },
+    manager: EntityManager,
+  ): Promise<Contacts> {
+    let contact = await manager.findOneBy(Contacts, { remote_jid });
 
     if (!contact) {
       const phone = await this.whatsappService.getFormattedNumber(sessionId, remote_jid);
       const profilePicUrl = await this.whatsappService.getProfilePicUrl(sessionId, remote_jid);
-      contact = this.contactRepository.create({
+      contact = manager.create(Contacts, {
         remote_jid,
         name,
         phone,
@@ -101,7 +104,7 @@ export class ContactsService {
         is_avatar_external: true,
         status: 1,
       });
-      await this.contactRepository.save(contact);
+      await manager.save(Contacts, contact);
     }
     return contact;
   }

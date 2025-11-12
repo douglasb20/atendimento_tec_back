@@ -37,8 +37,17 @@ export class SupportChats {
   @Column({ name: 'last_message_id', type: 'varchar', length: 50, nullable: true, default: null })
   last_message_id: string | null;
 
-  @Column({ name: 'is_waiting', type: 'tinyint', width: 1, default: 1 })
-  is_waiting: number;
+  @Column({
+    name: 'is_waiting',
+    type: 'tinyint',
+    width: 1,
+    default: 1,
+    transformer: {
+      to: (value: boolean) => (value ? 1 : 0),
+      from: (value: number) => value === 1,
+    },
+  })
+  is_waiting: boolean;
 
   @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;

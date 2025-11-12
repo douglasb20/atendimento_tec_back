@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { DataSource, EntityManager, QueryRunner } from 'typeorm';
 
 import { ChannelsService } from '@/channels/channels.service';
 import { ContactsService } from '@/contacts/contacts.service';
@@ -12,11 +13,12 @@ import {
 } from '@types';
 
 import { MessagesService } from './messages/messages.service';
-import { ProtocolCountersRepository } from './protocol-counters.repository';
 import { SupportChatsRepository } from './support-chats.repository';
+import { SupportChats } from './entities/support-chats.entity';
 
 @Injectable()
 export class SupportChatsService {
+  private queryRunner: QueryRunner;
   private readonly logger = new Logger(SupportChatsService.name);
 
   constructor(
@@ -25,144 +27,236 @@ export class SupportChatsService {
     private readonly channelsService: ChannelsService,
     private readonly contactsService: ContactsService,
     private readonly supportChatsRepository: SupportChatsRepository,
-    private readonly protocolCountersRepository: ProtocolCountersRepository,
-  ) {}
+    private readonly dataSource: DataSource,
+  ) {
+    this.queryRunner = this.dataSource.createQueryRunner();
+  }
 
   async sendMessage(to: string, message: string) {
     this.logger.log(`Enviando mensagem de para ${to} com mensagem: ${message}`);
     this.whatsappService.sendMessage('1', to, message);
   }
 
+  async listAllSupportChats() {
+    return this.supportChatsRepository.findAllSupportChats();
+  }
+
   // ====== Event Listeners Handles ======
   async onMessageCreate(payload: WhatsappWebhookPayload<MessagePayload>) {
     try {
+      await this.queryRunner.startTransaction();
+      const manager: EntityManager = this.queryRunner.manager;
+
       const { sessionId, data } = payload;
       const channel = await this.channelsService.getChannelBySessionId(sessionId);
       let phoneContact = data.message.id.remote;
 
-      const contact = await this.contactsService.findOrCreateByRemoteJid({
-        sessionId,
-        remote_jid: phoneContact,
-        name: data.message._data?.notifyName,
-      });
+      const contact = await this.contactsService.findOrCreateByRemoteJid(
+        {
+          sessionId,
+          remote_jid: phoneContact,
+          name: data.message._data?.notifyName,
+        },
+        manager,
+      );
 
-      const supportChat = await this.findOrOpen(contact.id, channel.id);
+      const supportChat = await this.findOrOpen(contact.id, channel.id, manager);
 
       const savedMessage = await this.messagesService.saveIncoming(
         channel,
         supportChat,
         data.message,
+        manager,
       );
 
       if (savedMessage) {
         await this.supportChatsRepository.updateLastMessage(
           supportChat.id,
           savedMessage?.lastMessage,
+          manager,
         );
 
         this.whatsappService.emitEvent('whatsapp:messages', savedMessage);
       }
+      await this.queryRunner.commitTransaction();
     } catch (err) {
       this.logger.error(`Erro ao processar mensagem: ${err.message}`);
+      await this.queryRunner.rollbackTransaction();
     }
   }
 
   async onMessageAck(payload: WhatsappWebhookPayload<MessagePayload>) {
     try {
+      await this.queryRunner.startTransaction();
+      const manager: EntityManager = this.queryRunner.manager;
+
       const { sessionId, data } = payload;
       const channel = await this.channelsService.getChannelBySessionId(sessionId);
       let phoneContact = data.message.id.remote;
 
-      const contact = await this.contactsService.findOrCreateByRemoteJid({
-        sessionId,
-        remote_jid: phoneContact,
-        name: data.message._data?.notifyName,
-      });
+      const contact = await this.contactsService.findOrCreateByRemoteJid(
+        {
+          sessionId,
+          remote_jid: phoneContact,
+          name: data.message._data?.notifyName,
+        },
+        manager,
+      );
 
-      const supportChat = await this.findOrOpen(contact.id, channel.id);
+      const supportChat = await this.findOrOpen(contact.id, channel.id, manager);
 
-      const savedMessage = await this.messagesService.saveMessageAck(supportChat.id, data.message);
+      const savedMessage = await this.messagesService.saveMessageAck(
+        supportChat.id,
+        data.message,
+        manager,
+      );
 
       if (savedMessage) {
-        this.whatsappService.emitEvent('whatsapp:message_ack', savedMessage);
+        this.whatsappService.emitEvent('whatsapp:messages', savedMessage);
       }
+      await this.queryRunner.commitTransaction();
     } catch (err) {
       this.logger.error(`Erro ao processar mensagem: ${err.message}`);
+      await this.queryRunner.rollbackTransaction();
     }
   }
 
   async onMessageEdit(payload: WhatsappWebhookPayload<MessageEditPayload>) {
     try {
+      await this.queryRunner.startTransaction();
+      const manager: EntityManager = this.queryRunner.manager;
+
       const { sessionId, data } = payload;
       const channel = await this.channelsService.getChannelBySessionId(sessionId);
       let phoneContact = data.message.id.remote;
 
-      const contact = await this.contactsService.findOrCreateByRemoteJid({
-        sessionId,
-        remote_jid: phoneContact,
-        name: data.message._data?.notifyName,
-      });
+      const contact = await this.contactsService.findOrCreateByRemoteJid(
+        {
+          sessionId,
+          remote_jid: phoneContact,
+          name: data.message._data?.notifyName,
+        },
+        manager,
+      );
 
-      const supportChat = await this.findOrOpen(contact.id, channel.id);
+      const supportChat = await this.findOrOpen(contact.id, channel.id, manager);
 
-      const savedMessage = await this.messagesService.saveMessageEdited(supportChat, data.message);
-
-      if (savedMessage) {
-        await this.supportChatsRepository.updateLastMessage(
-          supportChat.id,
-          savedMessage?.lastMessage,
-        );
-        this.whatsappService.emitEvent('whatsapp:message_edit', savedMessage);
-      }
-    } catch (err) {
-      this.logger.error(`Erro ao processar mensagem: ${err.message}`);
-    }
-  }
-
-  async onMessageRevokeEveryone(payload: WhatsappWebhookPayload<MessageEditPayload>) {
-    try {
-      const { sessionId, data } = payload;
-      const channel = await this.channelsService.getChannelBySessionId(sessionId);
-      let phoneContact = data.message.protocolMessageKey.remote;
-
-      const contact = await this.contactsService.findOrCreateByRemoteJid({
-        sessionId,
-        remote_jid: phoneContact,
-      });
-
-      const supportChat = await this.findOrOpen(contact.id, channel.id);
-
-      const savedMessage = await this.messagesService.saveMessageRevokeEveryone(
+      const savedMessage = await this.messagesService.saveMessageEdited(
         supportChat,
         data.message,
+        manager,
       );
 
       if (savedMessage) {
         await this.supportChatsRepository.updateLastMessage(
           supportChat.id,
           savedMessage?.lastMessage,
+          manager,
         );
-        this.whatsappService.emitEvent('whatsapp:message_revoke_everyone', savedMessage);
+        this.whatsappService.emitEvent('whatsapp:messages', savedMessage);
       }
+      await this.queryRunner.commitTransaction();
     } catch (err) {
       this.logger.error(`Erro ao processar mensagem: ${err.message}`);
+      await this.queryRunner.rollbackTransaction();
+    }
+  }
+
+  async onMessageRevokeEveryone(payload: WhatsappWebhookPayload<MessageEditPayload>) {
+    try {
+      await this.queryRunner.startTransaction();
+      const manager: EntityManager = this.queryRunner.manager;
+
+      const { sessionId, data } = payload;
+      const channel = await this.channelsService.getChannelBySessionId(sessionId);
+      let phoneContact = data.message.protocolMessageKey.remote;
+
+      const contact = await this.contactsService.findOrCreateByRemoteJid(
+        {
+          sessionId,
+          remote_jid: phoneContact,
+        },
+        manager,
+      );
+
+      const supportChat = await this.findOrOpen(contact.id, channel.id, manager);
+
+      const savedMessage = await this.messagesService.saveMessageRevokeEveryone(
+        supportChat,
+        data.message,
+        manager,
+      );
+
+      if (savedMessage) {
+        await this.supportChatsRepository.updateLastMessage(
+          supportChat.id,
+          savedMessage?.lastMessage,
+          manager,
+        );
+        this.whatsappService.emitEvent('whatsapp:messages', savedMessage);
+      }
+      await this.queryRunner.commitTransaction();
+    } catch (err) {
+      this.logger.error(`Erro ao processar mensagem: ${err.message}`);
+      await this.queryRunner.rollbackTransaction();
+    }
+  }
+
+  async onMessageReaction(payload: WhatsappWebhookPayload<ReactionPayload>) {
+    try {
+      await this.queryRunner.startTransaction();
+      const manager: EntityManager = this.queryRunner.manager;
+
+      const { sessionId, data } = payload;
+      const channel = await this.channelsService.getChannelBySessionId(sessionId);
+      let phoneContact = data.reaction.msgId.remote;
+
+      const contact = await this.contactsService.findOrCreateByRemoteJid(
+        {
+          sessionId,
+          remote_jid: phoneContact,
+        },
+        manager,
+      );
+
+      const supportChat = await this.findOrOpen(contact.id, channel.id, manager);
+
+      const savedMessage = await this.messagesService.saveMessageReaction(
+        supportChat.id,
+        data.reaction,
+        manager,
+      );
+
+      if (savedMessage) {
+        this.whatsappService.emitEvent('whatsapp:messages', savedMessage);
+      }
+      await this.queryRunner.commitTransaction();
+    } catch (err) {
+      this.logger.error(`Erro ao processar mensagem: ${err.message}`);
+      await this.queryRunner.rollbackTransaction();
     }
   }
 
   async onMessagesUnreadCount(payload: WhatsappWebhookPayload<ChatPayload>) {
     try {
+      await this.queryRunner.startTransaction();
+      const manager: EntityManager = this.queryRunner.manager;
+
       const { sessionId, data } = payload;
       const channel = await this.channelsService.getChannelBySessionId(sessionId);
 
-      const contact = await this.contactsService.findOrCreateByRemoteJid({
-        sessionId,
-        remote_jid: data.chat.id._serialized,
-        name: data.chat.name,
-      });
+      const contact = await this.contactsService.findOrCreateByRemoteJid(
+        {
+          sessionId,
+          remote_jid: data.chat.id._serialized,
+          name: data.chat.name,
+        },
+        manager,
+      );
 
-      const supportChat = await this.findOrOpen(contact.id, channel.id);
+      const supportChat = await this.findOrOpen(contact.id, channel.id, manager);
 
-      await this.supportChatsRepository.update(supportChat.id, {
+      await manager.update(SupportChats, supportChat.id, {
         unread_count: data.chat.unreadCount || 0,
       });
 
@@ -170,61 +264,19 @@ export class SupportChatsService {
         chatId: data.chat.id._serialized,
         unreadCount: data.chat.unreadCount || 0,
       });
+      await this.queryRunner.commitTransaction();
     } catch (err) {
       this.logger.error(`Erro ao processar mensagem: ${err.message}`);
+      await this.queryRunner.rollbackTransaction();
     }
   }
 
-  async onMessageReaction(payload: WhatsappWebhookPayload<ReactionPayload>) {
-    try {
-      const { sessionId, data } = payload;
-      const channel = await this.channelsService.getChannelBySessionId(sessionId);
-      let phoneContact = data.reaction.msgId.remote;
-
-      const contact = await this.contactsService.findOrCreateByRemoteJid({
-        sessionId,
-        remote_jid: phoneContact,
-      });
-
-      const supportChat = await this.findOrOpen(contact.id, channel.id);
-
-      const savedMessage = await this.messagesService.saveMessageReaction(
-        supportChat.id,
-        data.reaction,
-      );
-
-      if (savedMessage) {
-        this.whatsappService.emitEvent('whatsapp:message_ack', savedMessage);
-      }
-    } catch (err) {
-      this.logger.error(`Erro ao processar mensagem: ${err.message}`);
-    }
-  }
-
-  async findOrOpen(contact_id: number, channel_id: number, user_id?: number) {
-    let supportChat = await this.supportChatsRepository
-      .createQueryBuilder('sc')
-      .select('sc.*')
-      .innerJoin('support_chat_status', 'scs', 'scs.id = sc.support_chat_status_id')
-      .where('sc.contact_id = :contact_id', { contact_id })
-      .andWhere('sc.channel_id = :channel_id', { channel_id })
-      .andWhere('scs.is_final = 0')
-      .getRawOne();
-
-    const protocol = await this.protocolCountersRepository.generateProtocol();
-
-    if (!supportChat) {
-      supportChat = this.supportChatsRepository.create({
-        user_id: user_id || null,
-        channel_id,
-        contact_id,
-        support_chat_status_id: 1, // aberto
-        protocol,
-      });
-
-      await this.supportChatsRepository.save(supportChat);
-    }
-
-    return supportChat;
+  async findOrOpen(
+    contact_id: number,
+    channel_id: number,
+    manager: EntityManager,
+    user_id?: number,
+  ) {
+    return await this.supportChatsRepository.findOrOpen(contact_id, channel_id, manager, user_id);
   }
 }
