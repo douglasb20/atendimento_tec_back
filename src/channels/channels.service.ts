@@ -1,7 +1,8 @@
+import { runInTransaction } from '@/Utils';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ChannelStatus, WhatsappWebhookPayload } from '@types';
-import { DataSource, QueryRunner } from 'typeorm';
 import { randomUUID } from 'node:crypto';
+import { DataSource } from 'typeorm';
 import { WhatsappService } from 'whatsapp/whatsapp.service';
 import { ChannelsRepository } from './channels.repository';
 import { CreateOrChannelDto } from './dto/create-or-channel.dto';
@@ -10,14 +11,11 @@ import { Channels } from './entities/channels.entity';
 @Injectable()
 export class ChannelsService {
   private readonly logger = new Logger(ChannelsService.name);
-  private query: QueryRunner;
   constructor(
     private readonly channelsRepository: ChannelsRepository,
     private readonly whatsappService: WhatsappService,
     private dataSource: DataSource,
-  ) {
-    this.query = this.dataSource.createQueryRunner();
-  }
+  ) {}
 
   async getActiveChannels(): Promise<Channels[]> {
     const channels = await this.channelsRepository.findActives();
@@ -108,19 +106,18 @@ export class ChannelsService {
   }
 
   async handleSessionStarted(sessionId: string): Promise<void> {
-    const channel = await this.channelsRepository.findBySessionId(sessionId);
-    try {
-      await this.query.startTransaction();
-      await this.query.manager.update(Channels, channel.id, {
-        channel_status_id: ChannelStatus.CONNECTING,
-      });
-      await this.query.commitTransaction();
-      this.handleChannelStatus(channel.id);
-    } catch (error) {
-      this.logger.error('Erro ao processar início de sessão do canal WhatsApp:', error);
-      await this.query.rollbackTransaction();
-      throw error;
-    }
+    return runInTransaction(this.dataSource, async (manager) => {
+      try {
+        const channel = await this.channelsRepository.findBySessionId(sessionId);
+        await manager.update(Channels, channel.id, {
+          channel_status_id: ChannelStatus.CONNECTING,
+        });
+        this.handleChannelStatus(channel.id);
+      } catch (error) {
+        this.logger.error('Erro ao processar início de sessão do canal WhatsApp:', error);
+        throw error;
+      }
+    });
   }
 
   async handleQrCodeReceived(payload: WhatsappWebhookPayload<{ qr: string }>): Promise<void> {
@@ -133,20 +130,18 @@ export class ChannelsService {
     if (channel.channel_status_id !== ChannelStatus.CONNECTING) {
       return;
     }
-
-    try {
-      await this.query.startTransaction();
-      await this.query.manager.update(Channels, channel.id, {
-        qr_code: qr,
-        channel_status_id: ChannelStatus.CONNECTING,
-      });
-      await this.query.commitTransaction();
-      this.handleChannelStatus(channel.id);
-    } catch (error) {
-      this.logger.error('Erro ao processar QR Code recebido do canal WhatsApp:', error);
-      await this.query.rollbackTransaction();
-      throw error;
-    }
+    return runInTransaction(this.dataSource, async (manager) => {
+      try {
+        await manager.update(Channels, channel.id, {
+          qr_code: qr,
+          channel_status_id: ChannelStatus.CONNECTING,
+        });
+        this.handleChannelStatus(channel.id);
+      } catch (error) {
+        this.logger.error('Erro ao processar QR Code recebido do canal WhatsApp:', error);
+        throw error;
+      }
+    });
   }
 
   async handleChannelAuthenticated(payload: WhatsappWebhookPayload): Promise<void> {

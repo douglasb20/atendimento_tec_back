@@ -11,10 +11,11 @@ import { verify } from 'jsonwebtoken';
 
 import { AuthService } from 'auth/auth.service';
 import { JwtPayload } from '@types';
+import { Users } from '@/users/entities/users.entity';
 
 type ClientInfo = {
   socket: Socket;
-  user_id: number;
+  user: Users;
 };
 
 @WebSocketGateway({
@@ -45,10 +46,14 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
       const user = await this.authService.validateUser(payload);
 
       console.log(`Cliente conectado: ${client.id}`);
-      this.clients.set(client.id, {
+
+      const ClientInfo: ClientInfo = {
         socket: client,
-        user_id: user.id,
-      });
+        user,
+      };
+      this.clients.set(client.id, ClientInfo);
+
+      client.join(`user:${user.id}`);
     } catch (error) {
       console.log(`Cliente ${client.id} desconectado: ${error.message}`);
       client.disconnect();
@@ -73,5 +78,17 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
   emitToClient(clientId: string, event: string, data: any) {
     const client = this.clients.get(clientId);
     if (client) client.socket.emit(event, data);
+  }
+
+  emitToUser(userId: number, event: string, data: any) {
+    this.server.to(`user:${userId}`).emit(event, data);
+  }
+
+  getUserSocketIds(userId: number): string[] {
+    const ids: string[] = [];
+    for (const [sid, info] of this.clients.entries()) {
+      if (info.user.id === userId) ids.push(sid);
+    }
+    return ids;
   }
 }

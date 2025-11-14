@@ -81,8 +81,8 @@ export class CreateUsersTable1704379411392 implements MigrationInterface {
     );
     await queryRunner.query(
       "INSERT INTO \
-      users(name, email, password, role, is_superuser) \
-      values('Douglas', 'douglasdev.cn@gmail.com', '$2b$10$u02d66.IaHqUuJ3p42qQF.xrS1VjX3DWwVOTat/zMBu2lzzBFp0Ly', 'ADMIN', 1)",
+      users(name, email, password, avatar_url, role, is_superuser) \
+      values('Douglas', 'douglasdev.cn@gmail.com', '$2b$10$u02d66.IaHqUuJ3p42qQF.xrS1VjX3DWwVOTat/zMBu2lzzBFp0Ly', 'user/avatar/190e5e96-c03c-4c78-a0af-1c5c1c977956.jpeg', 'ADMIN', 1)",
     );
   }
 

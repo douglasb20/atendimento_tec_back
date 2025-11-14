@@ -5,6 +5,7 @@ import * as bodyParser from 'body-parser';
 import * as path from 'path';
 
 import { AppModule } from './app.module';
+import { Queue } from 'bullmq';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -31,6 +32,13 @@ async function bootstrap() {
   app.use(bodyParser.json({ limit: '10mb' }));
   app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
   app.useStaticAssets(path.resolve(process.cwd(), 'files'), { prefix: '/files/' });
+
+  const queue = app.get<Queue>('BullQueue_whatsapp-messages-queue');
+
+  queue.client
+    .then((client) => client.ping())
+    .then(() => console.log('Redis conectado ao Bull ✔'))
+    .catch((err) => console.error('Erro ao conectar no Redis Bull:', err));
 
   await app.listen(process.env.APP_ENV || 3001);
   console.log(`Application is running on: ${await app.getUrl()}`);

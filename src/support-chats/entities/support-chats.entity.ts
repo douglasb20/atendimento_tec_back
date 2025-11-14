@@ -4,6 +4,7 @@ import { SupportChatStatus } from './support-chat-status.entity';
 import { Users } from 'users/entities/users.entity';
 import { Channels } from 'channels/entities/channels.entity';
 import { MessageTypes } from '@/@types';
+import { Contacts } from '@/contacts/entities/contacts.entity';
 
 @Entity('support_chats')
 export class SupportChats {
@@ -39,13 +40,8 @@ export class SupportChats {
 
   @Column({
     name: 'is_waiting',
-    type: 'tinyint',
-    width: 1,
-    default: 1,
-    transformer: {
-      to: (value: boolean) => (value ? 1 : 0),
-      from: (value: number) => value === 1,
-    },
+    type: 'boolean',
+    default: true,
   })
   is_waiting: boolean;
 
@@ -53,15 +49,44 @@ export class SupportChats {
   created_at: Date;
 
   @Column({
-    name: 'updated_at',
+    name: 'answered_at',
     type: 'datetime',
     nullable: true,
     default: null,
+  })
+  answered_at: Date | null;
+
+  @Column({
+    name: 'finished_at',
+    type: 'datetime',
+    nullable: true,
+    default: null,
+  })
+  finished_at: Date | null;
+
+  @Column({
+    name: 'updated_at',
+    type: 'datetime',
+    nullable: true,
+    default: () => 'CURRENT_TIMESTAMP',
     onUpdate: 'CURRENT_TIMESTAMP',
   })
   updated_at: Date | null;
 
+  @Column({
+    name: 'observation_user',
+    type: 'text',
+    nullable: true,
+    default: null,
+  })
+  observation_user: string | null;
+
   // == Relationships ==
+
+  @ManyToOne(() => Contacts, (contact) => contact.supportChats)
+  @JoinColumn({ name: 'contact_id', referencedColumnName: 'id' })
+  contact: Contacts;
+
   @OneToMany(() => SupportChatMessages, (supportChatMessages) => supportChatMessages.supportChats)
   supportChatMessages: SupportChatMessages[];
 
@@ -75,5 +100,5 @@ export class SupportChats {
 
   @ManyToOne(() => Channels, (channel) => channel.supportChats, { eager: true })
   @JoinColumn({ name: 'channel_id' })
-  channels: Channels;
+  channel: Channels;
 }

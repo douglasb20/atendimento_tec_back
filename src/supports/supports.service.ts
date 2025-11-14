@@ -14,6 +14,7 @@ import { Services } from 'service/entities/service.entity';
 import { SupportStatus } from './entities/support-status.entity';
 import { SupportRepository } from './supports.repository';
 import { UpdateSupportDto } from './dto/update-support.dto';
+import { runInTransaction } from '@/Utils';
 
 @Injectable()
 export class SupportsService {
@@ -23,7 +24,7 @@ export class SupportsService {
     private supportsRepository: SupportRepository,
     private dataSource: DataSource,
   ) {
-    this.queryRunner = this.dataSource.createQueryRunner();
+    this.queryRunner = dataSource.createQueryRunner();
   }
 
   async findOne(id: number): Promise<SupportListResponse> {
@@ -42,121 +43,115 @@ export class SupportsService {
   }
 
   async createSupport(createSupportDto: CreateSupportDto): Promise<Supports> {
-    try {
-      await this.queryRunner.startTransaction('READ COMMITTED');
-
-      const { clients, users, contacts } = await this.ValidateSupport(
-        createSupportDto.client_id,
-        createSupportDto.user_id,
-        createSupportDto.contact_id,
-        createSupportDto.supportServices,
-      );
-
-      const newSupport = this.supportsRepository.create({
-        data_referencia: createSupportDto.data_referencia,
-        hora_inicio: createSupportDto.hora_inicio,
-        hora_fim: createSupportDto.hora_fim,
-        comentario: createSupportDto.comentario,
-        tipo_entrada: createSupportDto.tipo_entrada,
-        esta_pago: createSupportDto.esta_pago,
-        support_status_id: createSupportDto.support_status_id,
-
-        clients: clients,
-        contacts: contacts,
-        users: users,
-      });
-
-      await this.queryRunner.manager.save(Supports, newSupport);
-
-      if (createSupportDto.supportServices.length > 0) {
-        newSupport.supportServices = await this.SalvaSupportServico(
-          newSupport,
+    return runInTransaction(this.dataSource, async (manager) => {
+      try {
+        const { clients, users, contacts } = await this.ValidateSupport(
+          createSupportDto.client_id,
+          createSupportDto.user_id,
+          createSupportDto.contact_id,
           createSupportDto.supportServices,
         );
-      }
 
-      await this.queryRunner.commitTransaction();
-      return newSupport;
-    } catch (err) {
-      await this.queryRunner.rollbackTransaction();
-      this.logger.error(err.message);
-      throw new BadRequestException(err.message);
-    }
+        const newSupport = this.supportsRepository.create({
+          data_referencia: createSupportDto.data_referencia,
+          hora_inicio: createSupportDto.hora_inicio,
+          hora_fim: createSupportDto.hora_fim,
+          comentario: createSupportDto.comentario,
+          tipo_entrada: createSupportDto.tipo_entrada,
+          esta_pago: createSupportDto.esta_pago,
+          support_status_id: createSupportDto.support_status_id,
+
+          clients: clients,
+          contacts: contacts,
+          users: users,
+        });
+
+        await manager.save(Supports, newSupport);
+
+        if (createSupportDto.supportServices.length > 0) {
+          newSupport.supportServices = await this.SalvaSupportServico(
+            newSupport,
+            createSupportDto.supportServices,
+          );
+        }
+
+        return newSupport;
+      } catch (err) {
+        this.logger.error(err.message);
+        throw new BadRequestException(err.message);
+      }
+    });
   }
 
   async updateSupport(
     atendimento_id: number,
     updateSupportDto: UpdateSupportDto,
   ): Promise<Supports> {
-    try {
-      await this.queryRunner.startTransaction('READ COMMITTED');
+    return runInTransaction(this.dataSource, async (manager) => {
+      try {
+        const atendimento = await this.supportsRepository.findOneBy({ id: atendimento_id });
+        if (!atendimento) {
+          this.logger.error(`Erro de atualizar atendimento: Support não localizado com este id`);
+          throw new NotFoundException('Support não localizado com este id');
+        }
 
-      const atendimento = await this.supportsRepository.findOneBy({ id: atendimento_id });
-      if (!atendimento) {
-        this.logger.error(`Erro de atualizar atendimento: Support não localizado com este id`);
-        throw new NotFoundException('Support não localizado com este id');
-      }
-
-      const { clients, users, contacts } = await this.ValidateSupport(
-        updateSupportDto.client_id,
-        updateSupportDto.user_id,
-        updateSupportDto.contact_id,
-        updateSupportDto.supportServices,
-      );
-
-      const updatedSupport = this.supportsRepository.create({
-        ...atendimento,
-        data_referencia: updateSupportDto.data_referencia,
-        hora_inicio: updateSupportDto.hora_inicio,
-        hora_fim: updateSupportDto.hora_fim,
-        comentario: updateSupportDto.comentario,
-        tipo_entrada: updateSupportDto.tipo_entrada,
-        esta_pago: updateSupportDto.esta_pago,
-        support_status_id: updateSupportDto.support_status_id,
-
-        clients: clients,
-        contacts: contacts,
-        users: users,
-      });
-
-      await this.queryRunner.manager.save(Supports, updatedSupport);
-
-      if (updateSupportDto.supportServices.length > 0) {
-        updatedSupport.supportServices = await this.SalvaSupportServico(
-          updatedSupport,
+        const { clients, users, contacts } = await this.ValidateSupport(
+          updateSupportDto.client_id,
+          updateSupportDto.user_id,
+          updateSupportDto.contact_id,
           updateSupportDto.supportServices,
         );
-      }
 
-      await this.queryRunner.commitTransaction();
-      return updatedSupport;
-    } catch (err) {
-      await this.queryRunner.rollbackTransaction();
-      this.logger.error(err.message);
-      throw new BadRequestException(err.message);
-    }
+        const updatedSupport = this.supportsRepository.create({
+          ...atendimento,
+          data_referencia: updateSupportDto.data_referencia,
+          hora_inicio: updateSupportDto.hora_inicio,
+          hora_fim: updateSupportDto.hora_fim,
+          comentario: updateSupportDto.comentario,
+          tipo_entrada: updateSupportDto.tipo_entrada,
+          esta_pago: updateSupportDto.esta_pago,
+          support_status_id: updateSupportDto.support_status_id,
+
+          clients: clients,
+          contacts: contacts,
+          users: users,
+        });
+
+        await manager.save(Supports, updatedSupport);
+
+        if (updateSupportDto.supportServices.length > 0) {
+          updatedSupport.supportServices = await this.SalvaSupportServico(
+            updatedSupport,
+            updateSupportDto.supportServices,
+          );
+        }
+
+        return updatedSupport;
+      } catch (err) {
+        this.logger.error(err.message);
+        throw new BadRequestException(err.message);
+      }
+    });
   }
 
   async deleteSupport(id: number) {
-    try {
-      await this.queryRunner.startTransaction();
-      const support = await this.supportsRepository.findSupport(id);
-      if (!support) {
-        this.logger.error(`Erro de atualizar atendimento: Support não localizado com este id`);
-        throw new NotFoundException('Support não localizado com este id');
+    return runInTransaction(this.dataSource, async (manager) => {
+      try {
+        const support = await this.supportsRepository.findSupport(id);
+        if (!support) {
+          this.logger.error(`Erro de atualizar atendimento: Support não localizado com este id`);
+          throw new NotFoundException('Support não localizado com este id');
+        }
+
+        await manager.save(Supports, {
+          ...support,
+          support_status_id: 4,
+        });
+      } catch (err) {
+        this.logger.error(err.message);
+        throw new BadRequestException(err.message);
       }
-
-      await this.queryRunner.manager.save(Supports, {
-        ...support,
-        support_status_id: 4,
-      });
-
-      await this.queryRunner.commitTransaction();
-    } catch (err) {
-      await this.queryRunner.rollbackTransaction();
-      this.logger.error(err.message);
-      throw new BadRequestException(err.message);
-    }
+    });
   }
 
   async getListStatus(): Promise<SupportStatus[]> {

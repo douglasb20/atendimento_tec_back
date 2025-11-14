@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { SupportChats } from 'support-chats/entities/support-chats.entity';
@@ -7,15 +7,15 @@ import { ChannelStatus } from './entities/channel-status.entity';
 import { Channels } from './entities/channels.entity';
 
 import { WhatsappModule } from 'whatsapp/whatsapp.module';
-import { ChannelsService } from './channels.service';
 import { ChannelsController } from './channels.controller';
-import { ChannelsRepository } from './channels.repository';
 import { ChannelsListener } from './channels.listener';
+import { ChannelsRepository } from './channels.repository';
+import { ChannelsService } from './channels.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([SupportChats, SupportChatMessages, ChannelStatus, Channels]),
-    WhatsappModule,
+    forwardRef(() => WhatsappModule),
   ],
   controllers: [ChannelsController],
   providers: [ChannelsService, ChannelsRepository, ChannelsListener],

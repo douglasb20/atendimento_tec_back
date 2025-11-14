@@ -2,6 +2,7 @@ import { rename, readFile } from 'node:fs';
 import { promisify } from 'node:util';
 import * as crypto from 'node:crypto';
 import * as dotenv from 'dotenv';
+import { DataSource, EntityManager } from 'typeorm';
 
 dotenv.config();
 
@@ -78,5 +79,24 @@ export function formatFileSize(bytes) {
     return `${(bytes / mb).toFixed(2)} MB`;
   } else {
     return `${(bytes / gb).toFixed(2)} GB`;
+  }
+}
+
+export async function runInTransaction<T>(
+  dataSource: DataSource,
+  fn: (manager: EntityManager) => Promise<T>,
+): Promise<T> {
+  const qr = dataSource.createQueryRunner();
+  await qr.connect();
+  await qr.startTransaction();
+  try {
+    const result = await fn(qr.manager);
+    await qr.commitTransaction();
+    return result;
+  } catch (e) {
+    await qr.rollbackTransaction();
+    throw e;
+  } finally {
+    await qr.release();
   }
 }

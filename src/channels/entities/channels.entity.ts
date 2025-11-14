@@ -54,7 +54,7 @@ export class Channels {
   @JoinColumn({ name: 'channel_status_id' })
   channelStatus: ChannelStatus;
 
-  @OneToMany(() => SupportChats, (supportChat) => supportChat.channels)
+  @OneToMany(() => SupportChats, (supportChat) => supportChat.channel)
   supportChats: SupportChats[];
 
   @OneToMany(() => SupportChatMessages, (supportChatMessage) => supportChatMessage.channels)

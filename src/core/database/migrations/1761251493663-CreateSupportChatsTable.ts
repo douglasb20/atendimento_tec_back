@@ -78,11 +78,29 @@ export class CreateSupportChatsTable1761251493663 implements MigrationInterface 
             default: 'CURRENT_TIMESTAMP',
           },
           {
-            name: 'updated_at',
+            name: 'answered_at',
             type: 'datetime',
             isNullable: true,
             default: null,
+          },
+          {
+            name: 'finished_at',
+            type: 'datetime',
+            isNullable: true,
+            default: null,
+          },
+          {
+            name: 'updated_at',
+            type: 'datetime',
+            isNullable: true,
+            default: 'CURRENT_TIMESTAMP',
             onUpdate: 'CURRENT_TIMESTAMP',
+          },
+          {
+            name: 'observation_user',
+            type: 'text',
+            isNullable: true,
+            default: null,
           },
         ],
         foreignKeys: [

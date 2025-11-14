@@ -19,15 +19,33 @@ import { SupportsModule } from './supports/supports.module';
 import { ServicesModule } from './service/services.module';
 import { PermissionsModule } from 'permissions/permissions.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
-import { SupportChatModule } from './support-chats/support-chats.module';
+import { SupportChatsModule } from './support-chats/support-chats.module';
 import { ChannelsModule } from './channels/channels.module';
 import { ContactsModule } from './contacts/contacts.module';
 import { StorageModule } from './storage/storage.module';
+import { BullModule } from '@nestjs/bullmq';
 
 const destPath = path.resolve(__dirname, '..', '..', 'files', 'tmp');
 @Global()
 @Module({
   imports: [
+    BullModule.forRoot({
+      connection: {
+        host: process.env.BULL_REDIS_HOST,
+        port: parseInt(process.env.BULL_REDIS_PORT, 10),
+        password: process.env.BULL_REDIS_PASSWORD,
+        username: process.env.BULL_REDIS_USERNAME,
+      },
+      defaultJobOptions: {
+        removeOnComplete: 2,
+        removeOnFail: 5,
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 1000,
+        },
+      },
+    }),
     MulterModule.register({
       // dest: destPath,
       limits: { fileSize: 1048576 * 100 /* 100mb */ },
@@ -55,7 +73,7 @@ const destPath = path.resolve(__dirname, '..', '..', 'files', 'tmp');
     LogSistemaModule,
     PermissionsModule,
     WhatsappModule,
-    SupportChatModule,
+    SupportChatsModule,
     ChannelsModule,
     ContactsModule,
     StorageModule,

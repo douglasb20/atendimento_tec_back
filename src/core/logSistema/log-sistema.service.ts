@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, QueryRunner } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { LogSistemaRepository } from './log-sistema.repository';
 
 type LogdataType = {
@@ -15,13 +15,10 @@ type LogdataType = {
 
 @Injectable()
 export class LogSistemaService {
-  private queryRunner: QueryRunner;
   constructor(
     private readonly logSistemaRepository: LogSistemaRepository,
     private dataSource: DataSource,
-  ) {
-    this.queryRunner = this.dataSource.createQueryRunner();
-  }
+  ) {}
 
   async salvarLog(logdata: LogdataType) {
     const qr = this.dataSource.createQueryRunner();
@@ -40,7 +37,7 @@ export class LogSistemaService {
         queries: JSON.stringify(logdata.queries),
       });
 
-      await this.logSistemaRepository.saveLog(log, this.queryRunner.manager);
+      await this.logSistemaRepository.saveLog(log, qr.manager);
       await qr.commitTransaction();
     } catch (err) {
       await qr.rollbackTransaction();

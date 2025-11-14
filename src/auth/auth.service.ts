@@ -4,14 +4,15 @@ import * as bcrypt from 'bcrypt';
 import { format } from 'date-fns';
 import { Request } from 'express';
 
-import { Users } from 'users/entities/users.entity';
-import { ConfigMailerService } from 'core/mailer/configmailer.service';
-import { UpdateUserDto } from 'users/dto/update-user.dto';
-import { UserRepository } from 'users/users.repository';
-import { DataSource, LessThan, QueryRunner } from 'typeorm';
-import { UserRefreshTokens } from 'users/entities/user-refresh-tokens.entity';
+import { runInTransaction } from '@/Utils';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { JwtPayload } from '@types';
+import { ConfigMailerService } from 'core/mailer/configmailer.service';
+import { DataSource, EntityManager, LessThan } from 'typeorm';
+import { UpdateUserDto } from 'users/dto/update-user.dto';
+import { UserRefreshTokens } from 'users/entities/user-refresh-tokens.entity';
+import { Users } from 'users/entities/users.entity';
+import { UserRepository } from 'users/users.repository';
 
 type TokenResponse = {
   access_token: string;
@@ -22,15 +23,12 @@ type TokenResponse = {
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private query: QueryRunner;
   constructor(
     private readonly usersRepository: UserRepository,
     private readonly mailerService: ConfigMailerService,
     private readonly jwtService: JwtService,
     private readonly dataSource: DataSource,
-  ) {
-    this.query = this.dataSource.createQueryRunner();
-  }
+  ) {}
 
   public async createToken(user: Users, request: Request): Promise<TokenResponse> {
     const issuer = `${request.protocol}://${request.get('host')}`;
@@ -62,30 +60,29 @@ export class AuthService {
   }
 
   public async signin(email: string, password: string, request: Request) {
-    try {
-      await this.query.startTransaction();
-      const user = await this.findByEmail(email);
-      await this.checkPassword(password, user);
+    return runInTransaction(this.dataSource, async (manager) => {
+      try {
+        const user = await this.findByEmail(email);
+        await this.checkPassword(password, user);
 
-      const token = await this.createToken(user, request);
+        const token = await this.createToken(user, request);
 
-      const updateLastLogin: Partial<UpdateUserDto> = {
-        lastlogin_at: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
-      };
+        const updateLastLogin: Partial<UpdateUserDto> = {
+          lastlogin_at: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
+        };
 
-      await this.query.manager.update(Users, user.id, updateLastLogin);
-      await this.saveRefreshToken(user, token.refresh_token, token.refresh_expires);
+        await manager.update(Users, user.id, updateLastLogin);
+        await this.saveRefreshToken(user, token.refresh_token, token.refresh_expires, manager);
 
-      await this.query.commitTransaction();
-      return {
-        access_token: token.access_token,
-        refresh_token: token.refresh_token,
-        expiresAt: token.refresh_expires,
-      };
-    } catch (err) {
-      await this.query.rollbackTransaction();
-      throw new BadRequestException(err);
-    }
+        return {
+          access_token: token.access_token,
+          refresh_token: token.refresh_token,
+          expiresAt: token.refresh_expires,
+        };
+      } catch (err) {
+        throw new BadRequestException(err);
+      }
+    });
   }
 
   async forgottenPassword(email: string): Promise<void> {
@@ -100,31 +97,39 @@ export class AuthService {
   }
 
   async refresh(refreshToken: string, request: Request) {
-    try {
-      const payload: JwtPayload = this.jwtService.verify(refreshToken, {
-        secret: process.env.REFRESH_JWT_SECRET,
-      });
+    return runInTransaction(this.dataSource, async (manager) => {
+      try {
+        const payload: JwtPayload = this.jwtService.verify(refreshToken, {
+          secret: process.env.REFRESH_JWT_SECRET,
+        });
 
-      if (payload.type !== 'refresh') {
-        this.logger.error('Erro de validação: Tipo de token inválido');
-        throw new UnauthorizedException('Tipo de token inválido');
+        if (payload.type !== 'refresh') {
+          this.logger.error('Erro de validação: Tipo de token inválido');
+          throw new UnauthorizedException('Tipo de token inválido');
+        }
+        const user = await this.validateUser(payload);
+        const userRefresh = await this.validateRefresh(refreshToken);
+
+        if (!user || !userRefresh) {
+          this.logger.error('Erro de validação: Refresh token inválido');
+          throw new UnauthorizedException('Refresh token inválido');
+        }
+
+        const token = await this.createToken(user, request);
+
+        await this.saveRefreshToken(
+          user,
+          token.refresh_token,
+          token.refresh_expires,
+          manager,
+          userRefresh,
+        );
+        return { ...token };
+      } catch (err) {
+        this.logger.error(`Erro de validação: ${err.message}`);
+        throw new UnauthorizedException(err.message);
       }
-      const user = await this.validateUser(payload);
-      const userRefresh = await this.validateRefresh(refreshToken);
-
-      if (!user || !userRefresh) {
-        this.logger.error('Erro de validação: Refresh token inválido');
-        throw new UnauthorizedException('Refresh token inválido');
-      }
-
-      const token = await this.createToken(user, request);
-
-      await this.saveRefreshToken(user, token.refresh_token, token.refresh_expires, userRefresh);
-      return { ...token };
-    } catch (err) {
-      this.logger.error(`Erro de validação: ${err.message}`);
-      throw new UnauthorizedException(err.message);
-    }
+    });
   }
 
   // ==========================================================
@@ -133,9 +138,10 @@ export class AuthService {
     user: Users,
     refreshToken: string,
     expires: number,
+    manager: EntityManager,
     userRefresh: UserRefreshTokens = null,
   ) {
-    const newUserRefresh = this.query.manager.create(UserRefreshTokens, {
+    const newUserRefresh = manager.create(UserRefreshTokens, {
       ...userRefresh,
       user_id: user.id,
       refresh_token: refreshToken,
@@ -143,18 +149,20 @@ export class AuthService {
 
       users: user,
     });
-    await this.query.manager.save(UserRefreshTokens, newUserRefresh);
+    await manager.save(UserRefreshTokens, newUserRefresh);
   }
 
   public async validateRefresh(refreshToken: string): Promise<UserRefreshTokens> {
-    const userRefresh = await this.query.manager.findOneBy(UserRefreshTokens, {
-      refresh_token: refreshToken,
+    return runInTransaction(this.dataSource, async (manager) => {
+      const userRefresh = await manager.findOneBy(UserRefreshTokens, {
+        refresh_token: refreshToken,
+      });
+      if (!userRefresh) {
+        this.logger.error('Erro de validação: Refresh token não encontrado');
+        throw new UnauthorizedException('Refresh token não encontrado');
+      }
+      return userRefresh;
     });
-    if (!userRefresh) {
-      this.logger.error('Erro de validação: Refresh token não encontrado');
-      throw new UnauthorizedException('Refresh token não encontrado');
-    }
-    return userRefresh;
   }
 
   public async validateUser(jwtPayload: JwtPayload): Promise<Users> {
@@ -193,6 +201,8 @@ export class AuthService {
 
   @Cron(CronExpression.EVERY_MINUTE)
   async destroyExpiredRefresh() {
-    await this.query.manager.delete(UserRefreshTokens, { expires_at: LessThan(new Date()) });
+    return runInTransaction(this.dataSource, async (manager) => {
+      await manager.delete(UserRefreshTokens, { expires_at: LessThan(new Date()) });
+    });
   }
 }

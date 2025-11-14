@@ -1,19 +1,20 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
 import { MessageData, MessageTypes, MessageWithLastMessage, Reaction } from '@/@types';
-import { WhatsappService } from '@/whatsapp/whatsapp.service';
 import { Channels } from '@/channels/entities/channels.entity';
 import { StorageService } from '@/storage/storage.service';
+import { WhatsappService } from '@/whatsapp/whatsapp.service';
 
+import { getExtension, toMMSS } from '@/Utils';
+import { EntityManager } from 'typeorm';
 import { SupportChats } from '../entities/support-chats.entity';
 import { SupportChatMessages } from './entities/support-chat-messages.entity';
 import { MessagesRepository } from './messages.repository';
-import { getExtension, toMMSS } from '@/Utils';
-import { EntityManager } from 'typeorm';
 
 @Injectable()
 export class MessagesService {
+  private readonly logger = new Logger(MessagesService.name);
   constructor(
     private readonly messagesRepository: MessagesRepository,
     private readonly whatsappService: WhatsappService,
@@ -100,12 +101,21 @@ export class MessagesService {
       messagePayload.id.id,
     );
 
+    if (!messageToUpdate) {
+      this.logger.warn(
+        `Mensagem não encontrada para suporte_chat_id: ${support_chat_id} e message_id: ${messagePayload.id.id}`,
+      );
+      return null;
+    }
+
     const updatedMessage = this.messagesRepository.create({
       ...messageToUpdate,
       ack: messagePayload.ack,
     });
 
-    return this.saveMessage(updatedMessage, manager);
+    await manager.update(SupportChatMessages, updatedMessage.id, { ack: updatedMessage.ack });
+
+    return updatedMessage;
   }
 
   async saveMessageReaction(
@@ -201,36 +211,45 @@ export class MessagesService {
     messagePayload: MessageData,
     manager: EntityManager,
   ): Promise<MessageWithLastMessage> {
-    console.log('Processing image message...');
+    try {
+      console.log('Processing image message...');
 
-    const key = `chat/images/${randomUUID()}`;
-    const { presignedUrl, mimeType, mediaSize } = await this.processUploadMedia(
-      channel.session_id,
-      messagePayload.id.remote,
-      messagePayload.id.id,
-      key,
-      3,
-    );
+      const key = `chat/images/${randomUUID()}`;
+      const { presignedUrl, mimeType, mediaSize } = await this.processUploadMedia(
+        channel.session_id,
+        messagePayload.id.remote,
+        messagePayload.id.id,
+        key,
+        3,
+      );
 
-    const messageToSave = this.messagesRepository.create({
-      support_chat_id: support_chat.id,
-      channel_id: channel.id,
-      message_id: messagePayload.id.id,
-      datetime: new Date(messagePayload.timestamp * 1000),
-      ack: messagePayload.ack,
-      type: MessageTypes.IMAGE,
-      from_me: messagePayload.fromMe,
-      content: messagePayload.body || 'Imagem',
-      from: messagePayload.from,
-      to: messagePayload.to,
-      has_media: messagePayload.hasMedia,
-      media_url: key,
-      media_type: mimeType,
-      media_size: mediaSize,
-    });
-    const savedMessage = await this.saveMessage(messageToSave, manager, support_chat);
-    savedMessage.media_url = presignedUrl;
-    return savedMessage;
+      console.log('Finished upload media message...');
+
+      const messageToSave = this.messagesRepository.create({
+        support_chat_id: support_chat.id,
+        channel_id: channel.id,
+        message_id: messagePayload.id.id,
+        datetime: new Date(messagePayload.timestamp * 1000),
+        ack: messagePayload.ack,
+        type: MessageTypes.IMAGE,
+        from_me: messagePayload.fromMe,
+        content: messagePayload.body || 'Imagem',
+        from: messagePayload.from,
+        to: messagePayload.to,
+        has_media: messagePayload.hasMedia,
+        media_url: key,
+        media_type: mimeType,
+        media_size: mediaSize,
+      });
+
+      const savedMessage = await this.saveMessage(messageToSave, manager, support_chat);
+      savedMessage.media_url = presignedUrl;
+
+      return savedMessage;
+    } catch (err) {
+      this.logger.error('Erro ao processar mensagem de imagem:', err);
+      throw err;
+    }
   }
 
   async processStickerMessage(
@@ -422,14 +441,12 @@ export class MessagesService {
       ...savedMessage,
       lastMessage: null,
     };
+
     if (support_chat) {
       savedMessageWithLastMessage.lastMessage = {
         id: savedMessage.message_id,
         type: savedMessage.type,
-        content:
-          message.type === MessageTypes.TEXT && message.from_me
-            ? '*Você:* ' + savedMessage.content
-            : savedMessage.content,
+        content: savedMessage.content,
       };
     }
     return savedMessageWithLastMessage;

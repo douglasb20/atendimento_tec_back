@@ -29,13 +29,8 @@ export class SupportChatMessages {
 
   @Column({
     name: 'from_me',
-    type: 'tinyint',
-    width: 1,
-    default: 0,
-    transformer: {
-      to: (value: boolean) => (value ? 1 : 0),
-      from: (value: number) => value === 1,
-    },
+    type: 'boolean',
+    default: false,
   })
   from_me: boolean;
 
@@ -44,13 +39,8 @@ export class SupportChatMessages {
 
   @Column({
     name: 'has_media',
-    type: 'tinyint',
-    width: 1,
-    default: 0,
-    transformer: {
-      to: (value: boolean) => (value ? 1 : 0),
-      from: (value: number) => value === 1,
-    },
+    type: 'boolean',
+    default: false,
   })
   has_media: boolean;
 
@@ -71,49 +61,29 @@ export class SupportChatMessages {
 
   @Column({
     name: 'is_deleted',
-    type: 'tinyint',
-    width: 1,
-    default: 0,
-    transformer: {
-      to: (value: boolean) => (value ? 1 : 0),
-      from: (value: number) => value === 1,
-    },
+    type: 'boolean',
+    default: false,
   })
   is_deleted: boolean;
 
   @Column({
     name: 'is_edited',
-    type: 'tinyint',
-    width: 1,
-    default: 0,
-    transformer: {
-      to: (value: boolean) => (value ? 1 : 0),
-      from: (value: number) => value === 1,
-    },
+    type: 'boolean',
+    default: false,
   })
   is_edited: boolean;
 
   @Column({
     name: 'is_gif',
-    type: 'tinyint',
-    width: 1,
-    default: 0,
-    transformer: {
-      to: (value: boolean) => (value ? 1 : 0),
-      from: (value: number) => value === 1,
-    },
+    type: 'boolean',
+    default: false,
   })
   is_gif: boolean;
 
   @Column({
     name: 'has_reaction',
-    type: 'tinyint',
-    width: 1,
-    default: 0,
-    transformer: {
-      to: (value: boolean) => (value ? 1 : 0),
-      from: (value: number) => value === 1,
-    },
+    type: 'boolean',
+    default: false,
   })
   has_reaction: boolean;
 

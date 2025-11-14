@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import axios, { AxiosInstance } from 'axios';
 
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   DataTypeWhatsapp,
   ErrorResponse,
@@ -14,6 +15,7 @@ import {
   SessionStartResponse,
   WhatsappWebhookPayload,
 } from '@types';
+import { Queue } from 'bullmq';
 import { sleep } from 'Utils';
 import { WhatsappGateway } from './whatsapp.gateway';
 
@@ -23,6 +25,10 @@ export class WhatsappService {
   private axiosInstance: AxiosInstance;
 
   constructor(
+    @InjectQueue('whatsapp-messages-queue')
+    private readonly messagesQueue: Queue<WhatsappWebhookPayload>,
+    @InjectQueue('whatsapp-session-queue')
+    private readonly sessionQueue: Queue<WhatsappWebhookPayload>,
     private readonly eventEmitter: EventEmitter2,
     private readonly whatsappGateway: WhatsappGateway,
   ) {
@@ -35,42 +41,56 @@ export class WhatsappService {
     });
   }
 
-  async processWebhook(payload: WhatsappWebhookPayload) {
-    this.logger.log('Processando webhook do WhatsApp...');
-    const { dataType } = payload;
+  private getChatKey(payload: WhatsappWebhookPayload<any>): string | null {
+    const { sessionId, data, dataType } = payload;
+    let remoteJid: string;
 
     switch (dataType) {
       case DataTypeWhatsapp.MESSAGE_CREATE:
-        this.eventEmitter.emit('whatsapp.message_create', payload);
+      case DataTypeWhatsapp.MESSAGE_ACK:
+      case DataTypeWhatsapp.MESSAGE_EDIT:
+        remoteJid = data.message?.id?.remote;
         break;
       case DataTypeWhatsapp.MESSAGE_REVOKED_EVERYONE:
-        this.eventEmitter.emit('whatsapp.message_revoke_everyone', payload);
-        break;
-      case DataTypeWhatsapp.MESSAGE_EDIT:
-        this.eventEmitter.emit('whatsapp.message_edit', payload);
+        remoteJid = data.message?.protocolMessageKey?.remote;
         break;
       case DataTypeWhatsapp.MESSAGE_REACTION:
-        this.eventEmitter.emit('whatsapp.message_reaction', payload);
-        break;
-      case DataTypeWhatsapp.MESSAGE_ACK:
-        this.eventEmitter.emit('whatsapp.message_ack', payload);
+        remoteJid = data.reaction?.msgId?.remote;
         break;
       case DataTypeWhatsapp.UNREAD_COUNT:
-        this.eventEmitter.emit('whatsapp.unread_count', payload);
-        break;
-      case DataTypeWhatsapp.QR_RECEIVED:
-        this.eventEmitter.emit('whatsapp.qr_code_received', payload); // channels.listener
-        break;
-      case DataTypeWhatsapp.AUTHENTICATED:
-        this.eventEmitter.emit('whatsapp.authenticated', payload); // channels.listener
-      case DataTypeWhatsapp.READY:
-        this.eventEmitter.emit('whatsapp.ready', payload); // channels.listener
-        break;
-      case DataTypeWhatsapp.DISCONNECTED:
-        this.eventEmitter.emit('whatsapp.disconnected', payload); // channels.listener
+        remoteJid = data.chat?.id?._serialized;
         break;
     }
-    // this.whatsappGateway.emitEvent('whatsapp:message', payload);
+
+    if (!remoteJid) return `${sessionId}-system_${Date.now()}`;
+    return `${sessionId}-${remoteJid}_${Date.now()}`;
+  }
+
+  async processWebhook(payload: WhatsappWebhookPayload) {
+    this.logger.log(`Processando webhook do WhatsApp: ${payload.dataType}...`);
+    const key = this.getChatKey(payload);
+
+    switch (payload.dataType) {
+      case DataTypeWhatsapp.QR_RECEIVED:
+      case DataTypeWhatsapp.AUTHENTICATED:
+      case DataTypeWhatsapp.READY:
+        await this.sessionQueue.add(`whatsapp-session-${payload.sessionId}`, payload, {
+          jobId: key,
+        });
+        break;
+      case DataTypeWhatsapp.MESSAGE_CREATE:
+      case DataTypeWhatsapp.MESSAGE_REVOKED_EVERYONE:
+      case DataTypeWhatsapp.MESSAGE_EDIT:
+      case DataTypeWhatsapp.MESSAGE_REACTION:
+      case DataTypeWhatsapp.MESSAGE_ACK:
+      case DataTypeWhatsapp.UNREAD_COUNT:
+        await this.messagesQueue.add(`whatsapp-message-${payload.sessionId}`, payload, {
+          jobId: key,
+        });
+        break;
+    }
+
+    this.logger.log(`Evento enfileirado: ${payload.dataType} para a key ${key}`);
   }
 
   emitEvent(event: string, payload: any) {
@@ -225,8 +245,8 @@ export class WhatsappService {
 
     const url = `/client/sendMessage/${sessionId}`;
     try {
-      const response = await this.axiosInstance.post(url, dataPost);
-      this.logger.log(`Mensagem enviada com sucesso: ${response.data}`);
+      await this.axiosInstance.post(url, dataPost);
+      this.logger.log(`Mensagem enviada com sucesso`);
     } catch (error) {
       this.logger.error('Falha ao enviar mensagem:', error.response?.data || error.message);
       throw new Error('Não foi possível enviar a mensagem.');

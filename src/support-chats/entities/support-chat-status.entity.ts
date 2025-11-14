@@ -9,8 +9,12 @@ export class SupportChatStatus {
   @Column({ name: 'name', type: 'varchar', length: 100 })
   name: string;
 
-  @Column({ name: 'is_final', type: 'tinyint', width: 1, default: 0 })
-  is_final: number;
+  @Column({
+    name: 'is_final',
+    type: 'boolean',
+    default: true,
+  })
+  is_final: boolean;
 
   @OneToMany(() => SupportChats, (supportChats) => supportChats.supportChatStatus)
   supportChats: SupportChats[];

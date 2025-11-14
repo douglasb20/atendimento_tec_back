@@ -15,7 +15,6 @@ export class LogSistemaInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest();
     this.queryStorage.startRequest();
     const user = request.user; // Usuário capturado pelo Passport-JWT
-    const queries = this.queryStorage.getQueries(); // Pega todas as queries armazenadas
 
     return next.handle().pipe(
       tap(async () => {
@@ -35,7 +34,7 @@ export class LogSistemaInterceptor implements NestInterceptor {
           datetime_request: new Date(),
           body: request.body,
           params: request.params,
-          queries: queries, // Armazena todas as queries executadas
+          queries: this.queryStorage.getQueries(), // Armazena todas as queries executadas
         };
 
         await this.logSistemaService.salvarLog(logdata);

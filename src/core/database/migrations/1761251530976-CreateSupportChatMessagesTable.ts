@@ -34,7 +34,7 @@ export class CreateSupportChatMessagesTable1761251530976 implements MigrationInt
           },
           {
             name: 'datetime',
-            type: 'timestamp',
+            type: 'datetime',
             isNullable: false,
           },
           {
@@ -132,7 +132,7 @@ export class CreateSupportChatMessagesTable1761251530976 implements MigrationInt
             type: 'varchar',
             length: '20',
             isNullable: true,
-            default: '',
+            default: "''",
           },
           {
             name: 'created_at',
@@ -164,6 +164,16 @@ export class CreateSupportChatMessagesTable1761251530976 implements MigrationInt
             referencedColumnNames: ['id'],
             onDelete: 'RESTRICT',
             onUpdate: 'RESTRICT',
+          },
+        ],
+        indices: [
+          {
+            name: 'idx_support_chat_id',
+            columnNames: ['support_chat_id'],
+          },
+          {
+            name: 'idx_message_id',
+            columnNames: ['message_id'],
           },
         ],
       }),

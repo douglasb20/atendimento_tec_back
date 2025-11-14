@@ -9,6 +9,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Clients } from '../../clients/entities/clients.entity';
+import { SupportChats } from '@/support-chats/entities/support-chats.entity';
 
 @Entity('contacts')
 export class Contacts {
@@ -51,4 +52,7 @@ export class Contacts {
 
   @OneToMany(() => Supports, (supports) => supports.contacts)
   supports: Supports[];
+
+  @OneToMany(() => SupportChats, (supportChats) => supportChats.contact)
+  supportChats: SupportChats[];
 }

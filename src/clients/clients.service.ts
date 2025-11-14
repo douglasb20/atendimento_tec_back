@@ -1,89 +1,81 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { DataSource, QueryRunner } from 'typeorm';
+import { DataSource } from 'typeorm';
 
 import { ClientRepository } from './clients.repository';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { Clients } from './entities/clients.entity';
 
+import { runInTransaction } from '@/Utils';
 import { ContactsRepository } from 'contacts/contacts.repository';
 
 @Injectable()
 export class ClientService {
-  private query: QueryRunner;
   private readonly logger = new Logger(ClientService.name);
   constructor(
     private clientRepository: ClientRepository,
     private contactRepository: ContactsRepository,
     private dataSource: DataSource,
-  ) {
-    this.query = this.dataSource.createQueryRunner();
-  }
+  ) {}
 
   async createClient(createClientDto: CreateClientDto) {
-    try {
-      await this.query.startTransaction();
+    return runInTransaction(this.dataSource, async (manager) => {
+      try {
+        const client = await this.clientRepository.createClient(createClientDto, manager);
 
-      const client = await this.clientRepository.createClient(createClientDto, this.query.manager);
-
-      await this.query.commitTransaction();
-      return client;
-    } catch (err) {
-      await this.query.rollbackTransaction();
-      this.logger.error(err.message);
-      throw new BadRequestException(err.message);
-    }
+        return client;
+      } catch (err) {
+        this.logger.error(err.message);
+        throw new BadRequestException(err.message);
+      }
+    });
   }
 
   async updateClient(client_id: number, updateClientDto: UpdateClientDto) {
-    try {
-      await this.query.startTransaction();
-      const client = await this.clientRepository.findOneBy({ id: client_id });
-      if (!client) {
-        this.logger.error(`Erro de salvar cliente: Cliente com id "${client_id}" não existe`);
-        throw new Error(`Cliente com id "${client_id}" não existe.`);
+    return runInTransaction(this.dataSource, async (manager) => {
+      try {
+        const client = await this.clientRepository.findOneBy({ id: client_id });
+        if (!client) {
+          this.logger.error(`Erro de salvar cliente: Cliente com id "${client_id}" não existe`);
+          throw new Error(`Cliente com id "${client_id}" não existe.`);
+        }
+
+        const clientNew = {
+          ...client,
+          nome: updateClientDto.nome,
+          cnpj: updateClientDto.cnpj,
+        };
+
+        await manager.save(Clients, clientNew);
+      } catch (err) {
+        this.logger.error(err.message);
+        throw new BadRequestException(err.message);
       }
-
-      const clientNew = {
-        ...client,
-        nome: updateClientDto.nome,
-        cnpj: updateClientDto.cnpj,
-      };
-
-      await this.query.manager.save(Clients, clientNew);
-
-      await this.query.commitTransaction();
-    } catch (err) {
-      await this.query.rollbackTransaction();
-      this.logger.error(err.message);
-      throw new BadRequestException(err.message);
-    }
+    });
   }
 
   async removeClient(client_id: number) {
-    try {
-      await this.query.startTransaction();
+    return runInTransaction(this.dataSource, async (manager) => {
+      try {
+        const client = await this.clientRepository.findOneBy({ id: Number(client_id) });
+        if (!client) {
+          this.logger.error(`Erro de remover cliente: Cliente com id "${client_id}" não existe`);
+          throw new Error(`Cliente com id "${client_id}" não existe.`);
+        }
 
-      const client = await this.clientRepository.findOneBy({ id: Number(client_id) });
-      if (!client) {
-        this.logger.error(`Erro de remover cliente: Cliente com id "${client_id}" não existe`);
-        throw new Error(`Cliente com id "${client_id}" não existe.`);
+        await manager.save(Clients, {
+          ...client,
+          status: 0,
+        });
+      } catch (err) {
+        this.logger.error(err.message);
+        throw new BadRequestException(err.message);
       }
-
-      await this.query.manager.save(Clients, {
-        ...client,
-        status: 0,
-      });
-      await this.query.commitTransaction();
-    } catch (err) {
-      await this.query.rollbackTransaction();
-      this.logger.error(err.message);
-      throw new BadRequestException(err.message);
-    }
+    });
   }
 
   async findAll() {
-    return this.query.manager.findBy(Clients, {
+    return this.clientRepository.findBy({
       status: 1,
     });
   }

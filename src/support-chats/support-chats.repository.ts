@@ -20,11 +20,22 @@ export class SupportChatsRepository extends Repository<SupportChats> {
   async findAllSupportChats() {
     let supportChat = await this.createQueryBuilder('sc')
       // .select('sc.*')
+      .leftJoinAndSelect('sc.contact', 'c')
+      .leftJoinAndSelect('sc.channel', 'ch')
+      .leftJoinAndSelect('sc.supportChatStatus', 'ms')
       .innerJoin('support_chat_status', 'scs', 'scs.id = sc.support_chat_status_id')
-      .leftJoinAndSelect('sc.supportChatMessages', 'msg')
       .andWhere('scs.is_final = 0')
-      .andWhere('msg.message_id = :last_message_id', { last_message_id: '3F3F15C4B2B0518271CC' })
       .getMany();
+
+    return supportChat;
+  }
+
+  async findSupportChatsById(id: number): Promise<SupportChats> {
+    let supportChat = await this.findOne({
+      where: { id },
+      order: { supportChatMessages: { datetime: 'ASC' } },
+      relations: ['contact', 'channel', 'supportChatMessages', 'supportChatMessages'],
+    });
 
     return supportChat;
   }
@@ -37,6 +48,9 @@ export class SupportChatsRepository extends Repository<SupportChats> {
   ): Promise<SupportChats> {
     let supportChat = await this.createQueryBuilder('sc')
       .innerJoin('support_chat_status', 'scs', 'scs.id = sc.support_chat_status_id')
+      .leftJoinAndSelect('sc.contact', 'c')
+      .leftJoinAndSelect('sc.channel', 'ch')
+      .leftJoinAndSelect('sc.supportChatStatus', 'ms')
       .where('sc.contact_id = :contact_id', { contact_id })
       .andWhere('sc.channel_id = :channel_id', { channel_id })
       .andWhere('scs.is_final = 0')

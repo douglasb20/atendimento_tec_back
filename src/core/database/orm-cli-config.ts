@@ -14,5 +14,5 @@ export const dataSourceOptions: DataSourceOptions = {
 
 export const dataSource = new DataSource({
   ...dataSourceOptions,
-  migrations: ['dist/src/core/database/migrations/*.js'],
+  migrations: ['dist/core/database/migrations/*.js'],
 });

@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { SendMessageDto } from './dto/send-message.dto';
@@ -12,7 +23,6 @@ export class SupportChatsController {
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
   async sendMessage(@Body() sendMessageDto: SendMessageDto, @Req() req: Request) {
-    console.log('User:', req.user); // Access authenticated user information
     await this.supportChatsService.sendMessage(
       sendMessageDto.to,
       `*${req.user['name']}:*\n${sendMessageDto.message}`,
@@ -25,5 +35,12 @@ export class SupportChatsController {
   @HttpCode(HttpStatus.OK)
   async listAllSupportChats() {
     return this.supportChatsService.listAllSupportChats();
+  }
+
+  @Get('messages/:id')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async findSupportChatById(@Param('id', ParseIntPipe) id: number) {
+    return this.supportChatsService.findSupportChatsById(id);
   }
 }
