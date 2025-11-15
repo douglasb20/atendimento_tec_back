@@ -61,9 +61,9 @@ export class SupportsService {
           esta_pago: createSupportDto.esta_pago,
           support_status_id: createSupportDto.support_status_id,
 
-          clients: clients,
-          contacts: contacts,
-          users: users,
+          client: clients,
+          contact: contacts,
+          user: users,
         });
 
         await manager.save(Supports, newSupport);
@@ -112,9 +112,9 @@ export class SupportsService {
           esta_pago: updateSupportDto.esta_pago,
           support_status_id: updateSupportDto.support_status_id,
 
-          clients: clients,
-          contacts: contacts,
-          users: users,
+          client: clients,
+          contact: contacts,
+          user: users,
         });
 
         await manager.save(Supports, updatedSupport);

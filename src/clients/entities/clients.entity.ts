@@ -22,9 +22,9 @@ export class Clients {
   @Column({ default: 1, nullable: true })
   status: number;
 
-  @OneToMany(() => Contacts, (contacts) => contacts.clients)
+  @OneToMany(() => Contacts, (contacts) => contacts.client)
   contacts: Contacts[];
 
-  @OneToMany(() => Supports, (supports) => supports.clients)
+  @OneToMany(() => Supports, (supports) => supports.client)
   supports: Supports[];
 }

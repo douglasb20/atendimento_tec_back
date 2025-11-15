@@ -37,7 +37,7 @@ export class SupportChatsController {
     return this.supportChatsService.listAllSupportChats();
   }
 
-  @Get('messages/:id')
+  @Get('/:id/messages')
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
   async findSupportChatById(@Param('id', ParseIntPipe) id: number) {

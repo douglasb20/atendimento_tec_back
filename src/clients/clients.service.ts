@@ -86,7 +86,7 @@ export class ClientService {
       this.logger.error(`Erro de localizar cliente: Cliente com id "${client_id}" não existe`);
       throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
     }
-    const contacts = await this.contactRepository.findBy({ clients: client, status: 1 });
+    const contacts = await this.contactRepository.findBy({ client: client, status: 1 });
     client.contacts = contacts;
     return client;
   }

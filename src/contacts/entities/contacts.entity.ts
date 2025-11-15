@@ -46,13 +46,13 @@ export class Contacts {
   @Column({ type: 'tinyint', nullable: false, default: 1 })
   status: number;
 
-  @ManyToOne(() => Clients, (clients) => clients.contacts)
+  @ManyToOne(() => Clients, (client) => client.contacts)
   @JoinColumn({ name: 'client_id', referencedColumnName: 'id' })
-  clients: Clients;
+  client: Clients;
 
-  @OneToMany(() => Supports, (supports) => supports.contacts)
+  @OneToMany(() => Supports, (support) => support.contact)
   supports: Supports[];
 
-  @OneToMany(() => SupportChats, (supportChats) => supportChats.contact)
+  @OneToMany(() => SupportChats, (supportChat) => supportChat.contact)
   supportChats: SupportChats[];
 }

@@ -41,7 +41,9 @@ export class SupportChatsService {
   }
 
   async findSupportChatsById(id: number) {
-    return this.supportChatsRepository.findSupportChatsById(id);
+    const suportChatMessages = await this.supportChatsRepository.findSupportChatsById(id);
+    const messages = await this.messagesService.getsignedUrlForMessageMedia(suportChatMessages);
+    return messages;
   }
 
   // ====== Event Listeners Handles ======
@@ -148,14 +150,15 @@ export class SupportChatsService {
           );
           this.whatsappChatStateEmit({
             ...supportChat,
-            last_message: savedMessage?.lastMessage.content,
-            last_message_type: savedMessage?.lastMessage.type,
-            last_message_id: savedMessage?.lastMessage.id,
+            last_message: savedMessage?.lastMessage?.content,
+            last_message_type: savedMessage?.lastMessage?.type,
+            last_message_id: savedMessage?.lastMessage?.id,
           });
+
           this.whatsappService.emitEvent('whatsapp:messages', savedMessage);
         }
       } catch (err) {
-        this.logger.error(`Erro ao processar mensagem: ${err.message}`);
+        this.logger.error(`Erro ao processar mensagem edit: ${err.message}`);
         throw err;
       }
     });

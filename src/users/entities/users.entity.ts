@@ -43,7 +43,7 @@ export class Users {
   status: number;
 
   // ======= Relationships =======
-  @OneToMany(() => Supports, (supports) => supports.users)
+  @OneToMany(() => Supports, (supports) => supports.user)
   supports: Supports[];
 
   @OneToMany(() => PermissionXUser, (permissionUser) => permissionUser.user)

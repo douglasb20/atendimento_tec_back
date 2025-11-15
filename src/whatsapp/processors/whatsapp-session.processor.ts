@@ -13,7 +13,6 @@ export class WhatsappSessionProcessor extends WorkerHost {
 
   async process(job: Job<WhatsappWebhookPayload<any>>): Promise<boolean> {
     const payload = job.data;
-    console.log(job.attemptsMade);
 
     try {
       this.logger.log(`Processando evento de sessão do WhatsApp: ${payload.dataType}`);

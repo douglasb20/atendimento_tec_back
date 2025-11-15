@@ -22,6 +22,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       // .select('sc.*')
       .leftJoinAndSelect('sc.contact', 'c')
       .leftJoinAndSelect('sc.channel', 'ch')
+      .leftJoinAndSelect('c.client', 'cl')
       .leftJoinAndSelect('sc.supportChatStatus', 'ms')
       .innerJoin('support_chat_status', 'scs', 'scs.id = sc.support_chat_status_id')
       .andWhere('scs.is_final = 0')
@@ -34,7 +35,13 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     let supportChat = await this.findOne({
       where: { id },
       order: { supportChatMessages: { datetime: 'ASC' } },
-      relations: ['contact', 'channel', 'supportChatMessages', 'supportChatMessages'],
+      relations: [
+        'contact',
+        'channel',
+        'supportChatMessages',
+        'supportChatMessages',
+        'contact.client',
+      ],
     });
 
     return supportChat;

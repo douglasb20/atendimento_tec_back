@@ -50,17 +50,17 @@ export class Supports {
 
   // ============= RELATIONS ================
 
-  @ManyToOne(() => Clients, (clients) => clients.supports)
+  @ManyToOne(() => Clients, (client) => client.supports)
   @JoinColumn({ name: 'client_id', referencedColumnName: 'id' })
-  clients: Clients;
+  client: Clients;
 
-  @ManyToOne(() => Contacts, (contacts) => contacts.supports)
+  @ManyToOne(() => Contacts, (contact) => contact.supports)
   @JoinColumn({ name: 'contact_id', referencedColumnName: 'id' })
-  contacts: Contacts;
+  contact: Contacts;
 
-  @ManyToOne(() => Users, (users) => users.supports)
+  @ManyToOne(() => Users, (user) => user.supports)
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
-  users: Users;
+  user: Users;
 
   @ManyToOne(() => SupportStatus, (support) => support.supports)
   @JoinColumn({ name: 'support_status_id', referencedColumnName: 'id' })
