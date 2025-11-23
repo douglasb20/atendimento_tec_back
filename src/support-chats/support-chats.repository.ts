@@ -63,9 +63,9 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       .andWhere('scs.is_final = 0')
       .getOne();
 
-    const protocol = await this.protocolCountersRepository.generateProtocol(manager);
-
-    if (!supportChat) {
+      
+      if (!supportChat) {
+      const protocol = await this.protocolCountersRepository.generateProtocol(manager);
       const supportChatToSave = manager.create(SupportChats, {
         user_id: user_id || null,
         channel_id,

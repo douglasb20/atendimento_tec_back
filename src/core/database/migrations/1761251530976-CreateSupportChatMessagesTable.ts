@@ -100,6 +100,12 @@ export class CreateSupportChatMessagesTable1761251530976 implements MigrationInt
             isNullable: false,
           },
           {
+            name: 'device_type',
+            type: 'varchar',
+            length: '45',
+            isNullable: false,
+          },
+          {
             name: 'is_deleted',
             type: 'tinyint',
             length: '1',

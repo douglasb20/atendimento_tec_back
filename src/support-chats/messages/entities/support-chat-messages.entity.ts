@@ -59,6 +59,9 @@ export class SupportChatMessages {
   @Column({ name: 'to', type: 'varchar', nullable: false, length: 20 })
   to: string;
 
+  @Column({ name: 'device_type', type: 'varchar', nullable: false, length: 45 })
+  device_type: string;
+
   @Column({
     name: 'is_deleted',
     type: 'boolean',

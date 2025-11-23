@@ -13,7 +13,6 @@ import { SupportChatMessages } from './messages/entities/support-chat-messages.e
 import { MessagesModule } from './messages/messages.module';
 import { ProtocolCountersRepository } from './protocol-counters.repository';
 import { SupportChatsController } from './support-chats.controller';
-import { SupportChatsListener } from './support-chats.listener';
 import { SupportChatsRepository } from './support-chats.repository';
 import { SupportChatsService } from './support-chats.service';
 
@@ -35,7 +34,6 @@ import { SupportChatsService } from './support-chats.service';
   providers: [
     SupportChatsService,
     SupportChatsRepository,
-    SupportChatsListener,
     ProtocolCountersRepository,
   ],
   exports: [SupportChatsService],

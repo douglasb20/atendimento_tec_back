@@ -4,7 +4,7 @@ import { Inject, Logger } from '@nestjs/common';
 import { DataTypeWhatsapp, WhatsappWebhookPayload } from '@types';
 import { Job } from 'bullmq';
 
-@Processor('whatsapp-messages-queue', { concurrency: 5 })
+@Processor('whatsapp-messages-queue', { concurrency: 1 })
 export class WhatsappMessagesProcessor extends WorkerHost {
   private readonly logger = new Logger(WhatsappMessagesProcessor.name);
 

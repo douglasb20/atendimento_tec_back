@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 
 import { ChannelsService } from '@/channels/channels.service';
@@ -42,6 +42,9 @@ export class SupportChatsService {
 
   async findSupportChatsById(id: number) {
     const suportChatMessages = await this.supportChatsRepository.findSupportChatsById(id);
+    if (!suportChatMessages) { 
+      throw new NotFoundException('Chat de suporte não encontrado');
+    }
     const messages = await this.messagesService.getsignedUrlForMessageMedia(suportChatMessages);
     return messages;
   }
@@ -58,7 +61,7 @@ export class SupportChatsService {
           {
             sessionId,
             remote_jid: phoneContact,
-            name: data.message._data?.notifyName,
+            name: data?.message?._data?.notifyName || "Cliente",
           },
           manager,
         );
@@ -85,7 +88,12 @@ export class SupportChatsService {
             last_message_id: savedMessage?.lastMessage.id,
           });
 
-          this.whatsappService.emitEvent('whatsapp:messages', savedMessage);
+          const supoportChatsWhitMessage = {
+            ...supportChat,
+            supportChatMessages: savedMessage,
+          };
+
+          this.whatsappService.emitEvent('whatsapp:messages', supoportChatsWhitMessage);
         }
       } catch (err) {
         this.logger.error(`Erro ao processar mensagem: ${err.message}`);
@@ -224,7 +232,12 @@ export class SupportChatsService {
         );
 
         if (savedMessage) {
-          this.whatsappService.emitEvent('whatsapp:messages', savedMessage);
+
+          const supoportChatsWhitMessage = {
+            ...supportChat,
+            supportChatMessages: savedMessage,
+          };
+          this.whatsappService.emitEvent('whatsapp:messages', supoportChatsWhitMessage);
         }
       } catch (err) {
         this.logger.error(`Erro ao processar mensagem: ${err.message}`);

@@ -1,7 +1,7 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Supports } from './supports.entity';
 
-@Entity({ name: 'atendimento_status' })
+@Entity({ name: 'support_status' })
 export class SupportStatus {
   @PrimaryGeneratedColumn('increment')
   id: number;

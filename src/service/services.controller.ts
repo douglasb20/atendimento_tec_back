@@ -5,7 +5,7 @@ import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
 import { interval, map, Observable } from 'rxjs';
 
-@Controller('servicos')
+@Controller('services')
 export class ServicesController {
   constructor(private servicesService: ServicesService) {}
 

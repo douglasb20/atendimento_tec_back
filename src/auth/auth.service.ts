@@ -51,7 +51,7 @@ export class AuthService {
       },
       {
         secret: process.env.REFRESH_JWT_SECRET,
-        expiresIn: process.env.JWT_EXPIRATION,
+        expiresIn: process.env.JWT_EXPIRATION as any,
       },
     );
     const refreshDecoded = this.jwtService.decode<{ exp: number }>(refresh_token);

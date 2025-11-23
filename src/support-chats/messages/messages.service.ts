@@ -19,7 +19,7 @@ export class MessagesService {
     private readonly messagesRepository: MessagesRepository,
     private readonly whatsappService: WhatsappService,
     private readonly storageService: StorageService,
-  ) {}
+  ) { }
 
   async saveIncoming(
     channel: Channels,
@@ -189,18 +189,8 @@ export class MessagesService {
     messagePayload: MessageData,
     manager: EntityManager,
   ): Promise<MessageWithLastMessage> {
-    const messageToSave = this.messagesRepository.create({
-      support_chat_id: support_chat.id,
-      channel_id: channel.id,
-      message_id: messagePayload.id.id,
-      datetime: new Date(messagePayload.timestamp * 1000),
-      ack: messagePayload.ack,
-      type: MessageTypes.TEXT,
-      from_me: messagePayload.fromMe,
-      content: messagePayload.body,
-      from: messagePayload.from,
-      to: messagePayload.to,
-    });
+    const formatatedMessage = this.formatateMessageContent(messagePayload, channel, support_chat);
+    const messageToSave = this.messagesRepository.create(formatatedMessage);
 
     return await this.saveMessage(messageToSave, manager, support_chat);
   }
@@ -225,17 +215,10 @@ export class MessagesService {
 
       console.log('Finished upload media message...');
 
+      const formatatedMessage = this.formatateMessageContent(messagePayload, channel, support_chat);
+
       const messageToSave = this.messagesRepository.create({
-        support_chat_id: support_chat.id,
-        channel_id: channel.id,
-        message_id: messagePayload.id.id,
-        datetime: new Date(messagePayload.timestamp * 1000),
-        ack: messagePayload.ack,
-        type: MessageTypes.IMAGE,
-        from_me: messagePayload.fromMe,
-        content: messagePayload.body || 'Imagem',
-        from: messagePayload.from,
-        to: messagePayload.to,
+        ...formatatedMessage,
         has_media: messagePayload.hasMedia,
         media_url: keyWithExtension,
         media_type: mimeType,
@@ -269,22 +252,16 @@ export class MessagesService {
       3,
     );
 
+    const formatatedMessage = this.formatateMessageContent(messagePayload, channel, support_chat);
+
     const messageToSave = this.messagesRepository.create({
-      support_chat_id: support_chat.id,
-      channel_id: channel.id,
-      message_id: messagePayload.id.id,
-      datetime: new Date(messagePayload.timestamp * 1000),
-      ack: messagePayload.ack,
-      type: MessageTypes.STICKER,
-      from_me: messagePayload.fromMe,
-      content: messagePayload.body || 'Figurinha',
-      from: messagePayload.from,
-      to: messagePayload.to,
+      ...formatatedMessage,
       has_media: messagePayload.hasMedia,
       media_url: keyWithExtension,
       media_type: mimeType,
       media_size: mediaSize,
     });
+
     const savedMessage = await this.saveMessage(messageToSave, manager, support_chat);
     savedMessage.media_url = presignedUrl;
     return savedMessage;
@@ -307,17 +284,11 @@ export class MessagesService {
       3,
     );
 
+    messagePayload.body = toMMSS(messagePayload.duration || 0);
+    const formatatedMessage = this.formatateMessageContent(messagePayload, channel, support_chat);
+
     const messageToSave = this.messagesRepository.create({
-      support_chat_id: support_chat.id,
-      channel_id: channel.id,
-      message_id: messagePayload.id.id,
-      datetime: new Date(messagePayload.timestamp * 1000),
-      ack: messagePayload.ack,
-      type: MessageTypes.VOICE,
-      from_me: messagePayload.fromMe,
-      content: toMMSS(messagePayload.duration || 0),
-      from: messagePayload.from,
-      to: messagePayload.to,
+      ...formatatedMessage,
       has_media: messagePayload.hasMedia,
       media_url: keyWithExtension,
       media_type: mimeType.split(';')[0],
@@ -346,23 +317,17 @@ export class MessagesService {
       3,
     );
 
+    const formatatedMessage = this.formatateMessageContent(messagePayload, channel, support_chat);
+
     const messageToSave = this.messagesRepository.create({
-      support_chat_id: support_chat.id,
-      channel_id: channel.id,
-      message_id: messagePayload.id.id,
-      datetime: new Date(messagePayload.timestamp * 1000),
-      ack: messagePayload.ack,
-      type: MessageTypes.VIDEO,
-      from_me: messagePayload.fromMe,
-      content: messagePayload.body || '',
-      from: messagePayload.from,
-      to: messagePayload.to,
+      ...formatatedMessage,
       has_media: messagePayload.hasMedia,
       media_url: keyWithExtension,
       media_type: mimeType,
       media_size: mediaSize,
       is_gif: messagePayload.isGif,
     });
+
     const savedMessage = await this.saveMessage(messageToSave, manager, support_chat);
     savedMessage.media_url = presignedUrl;
     return savedMessage;
@@ -385,22 +350,16 @@ export class MessagesService {
       3,
     );
 
+    const formatatedMessage = this.formatateMessageContent(messagePayload, channel, support_chat);
+
     const messageToSave = this.messagesRepository.create({
-      support_chat_id: support_chat.id,
-      channel_id: channel.id,
-      message_id: messagePayload.id.id,
-      datetime: new Date(messagePayload.timestamp * 1000),
-      ack: messagePayload.ack,
-      type: MessageTypes.DOCUMENT,
-      from_me: messagePayload.fromMe,
-      content: messagePayload.body || 'Documento',
-      from: messagePayload.from,
-      to: messagePayload.to,
+      ...formatatedMessage,
       has_media: messagePayload.hasMedia,
       media_url: keyWithExtension,
       media_type: mimeType,
       media_size: mediaSize,
     });
+
     const savedMessage = await this.saveMessage(messageToSave, manager, support_chat);
     savedMessage.media_url = presignedUrl;
     return savedMessage;
@@ -412,21 +371,14 @@ export class MessagesService {
     messagePayload: MessageData,
     manager: EntityManager,
   ): Promise<MessageWithLastMessage> {
-    const messageToSave = this.messagesRepository.create({
-      support_chat_id: support_chat.id,
-      channel_id: channel.id,
-      message_id: messagePayload.id.id,
-      datetime: new Date(messagePayload.timestamp * 1000),
-      ack: messagePayload.ack,
-      type:
-        messagePayload.vCards.length > 1
-          ? MessageTypes.CONTACT_CARD_MULTI
-          : MessageTypes.CONTACT_CARD,
-      from_me: messagePayload.fromMe,
-      content: JSON.stringify(messagePayload.vCards),
-      from: messagePayload.from,
-      to: messagePayload.to,
-    });
+
+    messagePayload.body = JSON.stringify(messagePayload.vCards);
+    messagePayload.type = messagePayload.vCards.length > 1
+      ? MessageTypes.CONTACT_CARD_MULTI
+      : MessageTypes.CONTACT_CARD;
+    const formatatedMessage = this.formatateMessageContent(messagePayload, channel, support_chat);
+
+    const messageToSave = this.messagesRepository.create(formatatedMessage);
 
     return await this.saveMessage(messageToSave, manager, support_chat);
   }
@@ -449,6 +401,12 @@ export class MessagesService {
         content: savedMessage.content,
       };
     }
+
+    if (savedMessage.has_media && savedMessage.media_url) {
+      const presignedUrl = await this.storageService.generateViewUrl(savedMessage.media_url, 3);
+      savedMessageWithLastMessage.media_url = presignedUrl;
+    }
+
     return savedMessageWithLastMessage;
   }
 
@@ -501,5 +459,23 @@ export class MessagesService {
       mediaSize: messageMedia?.filesize || 0,
       keyWithExtension,
     };
+  }
+
+  formatateMessageContent(messagePayload: MessageData, channel: Channels, support_chat: SupportChats) {
+    const formatatedMessage = {
+      support_chat_id: support_chat.id,
+      channel_id: channel.id,
+      message_id: messagePayload.id.id,
+      datetime: new Date(messagePayload.timestamp * 1000),
+      ack: messagePayload.ack,
+      type: messagePayload.type,
+      from_me: messagePayload.fromMe,
+      content: messagePayload.body,
+      from: messagePayload.from,
+      to: messagePayload.to,
+      device_type: messagePayload.deviceType,
+    };
+
+    return formatatedMessage;
   }
 }
