@@ -114,8 +114,12 @@ export class UsersService {
     const user = await this.usersRepository.findById(user_id);
     const permissions = await this.permissionsRepository.permissionByUser(user_id);
     if (user.avatar_url) {
-      user.avatar_url = await this.storageService.generateViewUrl(user.avatar_url, 6);
+      user.avatar_url = await this.generateViewUrl(user.avatar_url, 6);
     }
     return { ...user, permissions };
+  }
+
+  async generateViewUrl(key: string, expiresIn?: number): Promise<string> {
+    return this.storageService.generateViewUrl(key, expiresIn);
   }
 }

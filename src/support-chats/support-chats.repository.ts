@@ -35,13 +35,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     let supportChat = await this.findOne({
       where: { id },
       order: { supportChatMessages: { datetime: 'ASC' } },
-      relations: [
-        'contact',
-        'channel',
-        'supportChatMessages',
-        'supportChatMessages',
-        'contact.client',
-      ],
+      relations: ['contact', 'contact.client', 'channel', 'supportChatMessages', 'user'],
     });
 
     return supportChat;
@@ -63,8 +57,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       .andWhere('scs.is_final = 0')
       .getOne();
 
-      
-      if (!supportChat) {
+    if (!supportChat) {
       const protocol = await this.protocolCountersRepository.generateProtocol(manager);
       const supportChatToSave = manager.create(SupportChats, {
         user_id: user_id || null,

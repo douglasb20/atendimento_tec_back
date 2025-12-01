@@ -43,4 +43,15 @@ export class SupportChatsController {
   async findSupportChatById(@Param('id', ParseIntPipe) id: number) {
     return this.supportChatsService.findSupportChatsById(id);
   }
+
+  @Post('/:id/send-reaction')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async sendReaction(
+    @Param('id', ParseIntPipe) id: number,
+    @Body()
+    { chat_id, message_id, reaction }: { chat_id: string; message_id: string; reaction: string },
+  ) {
+    return await this.supportChatsService.sendReactionMessage(id, chat_id, message_id, reaction);
+  }
 }

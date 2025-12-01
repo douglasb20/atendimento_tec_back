@@ -15,6 +15,7 @@ import { ProtocolCountersRepository } from './protocol-counters.repository';
 import { SupportChatsController } from './support-chats.controller';
 import { SupportChatsRepository } from './support-chats.repository';
 import { SupportChatsService } from './support-chats.service';
+import { StorageModule } from '@/storage/storage.module';
 
 @Module({
   imports: [
@@ -29,13 +30,10 @@ import { SupportChatsService } from './support-chats.service';
     forwardRef(() => ContactsModule),
     MessagesModule,
     ChannelsModule,
+    StorageModule,
   ],
   controllers: [SupportChatsController],
-  providers: [
-    SupportChatsService,
-    SupportChatsRepository,
-    ProtocolCountersRepository,
-  ],
+  providers: [SupportChatsService, SupportChatsRepository, ProtocolCountersRepository],
   exports: [SupportChatsService],
 })
 export class SupportChatsModule {}

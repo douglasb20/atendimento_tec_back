@@ -19,7 +19,7 @@ export class MessagesService {
     private readonly messagesRepository: MessagesRepository,
     private readonly whatsappService: WhatsappService,
     private readonly storageService: StorageService,
-  ) { }
+  ) {}
 
   async saveIncoming(
     channel: Channels,
@@ -371,11 +371,11 @@ export class MessagesService {
     messagePayload: MessageData,
     manager: EntityManager,
   ): Promise<MessageWithLastMessage> {
-
     messagePayload.body = JSON.stringify(messagePayload.vCards);
-    messagePayload.type = messagePayload.vCards.length > 1
-      ? MessageTypes.CONTACT_CARD_MULTI
-      : MessageTypes.CONTACT_CARD;
+    messagePayload.type =
+      messagePayload.vCards.length > 1
+        ? MessageTypes.CONTACT_CARD_MULTI
+        : MessageTypes.CONTACT_CARD;
     const formatatedMessage = this.formatateMessageContent(messagePayload, channel, support_chat);
 
     const messageToSave = this.messagesRepository.create(formatatedMessage);
@@ -461,7 +461,11 @@ export class MessagesService {
     };
   }
 
-  formatateMessageContent(messagePayload: MessageData, channel: Channels, support_chat: SupportChats) {
+  formatateMessageContent(
+    messagePayload: MessageData,
+    channel: Channels,
+    support_chat: SupportChats,
+  ) {
     const formatatedMessage = {
       support_chat_id: support_chat.id,
       channel_id: channel.id,

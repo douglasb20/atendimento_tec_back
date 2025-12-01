@@ -252,4 +252,24 @@ export class WhatsappService {
       throw new Error('Não foi possível enviar a mensagem.');
     }
   }
+
+  async sendReaction(sessionId: string, chatId: string, messageId: string, reaction: string) {
+    this.logger.log(`Enviando reação para ${chatId}`);
+    const dataPost = {
+      chatId,
+      messageId,
+      reaction,
+    };
+
+    const url = `/message/react/${sessionId}`;
+    try {
+      await this.axiosInstance.post(url, dataPost);
+      this.logger.log(`Reação enviada com sucesso`);
+    } catch (error) {
+      this.logger.error('Falha ao enviar reação:', error.response?.data || error.message);
+      if (error.response?.data?.error !== 'Message not Found') {
+        throw new Error('Mensagem não encontrada para adicionar reação.');
+      }
+    }
+  }
 }

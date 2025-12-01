@@ -1,7 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 
-import { ChannelsService } from '@/channels/channels.service';
 import { ContactsService } from '@/contacts/contacts.service';
 import { WhatsappService } from '@/whatsapp/whatsapp.service';
 import {
@@ -17,6 +16,8 @@ import { runInTransaction } from '@/Utils';
 import { SupportChats } from './entities/support-chats.entity';
 import { MessagesService } from './messages/messages.service';
 import { SupportChatsRepository } from './support-chats.repository';
+import { StorageService } from '@/storage/storage.service';
+import { ChannelsRepository } from '@/channels/channels.repository';
 
 @Injectable()
 export class SupportChatsService {
@@ -25,9 +26,10 @@ export class SupportChatsService {
   constructor(
     private readonly whatsappService: WhatsappService,
     private readonly messagesService: MessagesService,
-    private readonly channelsService: ChannelsService,
+    private readonly channelsRepository: ChannelsRepository,
     private readonly contactsService: ContactsService,
     private readonly supportChatsRepository: SupportChatsRepository,
+    private readonly storageService: StorageService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -41,12 +43,33 @@ export class SupportChatsService {
   }
 
   async findSupportChatsById(id: number) {
-    const suportChatMessages = await this.supportChatsRepository.findSupportChatsById(id);
-    if (!suportChatMessages) { 
+    const supportChatMessages = await this.supportChatsRepository.findSupportChatsById(id);
+    if (!supportChatMessages) {
       throw new NotFoundException('Chat de suporte não encontrado');
     }
-    const messages = await this.messagesService.getsignedUrlForMessageMedia(suportChatMessages);
+    if (supportChatMessages?.user && supportChatMessages.user.avatar_url) {
+      supportChatMessages.user.avatar_url = await this.storageService.generateViewUrl(
+        supportChatMessages.user.avatar_url,
+        6,
+      );
+    }
+    const messages = await this.messagesService.getsignedUrlForMessageMedia(supportChatMessages);
     return messages;
+  }
+
+  async sendReactionMessage(id: number, chat_id: string, messageId: string, reaction: string) {
+    this.logger.log(
+      `Enviando reação para ${chat_id} na mensagem ${messageId} com reação: ${reaction}`,
+    );
+    const supportChat = await this.supportChatsRepository.findOne({
+      where: { id },
+      relations: ['channel'],
+    });
+    if (!supportChat) {
+      throw new NotFoundException('Chat de suporte não encontrado');
+    }
+
+    this.whatsappService.sendReaction(supportChat.channel.session_id, chat_id, messageId, reaction);
   }
 
   // ====== Event Listeners Handles ======
@@ -54,14 +77,14 @@ export class SupportChatsService {
     return runInTransaction(this.dataSource, async (manager) => {
       try {
         const { sessionId, data } = payload;
-        const channel = await this.channelsService.getChannelBySessionId(sessionId);
+        const channel = await this.channelsRepository.findBySessionId(sessionId);
         const phoneContact = data.message.id.remote;
 
         const contact = await this.contactsService.findOrCreateByRemoteJid(
           {
             sessionId,
             remote_jid: phoneContact,
-            name: data?.message?._data?.notifyName || "Cliente",
+            name: data?.message?._data?.notifyName || 'Cliente',
           },
           manager,
         );
@@ -106,7 +129,7 @@ export class SupportChatsService {
     return runInTransaction(this.dataSource, async (manager) => {
       try {
         const { sessionId, data } = payload;
-        const channel = await this.channelsService.getChannelBySessionId(sessionId);
+        const channel = await this.channelsRepository.findBySessionId(sessionId);
         const phoneContact = data.message.id.remote;
 
         const contact = await manager.findOneBy(Contacts, {
@@ -135,7 +158,7 @@ export class SupportChatsService {
     return runInTransaction(this.dataSource, async (manager) => {
       try {
         const { sessionId, data } = payload;
-        const channel = await this.channelsService.getChannelBySessionId(sessionId);
+        const channel = await this.channelsRepository.findBySessionId(sessionId);
         const phoneContact = data.message.id.remote;
 
         const contact = await manager.findOneBy(Contacts, {
@@ -176,7 +199,7 @@ export class SupportChatsService {
     return runInTransaction(this.dataSource, async (manager) => {
       try {
         const { sessionId, data } = payload;
-        const channel = await this.channelsService.getChannelBySessionId(sessionId);
+        const channel = await this.channelsRepository.findBySessionId(sessionId);
         const phoneContact = data.message.protocolMessageKey.remote;
 
         const contact = await manager.findOneBy(Contacts, {
@@ -216,7 +239,7 @@ export class SupportChatsService {
     return runInTransaction(this.dataSource, async (manager) => {
       try {
         const { sessionId, data } = payload;
-        const channel = await this.channelsService.getChannelBySessionId(sessionId);
+        const channel = await this.channelsRepository.findBySessionId(sessionId);
         const phoneContact = data.reaction.msgId.remote;
 
         const contact = await manager.findOneBy(Contacts, {
@@ -232,7 +255,6 @@ export class SupportChatsService {
         );
 
         if (savedMessage) {
-
           const supoportChatsWhitMessage = {
             ...supportChat,
             supportChatMessages: savedMessage,
@@ -250,7 +272,7 @@ export class SupportChatsService {
     return runInTransaction(this.dataSource, async (manager) => {
       try {
         const { sessionId, data } = payload;
-        const channel = await this.channelsService.getChannelBySessionId(sessionId);
+        const channel = await this.channelsRepository.findBySessionId(sessionId);
         const phoneContact = data.chat.id._serialized;
 
         const contact = await manager.findOneBy(Contacts, {

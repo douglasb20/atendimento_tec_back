@@ -37,6 +37,7 @@ export class CreateChannelsTable1761251488012 implements MigrationInterface {
             name: 'channel_status_id',
             type: 'int',
             isNullable: false,
+            default: '1',
           },
           {
             name: 'qr_code',
