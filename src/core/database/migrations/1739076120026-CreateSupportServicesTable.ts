@@ -12,7 +12,6 @@ export class CreateSupportServicesTable1739076120026 implements MigrationInterfa
             isPrimary: true,
             isGenerated: true,
             generationStrategy: 'increment',
-            unsigned: true,
           },
           {
             name: 'support_id',

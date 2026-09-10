@@ -9,9 +9,10 @@ import { UserRepository } from './users.repository';
 import { UserRefreshTokens } from './entities/user-refresh-tokens.entity';
 import { PermissionsRepository } from 'permissions/permissions.repository';
 import { StorageService } from 'storage/storage.service';
+import { RedisCacheModule } from '@/redis-cache/redis-cache.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Users, Supports, UserRefreshTokens]), ConfigMailerModule],
+  imports: [TypeOrmModule.forFeature([Users, Supports, UserRefreshTokens]), ConfigMailerModule, RedisCacheModule],
   controllers: [UsersController],
   providers: [UsersService, UserRepository, PermissionsRepository, StorageService],
 })

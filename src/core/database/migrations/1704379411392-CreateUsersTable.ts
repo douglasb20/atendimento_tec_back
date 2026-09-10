@@ -38,22 +38,22 @@ export class CreateUsersTable1704379411392 implements MigrationInterface {
             name: 'avatar_url',
             type: 'varchar',
             length: '200',
+            isNullable: true,
           },
           {
             name: 'is_requestpassword',
-            type: 'tinyint',
-            length: '1',
+            type: 'smallint',
             default: '0',
             comment: 'Verifica se é pedido de nova senha',
           },
           {
             name: 'created_at',
-            type: 'datetime',
+            type: 'timestamp',
             default: 'CURRENT_TIMESTAMP',
           },
           {
             name: 'lastlogin_at',
-            type: 'datetime',
+            type: 'timestamp',
             isNullable: true,
           },
           {
@@ -65,14 +65,12 @@ export class CreateUsersTable1704379411392 implements MigrationInterface {
           },
           {
             name: 'is_superuser',
-            type: 'tinyint',
-            length: '1',
+            type: 'smallint',
             default: '0',
           },
           {
             name: 'status',
-            type: 'tinyint',
-            length: '1',
+            type: 'smallint',
             default: '1',
           },
         ],
@@ -82,7 +80,7 @@ export class CreateUsersTable1704379411392 implements MigrationInterface {
     await queryRunner.query(
       "INSERT INTO \
       users(name, email, password, avatar_url, role, is_superuser) \
-      values('Douglas', 'douglasdev.cn@gmail.com', '$2b$10$u02d66.IaHqUuJ3p42qQF.xrS1VjX3DWwVOTat/zMBu2lzzBFp0Ly', 'user/avatar/190e5e96-c03c-4c78-a0af-1c5c1c977956.jpeg', 'ADMIN', 1)",
+      values('Douglas', 'douglasdev.cn@gmail.com', '$2b$10$u02d66.IaHqUuJ3p42qQF.xrS1VjX3DWwVOTat/zMBu2lzzBFp0Ly', 'user/avatar/4ea11398-6bc6-4502-9c59-d34fc6bf9712.jpeg', 'ADMIN', 1)",
     );
   }
 

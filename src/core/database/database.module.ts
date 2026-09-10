@@ -9,16 +9,14 @@ import { CustomSqlLogger } from 'Utils/CustomSqlLogger';
     TypeOrmModule.forRootAsync({
       useFactory: async (configService: ConfigService, queryStorage: QueryStorageService) => {
         return {
-          type: 'mysql',
+          type: 'postgres',
           host: configService.get('DB_HOST'),
-          port: Number(configService.get('DB_PORT')),
+          port: parseInt(configService.get('DB_PORT')) || 5432,
           username: configService.get('DB_USER'),
           password: configService.get('DB_PASS'),
           database: configService.get('DB_NAME'),
           autoLoadEntities: true,
           synchronize: false,
-          dateStrings: true,
-          timezone: '-03:00',
           logging: ['query'],
           logger: new CustomSqlLogger(queryStorage),
         };

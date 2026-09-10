@@ -3,7 +3,7 @@ import { IsNotEmpty, IsString } from 'class-validator';
 export class SendMessageDto {
   @IsString()
   @IsNotEmpty()
-  to: string;
+  chat_id: string;
 
   @IsString()
   @IsNotEmpty()

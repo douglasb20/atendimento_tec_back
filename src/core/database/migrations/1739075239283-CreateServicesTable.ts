@@ -27,13 +27,12 @@ export class CreateServicesTable1739075239283 implements MigrationInterface {
           },
           {
             name: 'created_at',
-            type: 'datetime',
+            type: 'timestamp',
             default: 'CURRENT_TIMESTAMP',
           },
           {
             name: 'status',
-            type: 'tinyint',
-            length: '1',
+            type: 'smallint',
             isNullable: true,
             default: 1,
           },

@@ -16,6 +16,7 @@ import { SupportChatsController } from './support-chats.controller';
 import { SupportChatsRepository } from './support-chats.repository';
 import { SupportChatsService } from './support-chats.service';
 import { StorageModule } from '@/storage/storage.module';
+import { RedisCacheModule } from '@/redis-cache/redis-cache.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { StorageModule } from '@/storage/storage.module';
     MessagesModule,
     ChannelsModule,
     StorageModule,
+    RedisCacheModule,
   ],
   controllers: [SupportChatsController],
   providers: [SupportChatsService, SupportChatsRepository, ProtocolCountersRepository],

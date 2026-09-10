@@ -3,8 +3,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 export class CampoPagosupport1735388775966 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      'ALTER TABLE `supports` \
-        ADD COLUMN `esta_pago` int(1) NULL DEFAULT 0 AFTER `tipo_entrada` ',
+      'ALTER TABLE supports ADD COLUMN esta_pago integer NULL DEFAULT 0',
     );
   }
 

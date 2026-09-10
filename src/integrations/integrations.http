@@ -1,0 +1,74 @@
+# @name login
+POST {{url}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "douglasdev.cn@gmail.com",
+  "password": 1234
+}
+###
+
+@authToken = {{login.response.body.$.access_token}}
+
+@endpoint = /integrations
+
+#### 1) Listar integrações
+GET {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+
+#### 2) Buscar integração por id
+GET {{url}}{{endpoint}}/1
+Authorization: Bearer {{authToken}}
+
+#### 3) Cadastrar a Evolution API
+# integration_provider_id 1 = evolution (ver seed em integration_providers).
+#
+# base_url    -> como ESTE backend alcança a Evolution.
+# webhook_url -> como a EVOLUTION alcança este backend (o webhook é configurado
+#                automaticamente ao criar o canal).
+#
+# Os dois endereços costumam ser diferentes: com a Evolution em container e o
+# backend no host, o backend a alcança por localhost:8080, mas de dentro do
+# container o "localhost" é o próprio container — daí o IP do gateway Docker.
+#
+# A apiKey é a AUTHENTICATION_API_KEY global da Evolution (obrigatória para criar
+# instâncias). É gravada criptografada e nunca retorna nas leituras.
+POST {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "integration_provider_id": 1,
+  "name": "Evolution Principal",
+  "base_url": "http://localhost:8080",
+  "webhook_url": "http://172.17.0.1:3001/api/whatsapp/webhook",
+  "credentials": {
+    "apiKey": "SUA_APIKEY_GLOBAL_AQUI"
+  },
+  "is_default": true,
+  "is_active": true
+}
+
+#### 4) Atualizar integração (omitir `credentials` preserva as atuais)
+PATCH {{url}}{{endpoint}}/1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Evolution Produção"
+}
+
+#### 5) Rotacionar apenas as credenciais
+PATCH {{url}}{{endpoint}}/1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "credentials": {
+    "apiKey": "NOVA_APIKEY"
+  }
+}
+
+#### 6) Remover integração (falha se houver canais vinculados)
+DELETE {{url}}{{endpoint}}/1
+Authorization: Bearer {{authToken}}

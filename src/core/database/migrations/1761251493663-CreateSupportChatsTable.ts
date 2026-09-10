@@ -9,7 +9,6 @@ export class CreateSupportChatsTable1761251493663 implements MigrationInterface 
           {
             name: 'id',
             type: 'bigint',
-            unsigned: true,
             isPrimary: true,
             isGenerated: true,
             generationStrategy: 'increment',
@@ -43,7 +42,6 @@ export class CreateSupportChatsTable1761251493663 implements MigrationInterface 
           {
             name: 'unread_count',
             type: 'int',
-            length: '3',
             default: '0',
           },
           {
@@ -68,30 +66,29 @@ export class CreateSupportChatsTable1761251493663 implements MigrationInterface 
           },
           {
             name: 'is_waiting',
-            type: 'tinyint',
-            length: '1',
-            default: '1',
+            type: 'boolean',
+            default: true,
           },
           {
             name: 'created_at',
-            type: 'datetime',
+            type: 'timestamp',
             default: 'CURRENT_TIMESTAMP',
           },
           {
             name: 'answered_at',
-            type: 'datetime',
+            type: 'timestamp',
             isNullable: true,
             default: null,
           },
           {
             name: 'finished_at',
-            type: 'datetime',
+            type: 'timestamp',
             isNullable: true,
             default: null,
           },
           {
             name: 'updated_at',
-            type: 'datetime',
+            type: 'timestamp',
             isNullable: true,
             default: 'CURRENT_TIMESTAMP',
             onUpdate: 'CURRENT_TIMESTAMP',

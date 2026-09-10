@@ -25,7 +25,7 @@ export class Contacts {
   @Column({ type: 'text', nullable: false })
   avatar_url: string;
 
-  @Column({ type: 'tinyint', nullable: false, default: 0 })
+  @Column({ type: 'boolean', nullable: false, default: false })
   is_avatar_external: boolean;
 
   @Column({ type: 'varchar', length: 150, nullable: true, default: null })
@@ -43,7 +43,7 @@ export class Contacts {
   @Column({ type: 'timestamp', nullable: true, default: null, onUpdate: 'CURRENT_TIMESTAMP' })
   updated_at: Date | null;
 
-  @Column({ type: 'tinyint', nullable: false, default: 1 })
+  @Column({ type: 'smallint', nullable: false, default: 1 })
   status: number;
 
   @ManyToOne(() => Clients, (client) => client.contacts)

@@ -12,6 +12,7 @@ import {
 import { ChannelStatus } from './channel-status.entity';
 import { SupportChats } from 'support-chats/entities/support-chats.entity';
 import { SupportChatMessages } from 'support-chats/messages/entities/support-chat-messages.entity';
+import { Integrations } from 'integrations/entities/integrations.entity';
 
 @Entity('channels')
 export class Channels {
@@ -24,11 +25,20 @@ export class Channels {
   @Column({ type: 'varchar', length: 20, nullable: true })
   phone_number: string;
 
+  /** Identifica a sessão no provider — na Evolution é o `instanceName`. */
   @Column({ type: 'char', length: 36, nullable: true })
   session_id: string | null;
 
   @Column({ type: 'int', nullable: false })
   channel_status_id: number;
+
+  /** Integração usada por este canal. Nulo cai na integração padrão. */
+  @Column({ type: 'int', nullable: true })
+  integration_id: number | null;
+
+  /** Token da própria instância, devolvido pela Evolution como `hash` no create. */
+  @Column({ type: 'varchar', length: 255, nullable: true, select: false })
+  instance_token: string | null;
 
   @Column({ type: 'text', nullable: true })
   qr_code: string | null;
@@ -53,6 +63,10 @@ export class Channels {
   @ManyToOne(() => ChannelStatus, (channelStatus) => channelStatus.channels)
   @JoinColumn({ name: 'channel_status_id' })
   channelStatus: ChannelStatus;
+
+  @ManyToOne(() => Integrations, (integration) => integration.channels)
+  @JoinColumn({ name: 'integration_id' })
+  integration: Integrations;
 
   @OneToMany(() => SupportChats, (supportChat) => supportChat.channel)
   supportChats: SupportChats[];

@@ -2,7 +2,7 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeor
 
 @Entity('log_sistema')
 export class LogSistema {
-  @PrimaryGeneratedColumn('increment', { unsigned: true, type: 'bigint' })
+  @PrimaryGeneratedColumn('increment', { type: 'bigint' })
   id: number;
 
   @Column({ type: 'varchar', length: 255 })
@@ -20,7 +20,7 @@ export class LogSistema {
   @CreateDateColumn({ type: 'timestamp' })
   datetime_request: Date;
 
-  @Column({ type: 'json' })
+  @Column({ type: 'jsonb' })
   request_data: Record<string, any>; // Armazena params, query e body
 
   @Column({ type: 'text' })

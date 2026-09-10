@@ -31,9 +31,8 @@ export class CreateContactsTable1725896694498 implements MigrationInterface {
           },
           {
             name: 'is_avatar_external',
-            type: 'tinyint',
-            length: '1',
-            default: '0',
+            type: 'boolean',
+            default: false,
           },
           {
             name: 'tags',
@@ -57,20 +56,19 @@ export class CreateContactsTable1725896694498 implements MigrationInterface {
           },
           {
             name: 'created_at',
-            type: 'datetime',
+            type: 'timestamp',
             default: 'CURRENT_TIMESTAMP',
           },
           {
             name: 'updated_at',
-            type: 'datetime',
+            type: 'timestamp',
             isNullable: true,
             default: null,
             onUpdate: 'CURRENT_TIMESTAMP',
           },
           {
             name: 'status',
-            type: 'tinyint',
-            length: '1',
+            type: 'smallint',
             default: '1',
           },
         ],

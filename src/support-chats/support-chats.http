@@ -29,3 +29,42 @@ Content-Type: application/json
 #### 3) Get support chat by ID
 GET {{url}}{{endpoint}}/1/messages
 Authorization: Bearer {{authToken}}
+#### 4) Assinar upload de mídia
+# Devolve a URL e os campos do POST assinado. O front envia o arquivo direto
+# para o storage e guarda a `key` para o passo seguinte.
+POST {{url}}{{endpoint}}/sign-media-post
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "key": "support-chats/1/video-teste",
+  "fileType": "video/mp4"
+}
+
+#### 5) Enviar mídia (vídeo)
+# O backend monta a URL pública a partir da `media_key` e a repassa ao provider,
+# que baixa o arquivo direto — é o que permite vídeos grandes.
+POST {{url}}{{endpoint}}/1/send-media
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "chat_id": "554199999999@s.whatsapp.net",
+  "media_key": "support-chats/1/video-teste.mp4",
+  "media_type": "video",
+  "mimetype": "video/mp4",
+  "caption": "Vídeo de teste"
+}
+
+#### 6) Enviar documento (fileName é obrigatório na prática)
+POST {{url}}{{endpoint}}/1/send-media
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "chat_id": "554199999999@s.whatsapp.net",
+  "media_key": "support-chats/1/orcamento.pdf",
+  "media_type": "document",
+  "mimetype": "application/pdf",
+  "file_name": "orcamento.pdf"
+}

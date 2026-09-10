@@ -1,5 +1,5 @@
 {
-  "typescript.tsdk": "./node_modules/typescript/lib",
+  "js/ts.tsdk": "./node_modules/typescript/lib",
   "editor.detectIndentation": true,
   "editor.insertSpaces": true,
   "editor.tabSize": 2,
@@ -21,7 +21,7 @@
     "app-dev.yaml": "app-*",
     "nest-cli.json": "next-env.d.ts, tsconfig.json, babel.config*, .prettier*, .eslint*"
   },
-  "typescript.referencesCodeLens.enabled": true,
+  "js/ts.referencesCodeLens.enabled": true,
   "cSpell.ignorePaths": [
     "package.json"
     

@@ -8,7 +8,7 @@ import { Contacts } from '@/contacts/entities/contacts.entity';
 
 @Entity('support_chats')
 export class SupportChats {
-  @PrimaryGeneratedColumn('increment', { type: 'bigint', unsigned: true })
+  @PrimaryGeneratedColumn('increment', { type: 'bigint' })
   id: number;
 
   @Column({ name: 'user_id', type: 'bigint' })
@@ -26,7 +26,7 @@ export class SupportChats {
   @Column({ name: 'protocol', type: 'varchar', length: 50 })
   protocol: string;
 
-  @Column({ name: 'unread_count', type: 'int', width: 3, default: 0 })
+  @Column({ name: 'unread_count', type: 'int', default: 0 })
   unread_count: number;
 
   @Column({ name: 'last_message', type: 'text', nullable: true })
@@ -45,12 +45,12 @@ export class SupportChats {
   })
   is_waiting: boolean;
 
-  @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   @Column({
     name: 'answered_at',
-    type: 'datetime',
+    type: 'timestamp',
     nullable: true,
     default: null,
   })
@@ -58,7 +58,7 @@ export class SupportChats {
 
   @Column({
     name: 'finished_at',
-    type: 'datetime',
+    type: 'timestamp',
     nullable: true,
     default: null,
   })
@@ -66,7 +66,7 @@ export class SupportChats {
 
   @Column({
     name: 'updated_at',
-    type: 'datetime',
+    type: 'timestamp',
     nullable: true,
     default: () => 'CURRENT_TIMESTAMP',
     onUpdate: 'CURRENT_TIMESTAMP',

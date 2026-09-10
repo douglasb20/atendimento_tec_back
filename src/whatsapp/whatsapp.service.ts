@@ -1,275 +1,290 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import axios, { AxiosInstance } from 'axios';
-
 import { InjectQueue } from '@nestjs/bullmq';
-import {
-  DataTypeWhatsapp,
-  ErrorResponse,
-  GenericResponse,
-  GetClientInfoResponse,
-  MessageMedia,
-  MessageMediaResponse,
-  QrCodeResponse,
-  ResultResponse,
-  SessionStartResponse,
-  WhatsappWebhookPayload,
-} from '@types';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { Queue } from 'bullmq';
-import { sleep } from 'Utils';
+
+import { ChannelsRepository } from 'channels/channels.repository';
+import { Channels } from 'channels/entities/channels.entity';
+import { DataTypeWhatsapp, MessageMedia, WhatsappWebhookPayload } from '@types';
+import { EvolutionMapper } from './providers/evolution/evolution.mapper';
+import { EvolutionWebhookBody } from './providers/evolution/evolution.types';
+import { ProviderFactory } from './providers/provider.factory';
+import {
+  ProviderClientInfo,
+  ProviderConnectionResult,
+  ProviderMediaPayload,
+  ProviderSentMessage,
+} from './providers/whatsapp-provider.interface';
 import { WhatsappGateway } from './whatsapp.gateway';
 
+/**
+ * Fachada de WhatsApp da aplicação.
+ *
+ * Mantém as filas, o roteamento de webhooks e a emissão de eventos por socket,
+ * delegando as chamadas ao provider resolvido para o canal. Os consumidores
+ * (`ChannelsService`, `SupportChatsService`, `ContactsService`, `MessagesService`)
+ * seguem chamando por `sessionId`, sem conhecer qual provider está por trás.
+ */
 @Injectable()
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
-  private axiosInstance: AxiosInstance;
 
   constructor(
     @InjectQueue('whatsapp-messages-queue')
     private readonly messagesQueue: Queue<WhatsappWebhookPayload>,
     @InjectQueue('whatsapp-session-queue')
     private readonly sessionQueue: Queue<WhatsappWebhookPayload>,
-    private readonly eventEmitter: EventEmitter2,
     private readonly whatsappGateway: WhatsappGateway,
-  ) {
-    this.axiosInstance = axios.create({
-      baseURL: process.env.URL_WHATSAPP_API,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.WHATSAPP_API_KEY || '',
-      },
-    });
+    private readonly providerFactory: ProviderFactory,
+    @Inject(forwardRef(() => ChannelsRepository))
+    private readonly channelsRepository: ChannelsRepository,
+  ) {}
+
+  // == Recebimento de eventos ==
+
+  /**
+   * Normaliza o envelope da Evolution e enfileira o evento.
+   *
+   * Eventos sem interesse para o domínio são descartados silenciosamente — a
+   * Evolution pode enviar mais tipos do que assinamos.
+   */
+  async processWebhook(body: EvolutionWebhookBody): Promise<void> {
+    const { event, instance } = body;
+    const dataType = this.resolveDataType(body);
+
+    if (!dataType) {
+      this.logger.debug(`Evento ignorado: ${event} (instância ${instance})`);
+      return;
+    }
+
+    const payload = this.normalizePayload(body, dataType);
+    if (!payload) {
+      this.logger.debug(`Evento ${event} sem dados aproveitáveis; ignorado.`);
+      return;
+    }
+
+    const key = this.getChatKey(body, dataType);
+    const queue = this.isSessionEvent(dataType) ? this.sessionQueue : this.messagesQueue;
+    const prefix = this.isSessionEvent(dataType) ? 'whatsapp-session' : 'whatsapp-message';
+
+    await queue.add(`${prefix}-${instance}`, payload, { jobId: key });
+    this.logger.log(`Evento enfileirado: ${event} -> ${dataType} (job ${key})`);
   }
 
-  private getChatKey(payload: WhatsappWebhookPayload<any>): string | null {
-    const { sessionId, data, dataType } = payload;
-    let remoteJid: string;
+  /** Descobre o tipo interno; `connection.update` depende do estado recebido. */
+  private resolveDataType(body: EvolutionWebhookBody): DataTypeWhatsapp | null {
+    const mapped = EvolutionMapper.mapEventType(body.event);
+
+    if (mapped === DataTypeWhatsapp.STATE_CHANGED) {
+      return EvolutionMapper.mapConnectionState(body.data as never);
+    }
+
+    // Reação chega como mensagem contendo reactionMessage.
+    if (mapped === DataTypeWhatsapp.MESSAGE_CREATE && this.isReaction(body)) {
+      return DataTypeWhatsapp.MESSAGE_REACTION;
+    }
+
+    return mapped;
+  }
+
+  /** Converte o `data` da Evolution para o formato que os handlers consomem. */
+  private normalizePayload(
+    body: EvolutionWebhookBody,
+    dataType: DataTypeWhatsapp,
+  ): WhatsappWebhookPayload | null {
+    const { data } = body;
+
+    // Sem JID não há conversa a que vincular o evento: o mapper preencheria os
+    // campos com string vazia e gravaria uma mensagem órfã. Descartar aqui,
+    // como já se faz com reação, QR e contagem de não lidas.
+    const exigeRemoteJid = [
+      DataTypeWhatsapp.MESSAGE_CREATE,
+      DataTypeWhatsapp.MESSAGE_EDIT,
+      DataTypeWhatsapp.MESSAGE_ACK,
+      DataTypeWhatsapp.MESSAGE_REVOKED_EVERYONE,
+    ].includes(dataType);
+
+    if (exigeRemoteJid && !EvolutionMapper.extractRemoteJid(body.event, data)) {
+      this.logger.warn(`Evento ${body.event} sem remoteJid descartado (instância ${body.instance})`);
+      return null;
+    }
 
     switch (dataType) {
       case DataTypeWhatsapp.MESSAGE_CREATE:
-      case DataTypeWhatsapp.MESSAGE_ACK:
+        return EvolutionMapper.toInternalPayload(body, dataType, {
+          message: EvolutionMapper.mapUpsert(data as never),
+        });
+
       case DataTypeWhatsapp.MESSAGE_EDIT:
-        remoteJid = data.message?.id?.remote;
-        break;
+        return EvolutionMapper.toInternalPayload(body, dataType, {
+          message: EvolutionMapper.mapEdited(data as never),
+        });
+
+      case DataTypeWhatsapp.MESSAGE_ACK:
+        return EvolutionMapper.toInternalPayload(body, dataType, {
+          message: EvolutionMapper.mapUpdate(data as never),
+        });
+
       case DataTypeWhatsapp.MESSAGE_REVOKED_EVERYONE:
-        remoteJid = data.message?.protocolMessageKey?.remote;
-        break;
-      case DataTypeWhatsapp.MESSAGE_REACTION:
-        remoteJid = data.reaction?.msgId?.remote;
-        break;
-      case DataTypeWhatsapp.UNREAD_COUNT:
-        remoteJid = data.chat?.id?._serialized;
-        break;
-    }
+        return EvolutionMapper.toInternalPayload(body, dataType, {
+          message: EvolutionMapper.mapDeleted(data as never),
+        });
 
-    if (!remoteJid) return `${sessionId}-system_${Date.now()}`;
-    return `${sessionId}-${remoteJid}_${Date.now()}`;
-  }
+      case DataTypeWhatsapp.MESSAGE_REACTION: {
+        const reaction = EvolutionMapper.mapReaction(data as never);
+        return reaction ? EvolutionMapper.toInternalPayload(body, dataType, { reaction }) : null;
+      }
 
-  async processWebhook(payload: WhatsappWebhookPayload) {
-    this.logger.log(`Processando webhook do WhatsApp: ${payload.dataType}...`);
-    const key = this.getChatKey(payload);
+      case DataTypeWhatsapp.QR_RECEIVED: {
+        const qr = EvolutionMapper.mapQrCode(data as never);
+        return qr ? EvolutionMapper.toInternalPayload(body, dataType, { qr }) : null;
+      }
 
-    switch (payload.dataType) {
-      case DataTypeWhatsapp.QR_RECEIVED:
-      case DataTypeWhatsapp.AUTHENTICATED:
+      case DataTypeWhatsapp.UNREAD_COUNT: {
+        const chat = Array.isArray(data) ? data[0] : data;
+        const remoteJid =
+          (chat as { remoteJid?: string; id?: string })?.remoteJid ?? (chat as { id?: string })?.id;
+        if (!remoteJid) return null;
+
+        return EvolutionMapper.toInternalPayload(body, dataType, {
+          chat: {
+            id: { _serialized: remoteJid },
+            unreadCount: (chat as { unreadCount?: number })?.unreadCount ?? 0,
+          },
+        });
+      }
+
       case DataTypeWhatsapp.READY:
-        await this.sessionQueue.add(`whatsapp-session-${payload.sessionId}`, payload, {
-          jobId: key,
-        });
-        break;
-      case DataTypeWhatsapp.MESSAGE_CREATE:
-      case DataTypeWhatsapp.MESSAGE_REVOKED_EVERYONE:
-      case DataTypeWhatsapp.MESSAGE_EDIT:
-      case DataTypeWhatsapp.MESSAGE_REACTION:
-      case DataTypeWhatsapp.MESSAGE_ACK:
-      case DataTypeWhatsapp.UNREAD_COUNT:
-        await this.messagesQueue.add(`whatsapp-message-${payload.sessionId}`, payload, {
-          jobId: key,
-        });
-        break;
-    }
+      case DataTypeWhatsapp.DISCONNECTED:
+      case DataTypeWhatsapp.AUTHENTICATED:
+        return EvolutionMapper.toInternalPayload(body, dataType, data);
 
-    this.logger.log(`Evento enfileirado: ${payload.dataType} para a key ${key}`);
+      default:
+        return null;
+    }
   }
 
-  emitEvent(event: string, payload: any) {
+  private isReaction(body: EvolutionWebhookBody): boolean {
+    const data = body.data as { message?: { reactionMessage?: unknown }; messageType?: string };
+    return Boolean(data?.message?.reactionMessage) || data?.messageType === 'reactionMessage';
+  }
+
+  private isSessionEvent(dataType: DataTypeWhatsapp): boolean {
+    return [
+      DataTypeWhatsapp.QR_RECEIVED,
+      DataTypeWhatsapp.AUTHENTICATED,
+      DataTypeWhatsapp.READY,
+      DataTypeWhatsapp.DISCONNECTED,
+    ].includes(dataType);
+  }
+
+  /**
+   * Chave do job. O formato agrupa por conversa e mantém a unicidade por
+   * evento, preservando a ordenação garantida pela concorrência 1 do processor.
+   */
+  private getChatKey(body: EvolutionWebhookBody, dataType: DataTypeWhatsapp): string {
+    const remoteJid = EvolutionMapper.extractRemoteJid(body.event, body.data);
+
+    if (!remoteJid) {
+      return `${body.instance}-${dataType}_${Date.now()}`;
+    }
+
+    return `${body.instance}-${remoteJid}_${Date.now()}`;
+  }
+
+  // == Emissão para os clientes ==
+
+  emitEvent(event: string, payload: unknown): void {
     this.whatsappGateway.emitEvent(event, payload);
   }
 
-  async requestConnection(sessionId: string) {
-    try {
-      const urlStatus = `/session/status/${sessionId}`;
-      const { data: statusData } = await this.axiosInstance.get<SessionStartResponse>(urlStatus);
+  // == Chamadas ao provider ==
 
-      if (!statusData.success) {
-        if (statusData.message === 'session_not_found') {
-          const urlStart = `/session/start/${sessionId}`;
-          const { data } = await this.axiosInstance.get<SessionStartResponse>(urlStart);
+  async requestConnection(sessionId: string): Promise<ProviderConnectionResult> {
+    const channel = await this.channelsRepository.findBySessionId(sessionId);
+    const { provider, session } = await this.providerFactory.forChannel(channel);
 
-          if (!data.success) {
-            this.logger.log(
-              `Falha ao iniciar sessão para o WhatsApp: ${(data as unknown as ErrorResponse).error}`,
-            );
-            throw new InternalServerErrorException(
-              `Falha ao iniciar sessão para o WhatsApp: ${(data as unknown as ErrorResponse).error}`,
-            );
-          }
-          this.logger.log(`Sessão do WhatsApp iniciada com sucesso: ${data.message}`);
-        }
-        this.eventEmitter.emit('whatsapp.session_started', { sessionId });
-      }
-    } catch (error) {
-      this.logger.error(
-        'Erro ao solicitar conexão do WhatsApp:',
-        error.response?.data.error || error.message,
-      );
-      throw new InternalServerErrorException('Falha ao se comunicar com a API do WhatsApp.');
+    const result = await provider.requestConnection(session);
+
+    // A Evolution devolve o token da instância apenas na criação.
+    if (result.instanceToken) {
+      await this.channelsRepository.update(channel.id, {
+        instance_token: result.instanceToken,
+      });
     }
+
+    return result;
   }
 
-  async requestQrCode(sessionId: string) {
-    try {
-      const url = `/session/qr/${sessionId}`;
-      const { data: qrCodeData } = await this.axiosInstance.get<QrCodeResponse>(url);
-
-      const MESSAGE_SESSION_NOT_FOUND = 'qr code not ready or already scanned';
-
-      if (!qrCodeData.success && qrCodeData.message === MESSAGE_SESSION_NOT_FOUND) {
-        return;
-      }
-
-      return qrCodeData.qr;
-    } catch (error) {
-      this.logger.error(
-        'Erro ao solicitar conexão do WhatsApp:',
-        error.response?.data.error || error.message,
-      );
-      throw new InternalServerErrorException('Falha ao se comunicar com a API do WhatsApp.');
-    }
+  async requestQrCode(sessionId: string): Promise<string | null> {
+    const { provider, session } = await this.resolve(sessionId);
+    return provider.requestQrCode(session);
   }
 
-  async requestDisconnection(sessionId: string) {
-    try {
-      await sleep(5);
-      const url = `/session/terminate/${sessionId}`;
-      await this.axiosInstance.get<SessionStartResponse>(url);
-
-      await this.eventEmitter.emitAsync('whatsapp.disconnected', { sessionId });
-    } catch (error) {
-      this.logger.error(
-        'Erro ao solicitar desconexão do WhatsApp:',
-        error.response?.data.error || error.message,
-      );
-      throw new InternalServerErrorException('Falha ao se comunicar com a API do WhatsApp.');
-    }
+  async requestDisconnection(sessionId: string): Promise<void> {
+    const { provider, session } = await this.resolve(sessionId);
+    return provider.requestDisconnection(session);
   }
 
-  async getClientInfo(sessionId: string) {
-    try {
-      const url = `/client/getClassInfo/${sessionId}`;
-      const { data: clientInfo } = await this.axiosInstance.get<GetClientInfoResponse>(url);
-      return clientInfo;
-    } catch (error) {
-      this.logger.error(
-        'Erro ao obter informações do cliente do WhatsApp:',
-        error.response?.data.error || error.message,
-      );
-      throw new InternalServerErrorException('Falha ao se comunicar com a API do WhatsApp.');
-    }
+  async getClientInfo(sessionId: string): Promise<ProviderClientInfo> {
+    const { provider, session } = await this.resolve(sessionId);
+    return provider.getClientInfo(session);
   }
 
   async getProfilePicUrl(sessionId: string, remoteJid: string): Promise<string> {
-    try {
-      const url = `/contact/getProfilePicUrl/${sessionId}`;
-      const dataPost = {
-        contactId: remoteJid,
-      };
-      const { data: response } = await this.axiosInstance.post<GenericResponse<string>>(
-        url,
-        dataPost,
-      );
-      return response.result;
-    } catch (error) {
-      this.logger.error(
-        'Erro ao obter URL da foto de perfil do WhatsApp:',
-        error.response?.data.error || error.message,
-      );
-      throw new InternalServerErrorException('Falha ao se comunicar com a API do WhatsApp.');
-    }
+    const { provider, session } = await this.resolve(sessionId);
+    return provider.getProfilePicUrl(session, remoteJid);
   }
 
-  async getFormattedNumber(sessionId: string, remote_jid: string): Promise<string> {
-    try {
-      const url = `/contact/getFormattedNumber/${sessionId}`;
-
-      const dataPost = {
-        contactId: remote_jid,
-      };
-
-      const { data } = await this.axiosInstance.post<ResultResponse & { result: string }>(
-        url,
-        dataPost,
-      );
-      const formattedNumber = data.result;
-      const phone = formattedNumber.split(' ').slice(1).join('').replace('-', '');
-      return phone;
-    } catch (error) {
-      this.logger.error(
-        'Erro ao obter número formatado do WhatsApp:',
-        error.response?.data.error || error.message,
-      );
-      throw new InternalServerErrorException('Falha ao se comunicar com a API do WhatsApp.');
-    }
+  async getFormattedNumber(sessionId: string, remoteJid: string): Promise<string> {
+    const { provider, session } = await this.resolve(sessionId);
+    return provider.getFormattedNumber(session, remoteJid);
   }
 
   async downloadMedia(sessionId: string, messageId: string, chatId: string): Promise<MessageMedia> {
-    const url = `/message/downloadMedia/${sessionId}`;
-
-    const dataPost = {
-      chatId,
-      messageId,
-    };
-
-    const { data } = await this.axiosInstance.post<MessageMediaResponse>(url, dataPost);
-    return data.messageMedia;
+    const { provider, session } = await this.resolve(sessionId);
+    return provider.downloadMedia(session, messageId, chatId);
   }
 
-  async sendMessage(sessionId: string, to: string, message: string) {
+  async sendMessage(sessionId: string, to: string, message: string): Promise<ProviderSentMessage> {
+    const { provider, session } = await this.resolve(sessionId);
     this.logger.log(`Enviando mensagem para ${to}`);
-    const dataPost = {
-      chatId: to,
-      contentType: 'string',
-      content: message,
-    };
-
-    const url = `/client/sendMessage/${sessionId}`;
-    try {
-      await this.axiosInstance.post(url, dataPost);
-      this.logger.log(`Mensagem enviada com sucesso`);
-    } catch (error) {
-      this.logger.error('Falha ao enviar mensagem:', error.response?.data || error.message);
-      throw new Error('Não foi possível enviar a mensagem.');
-    }
+    return provider.sendMessage(session, to, message);
   }
 
-  async sendReaction(sessionId: string, chatId: string, messageId: string, reaction: string) {
-    this.logger.log(`Enviando reação para ${chatId}`);
-    const dataPost = {
-      chatId,
-      messageId,
-      reaction,
-    };
+  async replyMessage(
+    sessionId: string,
+    chatId: string,
+    messageId: string,
+    message: string,
+  ): Promise<ProviderSentMessage> {
+    const { provider, session } = await this.resolve(sessionId);
+    this.logger.log(`Respondendo mensagem em ${chatId}`);
+    return provider.replyMessage(session, chatId, messageId, message);
+  }
 
-    const url = `/message/react/${sessionId}`;
-    try {
-      await this.axiosInstance.post(url, dataPost);
-      this.logger.log(`Reação enviada com sucesso`);
-    } catch (error) {
-      this.logger.error('Falha ao enviar reação:', error.response?.data || error.message);
-      if (error.response?.data?.error !== 'Message not Found') {
-        throw new Error('Mensagem não encontrada para adicionar reação.');
-      }
-    }
+  async sendReaction(
+    sessionId: string,
+    chatId: string,
+    messageId: string,
+    reaction: string,
+  ): Promise<void> {
+    const { provider, session } = await this.resolve(sessionId);
+    return provider.sendReaction(session, chatId, messageId, reaction);
+  }
+
+  async sendMedia(sessionId: string, media: ProviderMediaPayload): Promise<ProviderSentMessage> {
+    const { provider, session } = await this.resolve(sessionId);
+    return provider.sendMedia(session, media);
+  }
+
+  /** Canal + provider + sessão a partir do `session_id`. */
+  private async resolve(sessionId: string) {
+    const channel = await this.channelsRepository.findBySessionIdWithToken(sessionId);
+    return this.providerFactory.forChannel(channel);
+  }
+
+  /** Exposto para o webhook validar o segredo da integração do canal. */
+  async findChannelBySession(sessionId: string): Promise<Channels | null> {
+    return this.channelsRepository.findBySessionId(sessionId, false);
   }
 }

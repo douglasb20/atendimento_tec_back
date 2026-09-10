@@ -12,7 +12,6 @@ export class CreateLogSistemaTable1739922407037 implements MigrationInterface {
             isPrimary: true,
             isGenerated: true,
             generationStrategy: 'increment',
-            unsigned: true,
           },
           {
             name: 'rota',
@@ -37,12 +36,12 @@ export class CreateLogSistemaTable1739922407037 implements MigrationInterface {
           },
           {
             name: 'datetime_request',
-            type: 'datetime',
+            type: 'timestamp',
             default: 'CURRENT_TIMESTAMP',
           },
           {
             name: 'request_data',
-            type: 'json',
+            type: 'jsonb',
           },
           {
             name: 'queries',

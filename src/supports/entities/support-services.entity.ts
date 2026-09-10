@@ -4,7 +4,7 @@ import { Services } from 'service/entities/service.entity';
 
 @Entity({ name: 'support_services' })
 export class SupportServices {
-  @PrimaryGeneratedColumn('increment', { unsigned: true })
+  @PrimaryGeneratedColumn('increment')
   id: number;
 
   @Column({ name: 'support_id', type: 'int' })

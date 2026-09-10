@@ -78,11 +78,27 @@ export class ChannelsService {
       channel.session_id = reloaded!.session_id;
     }
 
-    await this.whatsappService.requestConnection(channel.session_id);
-    const qrCode = await this.whatsappService.requestQrCode(channel.session_id);
+    // O connect do provider já devolve o QR quando a sessão não está conectada,
+    // então uma chamada basta.
+    const result = await this.whatsappService.requestConnection(channel.session_id);
 
-    if (qrCode) {
-      await this.channelsRepository.update(channel.id, { qr_code: qrCode });
+    if (result.qrCode) {
+      await this.channelsRepository.update(channel.id, {
+        qr_code: result.qrCode,
+        channel_status_id: ChannelStatus.CONNECTING,
+      });
+      this.handleChannelStatus(channel.id);
+      return;
+    }
+
+    if (result.state === 'connected') {
+      await this.channelsRepository.update(channel.id, {
+        qr_code: null,
+        connected_at: channel.connected_at ?? new Date(),
+        disconnected_at: null,
+        channel_status_id: ChannelStatus.CONNECTED,
+      });
+      this.handleChannelStatus(channel.id);
     }
   }
 
@@ -127,9 +143,6 @@ export class ChannelsService {
     } = payload;
     const channel = await this.channelsRepository.findBySessionId(sessionId);
 
-    if (channel.channel_status_id !== ChannelStatus.CONNECTING) {
-      return;
-    }
     return runInTransaction(this.dataSource, async (manager) => {
       try {
         await manager.update(Channels, channel.id, {
@@ -167,17 +180,29 @@ export class ChannelsService {
     const channel = await this.channelsRepository.findBySessionId(sessionId);
 
     try {
-      if (channel.channel_status_id === ChannelStatus.CONNECTED && channel.phone_number === null) {
-        const clientInfo = await this.whatsappService.getClientInfo(sessionId);
-        if (clientInfo) {
-          await this.channelsRepository.update(channel.id, {
-            phone_number: clientInfo.sessionInfo.wid.user.slice(-10),
-          });
-        }
-        this.handleChannelStatus(channel.id);
+      // O provider pode informar o número já no payload da conexão; se não
+      // vier, consulta a sessão.
+      const phoneFromPayload = (payload.data as { wuid?: string })?.wuid;
+      let phoneNumber = channel.phone_number;
+
+      if (!phoneNumber) {
+        const digits = phoneFromPayload?.split('@')[0]?.replace(/\D/g, '');
+        phoneNumber = digits
+          ? digits.slice(-10)
+          : ((await this.whatsappService.getClientInfo(sessionId))?.phoneNumber?.slice(-10) ??
+            null);
       }
+
+      await this.channelsRepository.update(channel.id, {
+        qr_code: null,
+        connected_at: channel.connected_at ?? new Date(),
+        disconnected_at: null,
+        channel_status_id: ChannelStatus.CONNECTED,
+        ...(phoneNumber && { phone_number: phoneNumber }),
+      });
+      this.handleChannelStatus(channel.id);
     } catch (error) {
-      this.logger.error('Erro ao processar autenticação do canal WhatsApp:', error);
+      this.logger.error('Erro ao processar conexão do canal WhatsApp:', error);
       throw error;
     }
   }

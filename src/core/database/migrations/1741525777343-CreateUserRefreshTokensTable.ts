@@ -9,7 +9,6 @@ export class CreateUserRefreshTokensTable1741525777343 implements MigrationInter
           {
             name: 'id',
             type: 'bigint',
-            unsigned: true,
             isPrimary: true,
             isGenerated: true,
             generationStrategy: 'increment',
@@ -26,7 +25,7 @@ export class CreateUserRefreshTokensTable1741525777343 implements MigrationInter
           },
           {
             name: 'expires_at',
-            type: 'datetime',
+            type: 'timestamp',
             isNullable: false,
           },
         ],

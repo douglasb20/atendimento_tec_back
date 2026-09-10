@@ -28,6 +28,10 @@ export class WhatsappSessionProcessor extends WorkerHost {
         case DataTypeWhatsapp.READY:
           await this.channelsService.handleChannelReady(payload);
           break;
+
+        case DataTypeWhatsapp.DISCONNECTED:
+          await this.channelsService.handleChannelDisconnected(payload);
+          break;
       }
 
       return true;

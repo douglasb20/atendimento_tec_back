@@ -21,7 +21,6 @@ export class CreatePermissionsTable1738349913965 implements MigrationInterface {
           {
             name: 'permission_module_id',
             type: 'int',
-            length: '11',
           },
           {
             name: 'name',

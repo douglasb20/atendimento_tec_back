@@ -17,7 +17,6 @@ export class CreateSupportChatMessagesTable1761251530976 implements MigrationInt
           {
             name: 'support_chat_id',
             type: 'bigint',
-            unsigned: true,
             isNullable: false,
           },
           {
@@ -34,7 +33,7 @@ export class CreateSupportChatMessagesTable1761251530976 implements MigrationInt
           },
           {
             name: 'datetime',
-            type: 'datetime',
+            type: 'timestamp',
             isNullable: false,
           },
           {
@@ -50,8 +49,7 @@ export class CreateSupportChatMessagesTable1761251530976 implements MigrationInt
           },
           {
             name: 'from_me',
-            type: 'tinyint',
-            length: '1',
+            type: 'boolean',
             isNullable: false,
           },
           {
@@ -61,10 +59,9 @@ export class CreateSupportChatMessagesTable1761251530976 implements MigrationInt
           },
           {
             name: 'has_media',
-            type: 'tinyint',
-            length: '1',
+            type: 'boolean',
             isNullable: false,
-            default: '0',
+            default: false,
           },
           {
             name: 'media_url',
@@ -83,7 +80,6 @@ export class CreateSupportChatMessagesTable1761251530976 implements MigrationInt
           {
             name: 'media_size',
             type: 'int',
-            length: '11',
             isNullable: true,
             default: null,
           },
@@ -107,31 +103,27 @@ export class CreateSupportChatMessagesTable1761251530976 implements MigrationInt
           },
           {
             name: 'is_deleted',
-            type: 'tinyint',
-            length: '1',
+            type: 'boolean',
             isNullable: false,
-            default: '0',
+            default: false,
           },
           {
             name: 'is_edited',
-            type: 'tinyint',
-            length: '1',
+            type: 'boolean',
             isNullable: false,
-            default: '0',
+            default: false,
           },
           {
             name: 'is_gif',
-            type: 'tinyint',
-            length: '1',
+            type: 'boolean',
             isNullable: false,
-            default: '0',
+            default: false,
           },
           {
             name: 'has_reaction',
-            type: 'tinyint',
-            length: '1',
+            type: 'boolean',
             isNullable: false,
-            default: '0',
+            default: false,
           },
           {
             name: 'reaction',
@@ -141,14 +133,19 @@ export class CreateSupportChatMessagesTable1761251530976 implements MigrationInt
             default: "''",
           },
           {
+            name: "raw_payload",
+            type: 'text',
+            isNullable: false,
+          },
+          {
             name: 'created_at',
-            type: 'datetime',
+            type: 'timestamp',
             default: 'CURRENT_TIMESTAMP',
             isNullable: false,
           },
           {
             name: 'updated_at',
-            type: 'datetime',
+            type: 'timestamp',
             isNullable: true,
             default: null,
             onUpdate: 'CURRENT_TIMESTAMP',

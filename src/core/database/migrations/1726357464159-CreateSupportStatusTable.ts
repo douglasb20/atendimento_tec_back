@@ -26,12 +26,7 @@ export class CreateSupportsStatusTable1726357464159 implements MigrationInterfac
 
     if (hasTable) {
       await queryRunner.query(
-        'INSERT INTO \
-        support_status(descricao) \
-        values("Aberto"), \
-        ("Pendente"), \
-        ("Finalizado"), \
-        ("Excluído")',
+        "INSERT INTO support_status(descricao) VALUES ('Aberto'), ('Pendente'), ('Finalizado'), ('Excluído')",
       );
     }
   }

@@ -323,6 +323,10 @@ export type Message = {
   messageSecret?: Array<number>;
 };
 
+export type QuoteMessage = {
+  body: string;
+};
+
 export type Reaction = {
   id: MessageId;
   orphan: number;
@@ -405,10 +409,18 @@ export type WhatsappWebhookPayload<T = any> = {
 export type MessageData = Message & {
   _data: {
     notifyName: string;
+    quotedMsg?: QuoteMessage;
+    quotedStanzaID?: string;
+    quotedRemoteJid?: string;
+    quotedParticipant?: string;
   };
 };
 export type MessagePayload = {
   message: MessageData;
+};
+
+export type RepliedMessagePayload = {
+  repliedMessage: MessageData;
 };
 
 export type MessageEditPayload = {

@@ -1,13 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { EntityManager } from 'typeorm';
 
 import { MessageData, MessageTypes, MessageWithLastMessage, Reaction } from '@/@types';
 import { Channels } from '@/channels/entities/channels.entity';
 import { StorageService } from '@/storage/storage.service';
 import { WhatsappService } from '@/whatsapp/whatsapp.service';
+import { RedisCacheRepository } from '@/redis-cache/redis-cache.repository';
 
 import { getExtension, toMMSS } from '@/Utils';
-import { EntityManager } from 'typeorm';
 import { SupportChats } from '../entities/support-chats.entity';
 import { SupportChatMessages } from './entities/support-chat-messages.entity';
 import { MessagesRepository } from './messages.repository';
@@ -16,6 +17,7 @@ import { MessagesRepository } from './messages.repository';
 export class MessagesService {
   private readonly logger = new Logger(MessagesService.name);
   constructor(
+    private readonly redisCacheRepository: RedisCacheRepository,
     private readonly messagesRepository: MessagesRepository,
     private readonly whatsappService: WhatsappService,
     private readonly storageService: StorageService,
@@ -86,8 +88,22 @@ export class MessagesService {
           manager,
         );
         break;
+      default:
+        // Tipos sem tratamento próprio (enquete, localização, template...) são
+        // gravados como texto para não perder a mensagem nem interromper a fila.
+        this.logger.warn(
+          `Tipo de mensagem sem tratamento específico: ${messagePayload.type}. Persistindo como texto.`,
+        );
+        savedMessage = await this.processTextMessage(
+          channel,
+          support_chat,
+          messagePayload,
+          manager,
+        );
+        break;
     }
 
+    delete savedMessage.raw_payload;
     return savedMessage;
   }
 
@@ -189,6 +205,12 @@ export class MessagesService {
     messagePayload: MessageData,
     manager: EntityManager,
   ): Promise<MessageWithLastMessage> {
+    const existingCachedMessage = await this.redisCacheRepository.get(
+      `message:messageId:${messagePayload.id.id}`,
+    );
+    if (existingCachedMessage) {
+      this.logger.log('Message already processed, skipping save.');
+    }
     const formatatedMessage = this.formatateMessageContent(messagePayload, channel, support_chat);
     const messageToSave = this.messagesRepository.create(formatatedMessage);
 
@@ -202,7 +224,7 @@ export class MessagesService {
     manager: EntityManager,
   ): Promise<MessageWithLastMessage> {
     try {
-      console.log('Processing image message...');
+      this.logger.log('Processing image message...');
 
       const key = `chat/images/${randomUUID()}`;
       const { presignedUrl, mimeType, mediaSize, keyWithExtension } = await this.processUploadMedia(
@@ -210,10 +232,9 @@ export class MessagesService {
         messagePayload.id.remote,
         messagePayload.id.id,
         key,
-        3,
       );
 
-      console.log('Finished upload media message...');
+      this.logger.log('Finished upload media message...');
 
       const formatatedMessage = this.formatateMessageContent(messagePayload, channel, support_chat);
 
@@ -241,7 +262,7 @@ export class MessagesService {
     messagePayload: MessageData,
     manager: EntityManager,
   ): Promise<MessageWithLastMessage> {
-    console.log('Processing sticker message...');
+    this.logger.log('Processing sticker message...');
 
     const key = `chat/images/${randomUUID()}`;
     const { presignedUrl, mimeType, mediaSize, keyWithExtension } = await this.processUploadMedia(
@@ -249,7 +270,6 @@ export class MessagesService {
       messagePayload.id.remote,
       messagePayload.id.id,
       key,
-      3,
     );
 
     const formatatedMessage = this.formatateMessageContent(messagePayload, channel, support_chat);
@@ -273,7 +293,7 @@ export class MessagesService {
     messagePayload: MessageData,
     manager: EntityManager,
   ): Promise<MessageWithLastMessage> {
-    console.log('Processing voice message...');
+    this.logger.log('Processing voice message...');
 
     const key = `chat/voices/${randomUUID()}`;
     const { presignedUrl, mimeType, mediaSize, keyWithExtension } = await this.processUploadMedia(
@@ -281,7 +301,6 @@ export class MessagesService {
       messagePayload.id.remote,
       messagePayload.id.id,
       key,
-      3,
     );
 
     messagePayload.body = toMMSS(messagePayload.duration || 0);
@@ -306,7 +325,7 @@ export class MessagesService {
     messagePayload: MessageData,
     manager: EntityManager,
   ): Promise<MessageWithLastMessage> {
-    console.log('Processing video message...');
+    this.logger.log('Processing video message...');
 
     const key = `chat/videos/${randomUUID()}`;
     const { presignedUrl, mimeType, mediaSize, keyWithExtension } = await this.processUploadMedia(
@@ -314,7 +333,6 @@ export class MessagesService {
       messagePayload.id.remote,
       messagePayload.id.id,
       key,
-      3,
     );
 
     const formatatedMessage = this.formatateMessageContent(messagePayload, channel, support_chat);
@@ -339,7 +357,7 @@ export class MessagesService {
     messagePayload: MessageData,
     manager: EntityManager,
   ): Promise<MessageWithLastMessage> {
-    console.log('Processing document message...');
+    this.logger.log('Processing document message...');
 
     const key = `chat/documents/${randomUUID()}`;
     const { presignedUrl, mimeType, mediaSize, keyWithExtension } = await this.processUploadMedia(
@@ -347,7 +365,6 @@ export class MessagesService {
       messagePayload.id.remote,
       messagePayload.id.id,
       key,
-      3,
     );
 
     const formatatedMessage = this.formatateMessageContent(messagePayload, channel, support_chat);
@@ -403,29 +420,35 @@ export class MessagesService {
     }
 
     if (savedMessage.has_media && savedMessage.media_url) {
-      const presignedUrl = await this.storageService.generateViewUrl(savedMessage.media_url, 3);
-      savedMessageWithLastMessage.media_url = presignedUrl;
+      savedMessageWithLastMessage.media_url = this.storageService.getPublicUrl(
+        savedMessage.media_url,
+      );
     }
 
     return savedMessageWithLastMessage;
   }
 
-  async getsignedUrlForMessageMedia(supportChatMessages: SupportChats): Promise<SupportChats> {
-    const messagesWithSignedUrls = await Promise.all(
-      supportChatMessages.supportChatMessages.map(async (message) => {
-        if (message.has_media && message.media_url) {
-          const presignedUrl = await this.storageService.generateViewUrl(message.media_url, 3);
-          return {
-            ...message,
-            media_url: presignedUrl,
-          };
-        }
-        return message;
-      }),
-    );
+  /**
+   * Resolve as URLs de mídia das mensagens do chat.
+   *
+   * Com o bucket público a URL é permanente: não há assinatura por mensagem nem
+   * cache a manter (antes era uma URL assinada por item, cacheada no Redis com
+   * validade menor que a da assinatura).
+   */
+  getUrlForMessageMedia(supportChatMessages: SupportChats): SupportChats {
+    const messagesWithUrls = supportChatMessages.supportChatMessages.map((message) => {
+      if (message.has_media && message.media_url) {
+        return {
+          ...message,
+          media_url: this.storageService.getPublicUrl(message.media_url),
+        };
+      }
+      return message;
+    });
+
     return {
       ...supportChatMessages,
-      supportChatMessages: messagesWithSignedUrls,
+      supportChatMessages: messagesWithUrls,
     };
   }
 
@@ -434,14 +457,13 @@ export class MessagesService {
     chatId: string,
     messageId: string,
     key: string,
-    duration: number,
   ): Promise<{
     presignedUrl: string;
     mimeType: string;
     mediaSize: number;
     keyWithExtension: string;
   }> {
-    console.log('Processing upload media message...');
+    this.logger.log('Processing upload media message...');
     const messageMedia = await this.whatsappService.downloadMedia(sessionId, messageId, chatId);
 
     const keyWithExtension = key + '.' + getExtension(messageMedia.mimetype);
@@ -451,10 +473,9 @@ export class MessagesService {
       keyWithExtension,
       messageMedia.mimetype,
     );
-    const presignedUrl = await this.storageService.generateViewUrl(keyWithExtension, duration);
 
     return {
-      presignedUrl,
+      presignedUrl: this.storageService.getPublicUrl(keyWithExtension),
       mimeType: messageMedia.mimetype,
       mediaSize: messageMedia?.filesize || 0,
       keyWithExtension,
@@ -477,7 +498,16 @@ export class MessagesService {
       content: messagePayload.body,
       from: messagePayload.from,
       to: messagePayload.to,
-      device_type: messagePayload.deviceType,
+      device_type: messagePayload.deviceType ?? null,
+      has_quoted: messagePayload.hasQuotedMsg,
+      quoted_msg_id: messagePayload.hasQuotedMsg
+        ? (messagePayload._data?.quotedStanzaID ?? null)
+        : null,
+      // O provider pode informar a mensagem citada sem enviar o conteúdo dela.
+      quoted_msg: messagePayload.hasQuotedMsg
+        ? (messagePayload._data?.quotedMsg?.body ?? null)
+        : null,
+      raw_payload: JSON.stringify(messagePayload),
     };
 
     return formatatedMessage;

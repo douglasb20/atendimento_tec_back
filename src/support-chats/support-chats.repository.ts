@@ -25,7 +25,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       .leftJoinAndSelect('c.client', 'cl')
       .leftJoinAndSelect('sc.supportChatStatus', 'ms')
       .innerJoin('support_chat_status', 'scs', 'scs.id = sc.support_chat_status_id')
-      .andWhere('scs.is_final = 0')
+      .andWhere('scs.is_final = false')
       .getMany();
 
     return supportChat;
@@ -54,7 +54,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       .leftJoinAndSelect('sc.supportChatStatus', 'ms')
       .where('sc.contact_id = :contact_id', { contact_id })
       .andWhere('sc.channel_id = :channel_id', { channel_id })
-      .andWhere('scs.is_final = 0')
+      .andWhere('scs.is_final = false')
       .getOne();
 
     if (!supportChat) {

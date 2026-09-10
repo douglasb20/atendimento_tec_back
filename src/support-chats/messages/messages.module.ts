@@ -9,14 +9,17 @@ import { SupportChatMessages } from './entities/support-chat-messages.entity';
 import { MessagesController } from './messages.controller';
 import { MessagesRepository } from './messages.repository';
 import { MessagesService } from './messages.service';
+import { MediaRetentionService } from './media-retention.service';
+import { RedisCacheModule } from '@/redis-cache/redis-cache.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([SupportChats, SupportChatMessages]),
     forwardRef(() => WhatsappModule),
+    RedisCacheModule,
   ],
   controllers: [MessagesController],
-  providers: [MessagesService, MessagesRepository, StorageService],
-  exports: [MessagesService],
+  providers: [MessagesService, MessagesRepository, StorageService, MediaRetentionService],
+  exports: [MessagesService, MediaRetentionService],
 })
 export class MessagesModule {}
