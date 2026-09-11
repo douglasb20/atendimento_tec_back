@@ -26,6 +26,20 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       .leftJoinAndSelect('sc.supportChatStatus', 'ms')
       .innerJoin('support_chat_status', 'scs', 'scs.id = sc.support_chat_status_id')
       .andWhere('scs.is_final = false')
+      // Conversa com mensagem mais recente primeiro, como em qualquer
+      // mensageiro. A data vem por subconsulta em vez do `updated_at` porque
+      // este muda em qualquer alteração da conversa (status, atribuição) e
+      // reordenaria a lista por motivos que o atendente não vê.
+      .addSelect(
+        (sub) =>
+          sub
+            .select('MAX(m.datetime)')
+            .from('support_chat_messages', 'm')
+            .where('m.support_chat_id = sc.id'),
+        'ultima_mensagem_em',
+      )
+      // NULLS LAST mantém no fim a conversa aberta que ainda não tem mensagem.
+      .orderBy('"ultima_mensagem_em"', 'DESC', 'NULLS LAST')
       .getMany();
 
     return supportChat;

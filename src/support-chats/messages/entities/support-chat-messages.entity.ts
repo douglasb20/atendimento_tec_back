@@ -52,6 +52,10 @@ export class SupportChatMessages {
   @Column({ name: 'media_size', type: 'int', nullable: true, default: null })
   media_size: number | null;
 
+  /** Nome original do arquivo — é o que identifica um documento na conversa. */
+  @Column({ name: 'file_name', type: 'varchar', length: 255, nullable: true })
+  file_name: string | null;
+
   /**
    * Mídia removida do storage pela política de retenção. Distinto de
    * `is_deleted`: a mensagem segue válida, apenas o arquivo não está mais

@@ -16,6 +16,13 @@ import { MessagesRepository } from './messages.repository';
 @Injectable()
 export class MessagesService {
   private readonly logger = new Logger(MessagesService.name);
+
+  /**
+   * Validade da reserva de envio, em segundos. Cobre a janela entre o envio e
+   * o webhook — na prática, segundos. Passado esse tempo, a linha provisória
+   * já está gravada e assume o papel.
+   */
+  private static readonly TTL_RESERVA_ENVIO = 120;
   constructor(
     private readonly redisCacheRepository: RedisCacheRepository,
     private readonly messagesRepository: MessagesRepository,
@@ -448,6 +455,8 @@ export class MessagesService {
       type: MessageTypes;
       mediaUrl?: string;
       mediaType?: string;
+      /** Nome original do arquivo — é o que identifica o documento na conversa. */
+      fileName?: string;
       quotedMsgId?: string;
       sentAt?: Date;
     },
@@ -465,6 +474,7 @@ export class MessagesService {
       has_media: Boolean(dados.mediaUrl),
       media_url: dados.mediaUrl ?? null,
       media_type: dados.mediaType ?? null,
+      file_name: dados.fileName ?? null,
       has_quoted: Boolean(dados.quotedMsgId),
       quoted_msg_id: dados.quotedMsgId ?? null,
       from: dados.channel.phone_number ?? '',
@@ -496,6 +506,12 @@ export class MessagesService {
       // O `datetime` da linha provisória é o instante do envio, que define a
       // posição na conversa; o do webhook chega depois e reordenaria a lista.
       message = { ...existente, ...message, id: existente.id, datetime: existente.datetime };
+
+      // O webhook não traz o nome nem o tamanho do arquivo que nós enviamos —
+      // sem isto, o espalhamento acima sobrescreveria com null o que a linha
+      // provisória guardou, e o documento voltaria a aparecer sem nome.
+      message.file_name ??= existente.file_name;
+      message.media_size ||= existente.media_size;
     }
 
     const savedMessage = await manager.save(SupportChatMessages, message);
@@ -528,6 +544,20 @@ export class MessagesService {
    * cache a manter (antes era uma URL assinada por item, cacheada no Redis com
    * validade menor que a da assinatura).
    */
+  /**
+   * Converte a key de mídia na URL pública de uma mensagem só.
+   *
+   * As colunas guardam a **key**, não a URL — a leitura HTTP já traduz isso no
+   * `getUrlForMessageMedia`, mas o que sai pelo WebSocket vinha cru, e o front
+   * recebia `chat/media/xxx.jpeg` como se fosse endereço. A imagem só aparecia
+   * ao recarregar a página, quando o caminho HTTP refazia a URL.
+   */
+  comUrlPublica<T extends { has_media?: boolean; media_url?: string }>(message: T): T {
+    if (!message?.has_media || !message.media_url) return message;
+
+    return { ...message, media_url: this.storageService.getPublicUrl(message.media_url) };
+  }
+
   getUrlForMessageMedia(supportChatMessages: SupportChats): SupportChats {
     const messagesWithUrls = supportChatMessages.supportChatMessages.map((message) => {
       if (message.has_media && message.media_url) {
@@ -545,6 +575,51 @@ export class MessagesService {
     };
   }
 
+  /**
+   * Reserva de envio: registra que a mídia de `messageId` já está no storage,
+   * para o webhook não baixá-la de volta.
+   *
+   * Gravada antes da chamada ao provider justamente porque o webhook chega
+   * junto com a resposta dele. O TTL curto basta: ou o webhook chega em
+   * segundos, ou a linha no banco já assumiu o papel.
+   */
+  async reservaEnvioComMidia(
+    messageId: string,
+    dados: { mediaKey: string; mimetype?: string; mediaSize?: number },
+  ): Promise<void> {
+    await this.redisCacheRepository.set(
+      `envioComMidia:${messageId}`,
+      JSON.stringify(dados),
+      MessagesService.TTL_RESERVA_ENVIO,
+    );
+  }
+
+  /** Lê a reserva; um Redis indisponível apenas devolve ao caminho do banco. */
+  private async consultaReservaEnvio(
+    messageId: string,
+  ): Promise<{ mediaKey: string; mimetype?: string; mediaSize?: number } | null> {
+    try {
+      const bruto = await this.redisCacheRepository.get(`envioComMidia:${messageId}`);
+      return bruto ? JSON.parse(bruto as string) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** A linha provisória, quando o `registraEnvio` chegou antes do webhook. */
+  private async buscaMediaJaNoStorage(
+    messageId: string,
+  ): Promise<{ mediaKey: string; mimetype?: string; mediaSize?: number } | null> {
+    const existente = await this.messagesRepository.findOneByMessageId(messageId);
+    if (!existente?.media_url) return null;
+
+    return {
+      mediaKey: existente.media_url,
+      mimetype: existente.media_type ?? '',
+      mediaSize: Number(existente.media_size) || 0,
+    };
+  }
+
   async processUploadMedia(
     sessionId: string,
     chatId: string,
@@ -556,17 +631,25 @@ export class MessagesService {
     mediaSize: number;
     keyWithExtension: string;
   }> {
-    // Mídia que nós mesmos enviamos já está no storage: a linha provisória do
-    // envio guardou a key. Baixá-la de volta do provider seria trabalho perdido
-    // — e falha, porque a mensagem enviada não tem o conteúdo lá para servir.
-    const jaNoStorage = await this.messagesRepository.findOneByMessageId(messageId);
-    if (jaNoStorage?.media_url) {
+    // Mídia que nós mesmos enviamos já está no storage: baixá-la de volta do
+    // provider seria trabalho perdido — e falha, porque a mensagem enviada não
+    // tem o conteúdo lá para servir.
+    //
+    // A reserva no Redis é consultada antes da linha do banco de propósito: a
+    // Evolution dispara o webhook no mesmo instante em que responde ao envio,
+    // e chega a vencer a gravação da linha provisória. Com um arquivo pequeno
+    // a corrida é perdida quase sempre. A reserva é gravada **antes** da
+    // chamada ao provider, então já está lá quando o webhook consulta.
+    const reservado = await this.consultaReservaEnvio(messageId);
+    const jaNoStorage = reservado ?? (await this.buscaMediaJaNoStorage(messageId));
+
+    if (jaNoStorage) {
       this.logger.log('Mídia já no storage (envio nosso); download dispensado.');
       return {
-        presignedUrl: this.storageService.getPublicUrl(jaNoStorage.media_url),
-        mimeType: jaNoStorage.media_type ?? '',
-        mediaSize: Number(jaNoStorage.media_size) || 0,
-        keyWithExtension: jaNoStorage.media_url,
+        presignedUrl: this.storageService.getPublicUrl(jaNoStorage.mediaKey),
+        mimeType: jaNoStorage.mimetype ?? '',
+        mediaSize: jaNoStorage.mediaSize ?? 0,
+        keyWithExtension: jaNoStorage.mediaKey,
       };
     }
 

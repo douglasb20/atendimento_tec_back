@@ -79,8 +79,20 @@ export class SupportChatsController {
   @Post('/:id/send-media')
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
-  async sendMedia(@Param('id', ParseIntPipe) id: number, @Body() sendMediaDto: SendMediaDto) {
-    return this.supportChatsService.sendMedia(id, sendMediaDto);
+  async sendMedia(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() sendMediaDto: SendMediaDto,
+    @Req() req: Request,
+  ) {
+    // A legenda leva o mesmo prefixo do texto: numa conversa atendida por mais
+    // de uma pessoa, é o que identifica quem falou no WhatsApp do cliente —
+    // lá só chega texto, não há como marcar o autor de outro jeito.
+    return this.supportChatsService.sendMedia(id, {
+      ...sendMediaDto,
+      caption: sendMediaDto.caption
+        ? `*${req.user['name']}:*\n${sendMediaDto.caption}`
+        : sendMediaDto.caption,
+    });
   }
 
   @Post('/:id/delete-message')

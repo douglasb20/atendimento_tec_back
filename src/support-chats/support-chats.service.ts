@@ -20,7 +20,6 @@ import { MessagesService } from './messages/messages.service';
 import { SupportChatsRepository } from './support-chats.repository';
 import { PresignedUpload, StorageService } from '@/storage/storage.service';
 import { ChannelsRepository } from '@/channels/channels.repository';
-import { RedisCacheRepository } from '@/redis-cache/redis-cache.repository';
 import { SignMediaPostDto } from './dto/sign-media-post.dto';
 import { SendMediaDto, SendMediaType } from './dto/send-media.dto';
 
@@ -39,7 +38,6 @@ export class SupportChatsService {
   private readonly logger = new Logger(SupportChatsService.name);
 
   constructor(
-    private readonly redisCacheRepository: RedisCacheRepository,
     private readonly whatsappService: WhatsappService,
     private readonly messagesService: MessagesService,
     private readonly channelsRepository: ChannelsRepository,
@@ -66,12 +64,6 @@ export class SupportChatsService {
       chat_id,
       message,
     );
-    this.redisCacheRepository.set(
-      `mediaMessage:messageId:${sentMessage.messageId}`,
-      JSON.stringify(sentMessage),
-      30,
-    );
-
     await this.registraEnvio({
       messageId: sentMessage.messageId,
       supportChat,
@@ -103,12 +95,6 @@ export class SupportChatsService {
       messageId,
       message,
     );
-    this.redisCacheRepository.set(
-      `mediaMessage:messageId:${sentMessage.messageId}`,
-      JSON.stringify(sentMessage),
-      30,
-    );
-
     await this.registraEnvio({
       messageId: sentMessage.messageId,
       supportChat,
@@ -155,11 +141,15 @@ export class SupportChatsService {
       quotedMessageId: quoted_message_id,
     });
 
-    this.redisCacheRepository.set(
-      `mediaMessage:messageId:${sentMessage.messageId}`,
-      JSON.stringify(sentMessage),
-      30,
-    );
+    // Antes de qualquer escrita no banco: a Evolution dispara o webhook no
+    // mesmo instante em que responde aqui, e a transação do `registraEnvio`
+    // chega a perder a corrida — o webhook então não acha a linha provisória e
+    // baixa de volta a mídia que nós mesmos acabamos de subir. Um SET no Redis
+    // ganha da transação com folga.
+    await this.messagesService.reservaEnvioComMidia(sentMessage.messageId, {
+      mediaKey: media_key,
+      mimetype,
+    });
 
     await this.registraEnvio({
       messageId: sentMessage.messageId,
@@ -169,6 +159,7 @@ export class SupportChatsService {
       type: TIPO_INTERNO_POR_MIDIA[media_type],
       mediaUrl: media_key,
       mediaType: mimetype,
+      fileName: file_name,
       quotedMsgId: quoted_message_id,
       sentAt: enviadoEm,
     });
@@ -188,6 +179,7 @@ export class SupportChatsService {
     type: MessageTypes;
     mediaUrl?: string;
     mediaType?: string;
+    fileName?: string;
     quotedMsgId?: string;
     sentAt: Date;
   }) {
@@ -338,7 +330,9 @@ export class SupportChatsService {
 
           const supoportChatsWhitMessage = {
             ...supportChat,
-            supportChatMessages: savedMessage,
+            // A key vira URL pública aqui: o que sai pelo socket é o que o
+            // front renderiza direto, sem passar pela leitura HTTP.
+            supportChatMessages: this.messagesService.comUrlPublica(savedMessage),
           };
 
           this.whatsappService.emitEvent('whatsapp:messages', supoportChatsWhitMessage);
@@ -362,7 +356,13 @@ export class SupportChatsService {
         const savedMessage = await this.messagesService.saveMessageAck(data.message, manager);
 
         if (savedMessage) {
-          this.whatsappService.emitEvent('whatsapp:message_ack', savedMessage);
+          // O front substitui a mensagem inteira ao receber o ack, então a
+          // key precisa virar URL aqui também — senão o ack apagaria a imagem
+          // que o evento anterior já tinha exibido.
+          this.whatsappService.emitEvent(
+            'whatsapp:message_ack',
+            this.messagesService.comUrlPublica(savedMessage),
+          );
         }
       } catch (err) {
         this.logger.error(`Erro ao processar mensagem ack: ${err.message}`);
@@ -411,7 +411,9 @@ export class SupportChatsService {
 
           const supoportChatsWhitMessage = {
             ...supportChat,
-            supportChatMessages: savedMessage,
+            // A key vira URL pública aqui: o que sai pelo socket é o que o
+            // front renderiza direto, sem passar pela leitura HTTP.
+            supportChatMessages: this.messagesService.comUrlPublica(savedMessage),
           };
 
           this.whatsappService.emitEvent('whatsapp:messages', supoportChatsWhitMessage);
@@ -471,7 +473,9 @@ export class SupportChatsService {
 
           const supoportChatsWhitMessage = {
             ...supportChat,
-            supportChatMessages: savedMessage,
+            // A key vira URL pública aqui: o que sai pelo socket é o que o
+            // front renderiza direto, sem passar pela leitura HTTP.
+            supportChatMessages: this.messagesService.comUrlPublica(savedMessage),
           };
 
           this.whatsappService.emitEvent('whatsapp:messages', supoportChatsWhitMessage);
@@ -511,7 +515,9 @@ export class SupportChatsService {
         if (savedMessage) {
           const supoportChatsWhitMessage = {
             ...supportChat,
-            supportChatMessages: savedMessage,
+            // A key vira URL pública aqui: o que sai pelo socket é o que o
+            // front renderiza direto, sem passar pela leitura HTTP.
+            supportChatMessages: this.messagesService.comUrlPublica(savedMessage),
           };
           this.whatsappService.emitEvent('whatsapp:messages', supoportChatsWhitMessage);
         }
