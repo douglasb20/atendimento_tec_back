@@ -34,7 +34,8 @@ export class Contacts {
   @Column({ type: 'varchar', length: 14, nullable: true, default: null })
   phone: string;
 
-  @Column({ type: 'varchar', length: 20, nullable: false })
+  /** JID do contato (`5564...@s.whatsapp.net`), usado no envio e no recebimento. */
+  @Column({ type: 'varchar', length: 60, nullable: false })
   remote_jid: string;
 
   @CreateDateColumn({ type: 'timestamp' })

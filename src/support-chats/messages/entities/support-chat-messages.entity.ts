@@ -72,14 +72,14 @@ export class SupportChatMessages {
   @Column({ name: 'quoted_msg', type: 'text', nullable: true })
   quoted_msg: string | null;
 
-  @Column({ name: 'from', type: 'varchar', nullable: false, length: 20 })
+  @Column({ name: 'from', type: 'varchar', nullable: false, length: 60 })
   from: string;
 
-  @Column({ name: 'to', type: 'varchar', nullable: false, length: 20 })
+  @Column({ name: 'to', type: 'varchar', nullable: false, length: 60 })
   to: string;
 
-  @Column({ name: 'device_type', type: 'varchar', nullable: false, length: 45 })
-  device_type: string;
+  @Column({ name: 'device_type', type: 'varchar', nullable: true, length: 45 })
+  device_type: string | null;
 
   @Column({
     name: 'is_deleted',

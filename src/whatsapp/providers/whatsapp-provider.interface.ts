@@ -59,6 +59,17 @@ export interface WhatsappProvider {
   ): Promise<void>;
 
   /**
+   * Revoga a mensagem para todos os participantes da conversa.
+   * `fromMe` é obrigatório: o WhatsApp exige a chave completa para revogar.
+   */
+  deleteMessage(
+    session: ProviderSessionRef,
+    chatId: string,
+    messageId: string,
+    fromMe: boolean,
+  ): Promise<void>;
+
+  /**
    * Envia mídia a partir de uma URL pública ou base64.
    * Preferir URL: evita trafegar bytes e não tem limite de tamanho de corpo.
    */
@@ -92,7 +103,12 @@ export type ProviderClientInfo = {
   profilePicUrl?: string | null;
 };
 
-export type ProviderMediaType = 'image' | 'video' | 'audio' | 'document' | 'sticker';
+/**
+ * `voice` é a mensagem de voz gravada na hora (PTT), que o WhatsApp exibe como
+ * bolha com forma de onda; `audio` é um arquivo de áudio anexado. A distinção
+ * existe no protocolo, não só na aparência.
+ */
+export type ProviderMediaType = 'image' | 'video' | 'audio' | 'voice' | 'document' | 'sticker';
 
 export type ProviderMediaPayload = {
   to: string;

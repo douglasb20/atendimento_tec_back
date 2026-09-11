@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { EntityManager } from 'typeorm';
 
-import { MessageData, MessageTypes, MessageWithLastMessage, Reaction } from '@/@types';
+import { MessageAck, MessageData, MessageTypes, MessageWithLastMessage, Reaction } from '@/@types';
 import { Channels } from '@/channels/entities/channels.entity';
 import { StorageService } from '@/storage/storage.service';
 import { WhatsappService } from '@/whatsapp/whatsapp.service';
@@ -107,29 +107,48 @@ export class MessagesService {
     return savedMessage;
   }
 
+  /**
+   * Atualiza o ack pela chave da mensagem.
+   *
+   * A busca é só pelo `message_id` (UNIQUE) de propósito: o ack da Evolution
+   * chega com `remoteJid` em formato `@lid`, que não bate com o `remote_jid` do
+   * contato, então localizar a conversa pelo JID falharia.
+   *
+   * O ack **só avança**. A Evolution entrega os eventos fora de ordem (um
+   * SERVER_ACK pode chegar depois do READ do mesmo envio), e gravar o último
+   * que chega faria a mensagem regredir de "lido" para "enviado" na tela.
+   */
   async saveMessageAck(
-    support_chat_id: number,
     messagePayload: MessageData,
     manager: EntityManager,
   ): Promise<MessageWithLastMessage> {
-    const messageToUpdate = await this.messagesRepository.findOneBySupportChatIdAndMessageId(
-      support_chat_id,
-      messagePayload.id.id,
-    );
+    const messageToUpdate = await this.messagesRepository.findOneByMessageId(messagePayload.id.id);
 
     if (!messageToUpdate) {
-      this.logger.warn(
-        `Mensagem não encontrada para suporte_chat_id: ${support_chat_id} e message_id: ${messagePayload.id.id}`,
+      this.logger.warn(`Mensagem não encontrada para message_id: ${messagePayload.id.id}`);
+      return null;
+    }
+
+    const ackAtual = messageToUpdate.ack ?? 0;
+    const ackNovo = messagePayload.ack;
+
+    // ACK_ERROR (-1) é exceção: sinaliza falha no envio e vale mesmo depois de
+    // um status positivo.
+    const regride = ackNovo <= ackAtual && ackNovo !== MessageAck.ACK_ERROR;
+
+    if (regride) {
+      this.logger.debug(
+        `Ack ignorado para ${messagePayload.id.id}: ${ackNovo} não supera o atual ${ackAtual}.`,
       );
       return null;
     }
 
     const updatedMessage = this.messagesRepository.create({
       ...messageToUpdate,
-      ack: messagePayload.ack,
+      ack: ackNovo,
     });
 
-    await manager.update(SupportChatMessages, updatedMessage.id, { ack: updatedMessage.ack });
+    await manager.update(SupportChatMessages, updatedMessage.id, { ack: ackNovo });
 
     return updatedMessage;
   }
@@ -186,10 +205,15 @@ export class MessagesService {
       messagePayload.protocolMessageKey.id,
     );
 
+    // O conteúdo é descartado junto: uma mensagem revogada não deve deixar
+    // rastro do texto original, nem no histórico nem na prévia da conversa.
     const updatedMessage = this.messagesRepository.create({
       ...messageToUpdate,
       is_deleted: true,
       type: MessageTypes.REVOKED,
+      content: '',
+      media_url: null,
+      has_media: false,
     });
 
     return this.saveMessage(
@@ -400,11 +424,80 @@ export class MessagesService {
     return await this.saveMessage(messageToSave, manager, support_chat);
   }
 
+  /** Busca pela chave do provider, que tem constraint UNIQUE. */
+  async findByMessageId(messageId: string): Promise<SupportChatMessages | null> {
+    return this.messagesRepository.findOneByMessageId(messageId);
+  }
+
+  /**
+   * Grava a mensagem no instante do envio, antes da confirmação do provider.
+   *
+   * Duas razões: a mensagem existe no histórico mesmo que o webhook se perca, e
+   * o `datetime` marca a posição definitiva na conversa — um vídeo grande, cujo
+   * webhook demora, não pula para baixo dos textos enviados depois dele.
+   *
+   * Os campos que só o WhatsApp conhece ficam vazios; o webhook os completa.
+   */
+  async saveOutgoing(
+    dados: {
+      messageId: string;
+      channel: Channels;
+      supportChat: SupportChats;
+      to: string;
+      content: string;
+      type: MessageTypes;
+      mediaUrl?: string;
+      mediaType?: string;
+      quotedMsgId?: string;
+      sentAt?: Date;
+    },
+    manager: EntityManager,
+  ): Promise<MessageWithLastMessage> {
+    const message = this.messagesRepository.create({
+      message_id: dados.messageId,
+      support_chat_id: dados.supportChat.id,
+      channel_id: dados.channel.id,
+      datetime: dados.sentAt ?? new Date(),
+      ack: MessageAck.ACK_PENDING,
+      type: dados.type,
+      from_me: true,
+      content: dados.content ?? '',
+      has_media: Boolean(dados.mediaUrl),
+      media_url: dados.mediaUrl ?? null,
+      media_type: dados.mediaType ?? null,
+      has_quoted: Boolean(dados.quotedMsgId),
+      quoted_msg_id: dados.quotedMsgId ?? null,
+      from: dados.channel.phone_number ?? '',
+      to: dados.to,
+      device_type: null,
+      is_deleted: false,
+      is_edited: false,
+      raw_payload: '{}',
+    } as Partial<SupportChatMessages>);
+
+    return this.saveMessage(message, manager, dados.supportChat);
+  }
+
   async saveMessage(
     message: SupportChatMessages,
     manager: EntityManager,
     support_chat: SupportChats = null,
   ): Promise<MessageWithLastMessage> {
+    // O envio pelo portal grava uma linha provisória antes do provider
+    // confirmar, para a mensagem existir no histórico mesmo que o webhook se
+    // perca. Quando ele chega, completa aquela linha em vez de criar outra —
+    // sem isto o `manager.save` inseriria uma duplicata, já que a entidade
+    // montada aqui não carrega o `id`.
+    const existente = message.message_id
+      ? await this.messagesRepository.findOneByMessageId(message.message_id)
+      : null;
+
+    if (existente) {
+      // O `datetime` da linha provisória é o instante do envio, que define a
+      // posição na conversa; o do webhook chega depois e reordenaria a lista.
+      message = { ...existente, ...message, id: existente.id, datetime: existente.datetime };
+    }
+
     const savedMessage = await manager.save(SupportChatMessages, message);
     const savedMessageWithLastMessage: MessageWithLastMessage = {
       ...savedMessage,
@@ -463,6 +556,20 @@ export class MessagesService {
     mediaSize: number;
     keyWithExtension: string;
   }> {
+    // Mídia que nós mesmos enviamos já está no storage: a linha provisória do
+    // envio guardou a key. Baixá-la de volta do provider seria trabalho perdido
+    // — e falha, porque a mensagem enviada não tem o conteúdo lá para servir.
+    const jaNoStorage = await this.messagesRepository.findOneByMessageId(messageId);
+    if (jaNoStorage?.media_url) {
+      this.logger.log('Mídia já no storage (envio nosso); download dispensado.');
+      return {
+        presignedUrl: this.storageService.getPublicUrl(jaNoStorage.media_url),
+        mimeType: jaNoStorage.media_type ?? '',
+        mediaSize: Number(jaNoStorage.media_size) || 0,
+        keyWithExtension: jaNoStorage.media_url,
+      };
+    }
+
     this.logger.log('Processing upload media message...');
     const messageMedia = await this.whatsappService.downloadMedia(sessionId, messageId, chatId);
 

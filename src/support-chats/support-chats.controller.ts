@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -31,12 +32,11 @@ export class SupportChatsController {
     @Body() sendMessageDto: SendMessageDto,
     @Req() req: Request,
   ) {
-    await this.supportChatsService.sendMessage(
+    return this.supportChatsService.sendMessage(
       id,
       sendMessageDto.chat_id,
       `*${req.user['name']}:*\n${sendMessageDto.message}`,
     );
-    return { status: 'message sent' };
   }
 
   @Post('/sign-media-post')
@@ -54,13 +54,12 @@ export class SupportChatsController {
     @Body() replyMessageDto: ReplyMessageDto,
     @Req() req: Request,
   ) {
-    await this.supportChatsService.replyMessage(
+    return this.supportChatsService.replyMessage(
       id,
       replyMessageDto.chat_id,
       replyMessageDto.message_id,
       `*${req.user['name']}:*\n${replyMessageDto.message}`,
     );
-    return { status: 'message sent' };
   }
 
   @Get()
@@ -82,6 +81,19 @@ export class SupportChatsController {
   @HttpCode(HttpStatus.OK)
   async sendMedia(@Param('id', ParseIntPipe) id: number, @Body() sendMediaDto: SendMediaDto) {
     return this.supportChatsService.sendMedia(id, sendMediaDto);
+  }
+
+  @Post('/:id/delete-message')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async deleteMessage(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() { message_id }: { message_id: string },
+  ) {
+    if (!message_id) {
+      throw new BadRequestException('O campo message_id é obrigatório');
+    }
+    return this.supportChatsService.deleteMessage(id, message_id);
   }
 
   @Post('/:id/send-reaction')

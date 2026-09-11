@@ -39,6 +39,9 @@ const MEDIA_TYPE_MAP: Record<ProviderMediaType, string> = {
   image: 'image',
   video: 'video',
   audio: 'audio',
+  // `voice` não passa por `sendMedia`: tem rota própria, que converte para
+  // OGG/Opus e marca `ptt`. O valor aqui é só para o mapa ficar completo.
+  voice: 'audio',
   document: 'document',
   sticker: 'image',
 };
@@ -248,6 +251,27 @@ export class EvolutionProvider implements WhatsappProvider {
     }
   }
 
+  async deleteMessage(
+    session: ProviderSessionRef,
+    chatId: string,
+    messageId: string,
+    fromMe: boolean,
+  ): Promise<void> {
+    try {
+      // A Evolution recebe a chave no corpo de um DELETE — não em query string.
+      await this.http.delete(`/chat/deleteMessageForEveryone/${session.sessionId}`, {
+        data: { id: messageId, remoteJid: this.toJid(chatId), fromMe },
+      });
+    } catch (error) {
+      if (this.statusOf(error) === 400) {
+        throw new BadRequestException(
+          'Não foi possível apagar: a mensagem pode ser antiga demais ou já ter sido removida.',
+        );
+      }
+      this.fail('Não foi possível apagar a mensagem', error);
+    }
+  }
+
   async sendMedia(
     session: ProviderSessionRef,
     payload: ProviderMediaPayload,
@@ -274,12 +298,26 @@ export class EvolutionProvider implements WhatsappProvider {
     const endpoint =
       mediaType === 'sticker'
         ? `/message/sendSticker/${session.sessionId}`
-        : `/message/sendMedia/${session.sessionId}`;
+        : mediaType === 'voice'
+          ? `/message/sendWhatsAppAudio/${session.sessionId}`
+          : `/message/sendMedia/${session.sessionId}`;
 
     if (mediaType === 'sticker') {
       delete body.mediatype;
       body.sticker = media;
       delete body.media;
+    }
+
+    // A rota de mensagem de voz tem corpo próprio: só `audio`, sem `mediatype`
+    // nem `caption` (o WhatsApp não exibe legenda em bolha de voz). A Evolution
+    // baixa a URL e converte para OGG/Opus com ffmpeg antes de enviar.
+    if (mediaType === 'voice') {
+      body.audio = media;
+      delete body.media;
+      delete body.mediatype;
+      delete body.caption;
+      delete body.fileName;
+      delete body.mimetype;
     }
 
     // O provider baixa a mídia da URL que enviamos, e esse download pode falhar

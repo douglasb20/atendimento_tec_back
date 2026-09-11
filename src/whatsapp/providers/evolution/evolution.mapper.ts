@@ -130,8 +130,12 @@ export class EvolutionMapper {
       case EvolutionEvent.MESSAGES_UPDATE:
       case EvolutionEvent.SEND_MESSAGE_UPDATE:
         return (data as EvolutionUpdateData).remoteJid ?? null;
-      case EvolutionEvent.MESSAGES_DELETE:
-        return (data as EvolutionDeleteData).remoteJid ?? null;
+      case EvolutionEvent.MESSAGES_DELETE: {
+        // A revogação chega ora achatada, ora com a chave aninhada em `key`,
+        // conforme a origem (celular do atendente ou a própria API).
+        const del = data as EvolutionDeleteData & { key?: { remoteJid?: string } };
+        return del.remoteJid ?? del.key?.remoteJid ?? null;
+      }
       case EvolutionEvent.CHATS_UPDATE: {
         const chat = Array.isArray(data) ? data[0] : (data as EvolutionChatData);
         return chat?.remoteJid ?? chat?.id ?? null;
@@ -253,7 +257,15 @@ export class EvolutionMapper {
    * fluxo de revogação busca o id da mensagem original.
    */
   static mapDeleted(data: EvolutionDeleteData): MessageData {
-    const remoteJid = data.remoteJid ?? '';
+    // Duas formas convivem aqui: achatada (revogação vinda do aparelho) e com
+    // `key` aninhado (revogação pedida pela API). No aninhado, `data.id` é o id
+    // interno da Evolution — a chave do WhatsApp está em `key.id`.
+    const chave = (data as EvolutionDeleteData & { key?: EvolutionDeleteData }).key;
+    const remoteJid = data.remoteJid ?? chave?.remoteJid ?? '';
+    const fromMe = data.fromMe ?? chave?.fromMe ?? false;
+    const messageId = chave?.id ?? data.id ?? '';
+
+    data = { ...data, remoteJid, fromMe, id: messageId };
 
     return {
       ack: MessageAck.ACK_ERROR,

@@ -188,7 +188,10 @@ export class WhatsappService {
       return `${body.instance}-${dataType}_${Date.now()}`;
     }
 
-    return `${body.instance}-${remoteJid}_${Date.now()}`;
+    // O BullMQ recusa `:` no jobId, e o JID pode trazer sufixo de dispositivo
+    // (`222226020307023:45@lid`). Trocar por `-` mantém a chave estável por
+    // conversa, que é o que garante a ordenação.
+    return `${body.instance}-${remoteJid.replace(/:/g, '-')}_${Date.now()}`;
   }
 
   // == Emissão para os clientes ==
@@ -275,6 +278,16 @@ export class WhatsappService {
   async sendMedia(sessionId: string, media: ProviderMediaPayload): Promise<ProviderSentMessage> {
     const { provider, session } = await this.resolve(sessionId);
     return provider.sendMedia(session, media);
+  }
+
+  async deleteMessage(
+    sessionId: string,
+    chatId: string,
+    messageId: string,
+    fromMe: boolean,
+  ): Promise<void> {
+    const { provider, session } = await this.resolve(sessionId);
+    return provider.deleteMessage(session, chatId, messageId, fromMe);
   }
 
   /** Canal + provider + sessão a partir do `session_id`. */

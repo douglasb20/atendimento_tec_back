@@ -4,6 +4,8 @@ export enum SendMediaType {
   IMAGE = 'image',
   VIDEO = 'video',
   AUDIO = 'audio',
+  /** Mensagem de voz gravada na hora (PTT) — bolha com forma de onda. */
+  VOICE = 'voice',
   DOCUMENT = 'document',
   STICKER = 'sticker',
 }

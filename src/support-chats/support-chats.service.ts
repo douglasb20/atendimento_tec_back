@@ -8,6 +8,7 @@ import {
   ChatPayload,
   MessageEditPayload,
   MessagePayload,
+  MessageTypes,
   ReactionPayload,
   WhatsappWebhookPayload,
 } from '@types';
@@ -21,7 +22,17 @@ import { PresignedUpload, StorageService } from '@/storage/storage.service';
 import { ChannelsRepository } from '@/channels/channels.repository';
 import { RedisCacheRepository } from '@/redis-cache/redis-cache.repository';
 import { SignMediaPostDto } from './dto/sign-media-post.dto';
-import { SendMediaDto } from './dto/send-media.dto';
+import { SendMediaDto, SendMediaType } from './dto/send-media.dto';
+
+/** Tipo de mídia do envio → tipo interno persistido, o mesmo que o webhook grava. */
+const TIPO_INTERNO_POR_MIDIA: Record<SendMediaType, MessageTypes> = {
+  [SendMediaType.IMAGE]: MessageTypes.IMAGE,
+  [SendMediaType.VIDEO]: MessageTypes.VIDEO,
+  [SendMediaType.AUDIO]: MessageTypes.AUDIO,
+  [SendMediaType.VOICE]: MessageTypes.VOICE,
+  [SendMediaType.DOCUMENT]: MessageTypes.DOCUMENT,
+  [SendMediaType.STICKER]: MessageTypes.STICKER,
+};
 
 @Injectable()
 export class SupportChatsService {
@@ -49,6 +60,7 @@ export class SupportChatsService {
       throw new NotFoundException('Chat de suporte não encontrado');
     }
 
+    const enviadoEm = new Date();
     const sentMessage = await this.whatsappService.sendMessage(
       supportChat.channel.session_id,
       chat_id,
@@ -59,6 +71,19 @@ export class SupportChatsService {
       JSON.stringify(sentMessage),
       30,
     );
+
+    await this.registraEnvio({
+      messageId: sentMessage.messageId,
+      supportChat,
+      to: chat_id,
+      content: message,
+      type: MessageTypes.TEXT,
+      sentAt: enviadoEm,
+    });
+
+    // O id volta para o front casar a mensagem otimista (exibida na hora) com a
+    // definitiva, que chega depois pelo webhook.
+    return { status: 'message sent', message_id: sentMessage.messageId };
   }
 
   async replyMessage(id: number, chat_id: string, messageId: string, message: string) {
@@ -71,6 +96,7 @@ export class SupportChatsService {
       throw new NotFoundException('Chat de suporte não encontrado');
     }
 
+    const enviadoEm = new Date();
     const sentMessage = await this.whatsappService.replyMessage(
       supportChat.channel.session_id,
       chat_id,
@@ -82,6 +108,18 @@ export class SupportChatsService {
       JSON.stringify(sentMessage),
       30,
     );
+
+    await this.registraEnvio({
+      messageId: sentMessage.messageId,
+      supportChat,
+      to: chat_id,
+      content: message,
+      type: MessageTypes.TEXT,
+      quotedMsgId: messageId,
+      sentAt: enviadoEm,
+    });
+
+    return { status: 'message sent', message_id: sentMessage.messageId };
   }
 
   /**
@@ -106,6 +144,7 @@ export class SupportChatsService {
     const mediaUrl = this.storageService.getPublicUrl(media_key);
     this.logger.log(`Enviando ${media_type} para ${chat_id}`);
 
+    const enviadoEm = new Date();
     const sentMessage = await this.whatsappService.sendMedia(supportChat.channel.session_id, {
       to: chat_id,
       mediaType: media_type,
@@ -122,7 +161,46 @@ export class SupportChatsService {
       30,
     );
 
+    await this.registraEnvio({
+      messageId: sentMessage.messageId,
+      supportChat,
+      to: chat_id,
+      content: caption ?? '',
+      type: TIPO_INTERNO_POR_MIDIA[media_type],
+      mediaUrl: media_key,
+      mediaType: mimetype,
+      quotedMsgId: quoted_message_id,
+      sentAt: enviadoEm,
+    });
+
     return { status: 'media sent', message_id: sentMessage.messageId };
+  }
+
+  /**
+   * Persiste a mensagem recém-enviada, sem deixar a falha derrubar o envio: o
+   * provider já aceitou, e o webhook ainda vai gravá-la de todo modo.
+   */
+  private async registraEnvio(dados: {
+    messageId: string;
+    supportChat: SupportChats;
+    to: string;
+    content: string;
+    type: MessageTypes;
+    mediaUrl?: string;
+    mediaType?: string;
+    quotedMsgId?: string;
+    sentAt: Date;
+  }) {
+    try {
+      await runInTransaction(this.dataSource, (manager) =>
+        this.messagesService.saveOutgoing(
+          { ...dados, channel: dados.supportChat.channel },
+          manager,
+        ),
+      );
+    } catch (err) {
+      this.logger.warn(`Não foi possível registrar o envio ${dados.messageId}: ${err.message}`);
+    }
   }
 
   async listAllSupportChats() {
@@ -165,6 +243,36 @@ export class SupportChatsService {
       this.logger.error('Falha ao enviar reação:', error.response?.data || error.message);
       throw new BadRequestException('Não foi possível enviar a reação.');
     }
+  }
+
+  /**
+   * Revoga a mensagem no WhatsApp. A marcação local fica por conta do webhook
+   * `messages.delete`, que é quem confirma que o WhatsApp aceitou a revogação.
+   */
+  async deleteMessage(id: number, messageId: string) {
+    const supportChat = await this.supportChatsRepository.findOne({
+      where: { id },
+      relations: ['channel', 'contact'],
+    });
+    if (!supportChat) {
+      throw new NotFoundException('Chat de suporte não encontrado');
+    }
+
+    const message = await this.messagesService.findByMessageId(messageId);
+    if (!message) {
+      throw new NotFoundException('Mensagem não encontrada');
+    }
+
+    this.logger.log(`Apagando mensagem ${messageId} de ${supportChat.contact?.remote_jid}`);
+
+    await this.whatsappService.deleteMessage(
+      supportChat.channel.session_id,
+      supportChat.contact?.remote_jid,
+      messageId,
+      message.from_me,
+    );
+
+    return { status: 'message deleted' };
   }
 
   async signMediaPost(signMediaPostDto: SignMediaPostDto): Promise<PresignedUpload> {
@@ -212,17 +320,21 @@ export class SupportChatsService {
         );
 
         if (savedMessage) {
-          await this.supportChatsRepository.updateLastMessage(
-            supportChat.id,
-            savedMessage?.lastMessage,
-            manager,
-          );
-          this.whatsappChatStateEmit({
-            ...supportChat,
-            last_message: savedMessage?.lastMessage.content,
-            last_message_type: savedMessage?.lastMessage.type,
-            last_message_id: savedMessage?.lastMessage.id,
-          });
+          // `lastMessage` só vem preenchido quando a mensagem afetada era a
+          // última da conversa; nas demais, a prévia do chat não muda.
+          if (savedMessage.lastMessage) {
+            await this.supportChatsRepository.updateLastMessage(
+              supportChat.id,
+              savedMessage.lastMessage,
+              manager,
+            );
+            this.whatsappChatStateEmit({
+              ...supportChat,
+              last_message: savedMessage.lastMessage.content,
+              last_message_type: savedMessage.lastMessage.type,
+              last_message_id: savedMessage.lastMessage.id,
+            });
+          }
 
           const supoportChatsWhitMessage = {
             ...supportChat,
@@ -241,28 +353,13 @@ export class SupportChatsService {
   async onMessageAck(payload: WhatsappWebhookPayload<MessagePayload>) {
     return runInTransaction(this.dataSource, async (manager) => {
       try {
-        const { sessionId, data } = payload;
-        const channel = await this.channelsRepository.findBySessionId(sessionId);
-        const phoneContact = data.message.id.remote;
+        const { data } = payload;
 
-        const contact = await manager.findOneBy(Contacts, {
-          remote_jid: phoneContact,
-        });
-
-        // Ack de conversa que ainda não existe aqui (sincronização inicial da
-        // sessão, por exemplo): não há o que atualizar.
-        if (!contact) {
-          this.logger.debug(`Ack ignorado: contato ${phoneContact} não cadastrado.`);
-          return;
-        }
-
-        const supportChat = await this.findOrOpen(contact.id, channel.id, manager);
-
-        const savedMessage = await this.messagesService.saveMessageAck(
-          supportChat.id,
-          data.message,
-          manager,
-        );
+        // A mensagem é localizada pelo próprio id, sem passar pelo contato: o
+        // ack chega com `remoteJid` no formato `@lid`, que não corresponde ao
+        // `remote_jid` gravado. Mensagem desconhecida (sincronização inicial da
+        // sessão, por exemplo) simplesmente não tem o que atualizar.
+        const savedMessage = await this.messagesService.saveMessageAck(data.message, manager);
 
         if (savedMessage) {
           this.whatsappService.emitEvent('whatsapp:message_ack', savedMessage);
@@ -329,15 +426,25 @@ export class SupportChatsService {
   async onMessageRevokeEveryone(payload: WhatsappWebhookPayload<MessageEditPayload>) {
     return runInTransaction(this.dataSource, async (manager) => {
       try {
-        const { sessionId, data } = payload;
-        const channel = await this.channelsRepository.findBySessionId(sessionId);
-        const phoneContact = data.message.protocolMessageKey.remote;
+        const { data } = payload;
+        const messageId = data.message.protocolMessageKey.id;
 
-        const contact = await manager.findOneBy(Contacts, {
-          remote_jid: phoneContact,
+        // A conversa vem da própria mensagem, não do JID: a revogação feita no
+        // aparelho chega com `remoteJid` em formato `@lid`, que não bate com o
+        // `remote_jid` do contato.
+        const mensagem = await this.messagesService.findByMessageId(messageId);
+        if (!mensagem) {
+          this.logger.debug(`Revogação ignorada: mensagem ${messageId} não encontrada.`);
+          return;
+        }
+
+        const supportChat = await this.supportChatsRepository.findOne({
+          where: { id: mensagem.support_chat_id },
         });
-
-        const supportChat = await this.findOrOpen(contact.id, channel.id, manager);
+        if (!supportChat) {
+          this.logger.debug(`Revogação ignorada: chat ${mensagem.support_chat_id} não encontrado.`);
+          return;
+        }
 
         const savedMessage = await this.messagesService.saveMessageRevokeEveryone(
           supportChat,
@@ -346,17 +453,21 @@ export class SupportChatsService {
         );
 
         if (savedMessage) {
-          await this.supportChatsRepository.updateLastMessage(
-            supportChat.id,
-            savedMessage?.lastMessage,
-            manager,
-          );
-          this.whatsappChatStateEmit({
-            ...supportChat,
-            last_message: savedMessage?.lastMessage.content,
-            last_message_type: savedMessage?.lastMessage.type,
-            last_message_id: savedMessage?.lastMessage.id,
-          });
+          // `lastMessage` só vem preenchido quando a mensagem afetada era a
+          // última da conversa; nas demais, a prévia do chat não muda.
+          if (savedMessage.lastMessage) {
+            await this.supportChatsRepository.updateLastMessage(
+              supportChat.id,
+              savedMessage.lastMessage,
+              manager,
+            );
+            this.whatsappChatStateEmit({
+              ...supportChat,
+              last_message: savedMessage.lastMessage.content,
+              last_message_type: savedMessage.lastMessage.type,
+              last_message_id: savedMessage.lastMessage.id,
+            });
+          }
 
           const supoportChatsWhitMessage = {
             ...supportChat,
@@ -383,6 +494,11 @@ export class SupportChatsService {
         const contact = await manager.findOneBy(Contacts, {
           remote_jid: phoneContact,
         });
+
+        if (!contact) {
+          this.logger.debug(`Reação ignorada: contato ${phoneContact} não cadastrado.`);
+          return;
+        }
 
         const supportChat = await this.findOrOpen(contact.id, channel.id, manager);
 
@@ -413,9 +529,17 @@ export class SupportChatsService {
         const channel = await this.channelsRepository.findBySessionId(sessionId);
         const phoneContact = data.chat.id._serialized;
 
+        // `chats.update` identifica o contato pelo `@lid`, e não pelo JID que
+        // gravamos — por isso a busca considera os dois endereços.
         const contact = await manager.findOneBy(Contacts, {
           remote_jid: phoneContact,
         });
+
+        // Conversa que ainda não existe aqui: não há contagem a atualizar.
+        if (!contact) {
+          this.logger.debug(`Contagem ignorada: contato ${phoneContact} não cadastrado.`);
+          return;
+        }
 
         const supportChat = await this.findOrOpen(contact.id, channel.id, manager);
 
