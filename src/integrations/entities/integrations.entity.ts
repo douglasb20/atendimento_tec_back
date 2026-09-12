@@ -32,7 +32,7 @@ export class Integrations {
   webhook_url: string | null;
 
   /**
-   * Segredo enviado nos headers do webhook e validado no recebimento — o campo
+   * Segredo enviado nos headers do webhook e validado no recebimento - o campo
    * `apikey` do corpo da Evolution vem nulo salvo configuração específica.
    */
   @Column({ type: 'varchar', length: 255, nullable: true, select: false })

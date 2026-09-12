@@ -31,7 +31,7 @@ export class IntegrationsRepository extends Repository<Integrations> {
 
   /**
    * Busca a integração incluindo os campos sensíveis (`select: false` na entidade).
-   * Uso restrito à camada de provider — nunca em respostas de API.
+   * Uso restrito à camada de provider - nunca em respostas de API.
    */
   async findByIdWithCredentials(id: number, emitError = true): Promise<Integrations> {
     const integration = await this.createQueryBuilder('i')

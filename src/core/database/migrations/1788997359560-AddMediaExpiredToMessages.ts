@@ -5,7 +5,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * É diferente de `is_deleted`: ali a mensagem foi revogada pelo contato no
  * WhatsApp e o conteúdo deixou de valer. Aqui a mensagem continua íntegra
- * (legenda, data, autor) — apenas o arquivo não está mais disponível, e o front
+ * (legenda, data, autor) - apenas o arquivo não está mais disponível, e o front
  * deve exibir "mídia expirada" em vez de "mensagem apagada".
  */
 export class AddMediaExpiredToMessages1788997359560 implements MigrationInterface {

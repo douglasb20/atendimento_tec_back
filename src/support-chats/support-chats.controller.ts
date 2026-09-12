@@ -12,6 +12,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Permissions } from 'permissions/permissions.decorator';
+import { PermissionGuard } from 'permissions/permissions.guard';
 import { Request } from 'express';
 
 import { SupportChatsService } from './support-chats.service';
@@ -19,6 +21,7 @@ import { SendMessageDto } from './dto/send-message.dto';
 import { ReplyMessageDto } from './dto/reply-message.dto';
 import { SendMediaDto } from './dto/send-media.dto';
 import { SignMediaPostDto } from './dto/sign-media-post.dto';
+import { FinalizarAtendimentoDto } from './dto/finalizar-atendimento.dto';
 
 @Controller('support-chats')
 export class SupportChatsController {
@@ -85,7 +88,7 @@ export class SupportChatsController {
     @Req() req: Request,
   ) {
     // A legenda leva o mesmo prefixo do texto: numa conversa atendida por mais
-    // de uma pessoa, é o que identifica quem falou no WhatsApp do cliente —
+    // de uma pessoa, é o que identifica quem falou no WhatsApp do cliente -
     // lá só chega texto, não há como marcar o autor de outro jeito.
     return this.supportChatsService.sendMedia(id, {
       ...sendMediaDto,
@@ -106,6 +109,30 @@ export class SupportChatsController {
       throw new BadRequestException('O campo message_id é obrigatório');
     }
     return this.supportChatsService.deleteMessage(id, message_id);
+  }
+
+  @Post('/:id/iniciar')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:update')
+  @HttpCode(HttpStatus.OK)
+  async iniciarAtendimento(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
+    return this.supportChatsService.iniciarAtendimento(id, req.user['id']);
+  }
+
+  @Post('/:id/finalizar')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:update')
+  @HttpCode(HttpStatus.OK)
+  async finalizarAtendimento(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() finalizarAtendimentoDto: FinalizarAtendimentoDto,
+    @Req() req: Request,
+  ) {
+    return this.supportChatsService.finalizarAtendimento(
+      id,
+      req.user['id'],
+      finalizarAtendimentoDto,
+    );
   }
 
   @Post('/:id/send-reaction')

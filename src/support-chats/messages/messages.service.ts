@@ -19,7 +19,7 @@ export class MessagesService {
 
   /**
    * Validade da reserva de envio, em segundos. Cobre a janela entre o envio e
-   * o webhook — na prática, segundos. Passado esse tempo, a linha provisória
+   * o webhook - na prática, segundos. Passado esse tempo, a linha provisória
    * já está gravada e assume o papel.
    */
   private static readonly TTL_RESERVA_ENVIO = 120;
@@ -440,7 +440,7 @@ export class MessagesService {
    * Grava a mensagem no instante do envio, antes da confirmação do provider.
    *
    * Duas razões: a mensagem existe no histórico mesmo que o webhook se perca, e
-   * o `datetime` marca a posição definitiva na conversa — um vídeo grande, cujo
+   * o `datetime` marca a posição definitiva na conversa - um vídeo grande, cujo
    * webhook demora, não pula para baixo dos textos enviados depois dele.
    *
    * Os campos que só o WhatsApp conhece ficam vazios; o webhook os completa.
@@ -455,7 +455,7 @@ export class MessagesService {
       type: MessageTypes;
       mediaUrl?: string;
       mediaType?: string;
-      /** Nome original do arquivo — é o que identifica o documento na conversa. */
+      /** Nome original do arquivo - é o que identifica o documento na conversa. */
       fileName?: string;
       quotedMsgId?: string;
       sentAt?: Date;
@@ -495,7 +495,7 @@ export class MessagesService {
   ): Promise<MessageWithLastMessage> {
     // O envio pelo portal grava uma linha provisória antes do provider
     // confirmar, para a mensagem existir no histórico mesmo que o webhook se
-    // perca. Quando ele chega, completa aquela linha em vez de criar outra —
+    // perca. Quando ele chega, completa aquela linha em vez de criar outra -
     // sem isto o `manager.save` inseriria uma duplicata, já que a entidade
     // montada aqui não carrega o `id`.
     const existente = message.message_id
@@ -507,7 +507,7 @@ export class MessagesService {
       // posição na conversa; o do webhook chega depois e reordenaria a lista.
       message = { ...existente, ...message, id: existente.id, datetime: existente.datetime };
 
-      // O webhook não traz o nome nem o tamanho do arquivo que nós enviamos —
+      // O webhook não traz o nome nem o tamanho do arquivo que nós enviamos -
       // sem isto, o espalhamento acima sobrescreveria com null o que a linha
       // provisória guardou, e o documento voltaria a aparecer sem nome.
       message.file_name ??= existente.file_name;
@@ -547,7 +547,7 @@ export class MessagesService {
   /**
    * Converte a key de mídia na URL pública de uma mensagem só.
    *
-   * As colunas guardam a **key**, não a URL — a leitura HTTP já traduz isso no
+   * As colunas guardam a **key**, não a URL - a leitura HTTP já traduz isso no
    * `getUrlForMessageMedia`, mas o que sai pelo WebSocket vinha cru, e o front
    * recebia `chat/media/xxx.jpeg` como se fosse endereço. A imagem só aparecia
    * ao recarregar a página, quando o caminho HTTP refazia a URL.
@@ -632,7 +632,7 @@ export class MessagesService {
     keyWithExtension: string;
   }> {
     // Mídia que nós mesmos enviamos já está no storage: baixá-la de volta do
-    // provider seria trabalho perdido — e falha, porque a mensagem enviada não
+    // provider seria trabalho perdido - e falha, porque a mensagem enviada não
     // tem o conteúdo lá para servir.
     //
     // A reserva no Redis é consultada antes da linha do banco de propósito: a

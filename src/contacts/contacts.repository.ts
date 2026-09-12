@@ -47,6 +47,18 @@ export class ContactsRepository extends Repository<Contacts> {
     return await manager.save(Contacts, updateContact);
   }
 
+  /**
+   * Contato com o cliente carregado - o que o front precisa para exibir o nome.
+   *
+   * Recebe o `manager` porque é chamado de dentro da transação de atualização:
+   * lendo pelo repositório, a consulta cai fora dela e devolve o estado
+   * anterior ao commit.
+   */
+  async findByIdComCliente(id: number, manager?: EntityManager) {
+    const origem = manager ?? this.manager;
+    return origem.findOne(Contacts, { where: { id }, relations: ['client'] });
+  }
+
   async deleteContact(id: number, manager: EntityManager) {
     const contact = await this.findById(id);
     if (!contact) {

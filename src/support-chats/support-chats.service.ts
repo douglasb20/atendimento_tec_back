@@ -1,4 +1,11 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 
@@ -9,6 +16,7 @@ import {
   MessageEditPayload,
   MessagePayload,
   MessageTypes,
+  SupportChatStatusId,
   ReactionPayload,
   WhatsappWebhookPayload,
 } from '@types';
@@ -22,6 +30,7 @@ import { PresignedUpload, StorageService } from '@/storage/storage.service';
 import { ChannelsRepository } from '@/channels/channels.repository';
 import { SignMediaPostDto } from './dto/sign-media-post.dto';
 import { SendMediaDto, SendMediaType } from './dto/send-media.dto';
+import { FinalizarAtendimentoDto } from './dto/finalizar-atendimento.dto';
 
 /** Tipo de mídia do envio → tipo interno persistido, o mesmo que o webhook grava. */
 const TIPO_INTERNO_POR_MIDIA: Record<SendMediaType, MessageTypes> = {
@@ -143,7 +152,7 @@ export class SupportChatsService {
 
     // Antes de qualquer escrita no banco: a Evolution dispara o webhook no
     // mesmo instante em que responde aqui, e a transação do `registraEnvio`
-    // chega a perder a corrida — o webhook então não acha a linha provisória e
+    // chega a perder a corrida - o webhook então não acha a linha provisória e
     // baixa de volta a mídia que nós mesmos acabamos de subir. Um SET no Redis
     // ganha da transação com folga.
     await this.messagesService.reservaEnvioComMidia(sentMessage.messageId, {
@@ -357,7 +366,7 @@ export class SupportChatsService {
 
         if (savedMessage) {
           // O front substitui a mensagem inteira ao receber o ack, então a
-          // key precisa virar URL aqui também — senão o ack apagaria a imagem
+          // key precisa virar URL aqui também - senão o ack apagaria a imagem
           // que o evento anterior já tinha exibido.
           this.whatsappService.emitEvent(
             'whatsapp:message_ack',
@@ -536,7 +545,7 @@ export class SupportChatsService {
         const phoneContact = data.chat.id._serialized;
 
         // `chats.update` identifica o contato pelo `@lid`, e não pelo JID que
-        // gravamos — por isso a busca considera os dois endereços.
+        // gravamos - por isso a busca considera os dois endereços.
         const contact = await manager.findOneBy(Contacts, {
           remote_jid: phoneContact,
         });
@@ -571,6 +580,110 @@ export class SupportChatsService {
     user_id?: number,
   ) {
     return await this.supportChatsRepository.findOrOpen(contact_id, channel_id, manager, user_id);
+  }
+
+  /**
+   * Atribui o atendimento ao atendente e inicia a contagem de tempo.
+   *
+   * A conversa nasce em "Aguardando" e só sai daqui: enquanto ninguém assume,
+   * o cronômetro não corre e não há a quem cobrar o atendimento.
+   */
+  async iniciarAtendimento(id: number, user_id: number): Promise<SupportChats> {
+    const supportChat = await this.supportChatsRepository.findParaEstado(id);
+    if (!supportChat) {
+      throw new NotFoundException('Chat de suporte não encontrado');
+    }
+
+    if (supportChat.supportChatStatus?.is_final) {
+      throw new BadRequestException('Este atendimento já foi finalizado');
+    }
+
+    if (supportChat.support_chat_status_id === SupportChatStatusId.EM_ANDAMENTO) {
+      // Idempotente para quem já é o dono: duplo clique não é erro.
+      if (Number(supportChat.user_id) === Number(user_id)) {
+        return supportChat;
+      }
+      throw new ConflictException(
+        `Atendimento já assumido por ${supportChat.user?.name ?? 'outro atendente'}`,
+      );
+    }
+
+    const assumidoEm = new Date();
+    const afetadas = await runInTransaction(this.dataSource, (manager) =>
+      this.supportChatsRepository.assumir(id, user_id, assumidoEm, manager),
+    );
+
+    // Zero linhas significa que outro atendente ganhou a corrida entre a
+    // leitura acima e o update.
+    if (!afetadas) {
+      throw new ConflictException('Este atendimento acabou de ser assumido por outro atendente');
+    }
+
+    return this.recarregaEEmiteEstado(id);
+  }
+
+  /**
+   * Encerra o atendimento.
+   *
+   * Exige cliente associado: o atendimento encerrado alimenta o histórico do
+   * cliente, e sem o vínculo ele se perde. A mesma regra existe no front, que
+   * bloqueia o botão - aqui é a garantia de quem chama a API direto.
+   */
+  async finalizarAtendimento(
+    id: number,
+    user_id: number,
+    dto: FinalizarAtendimentoDto,
+  ): Promise<SupportChats> {
+    const supportChat = await this.supportChatsRepository.findParaEstado(id);
+    if (!supportChat) {
+      throw new NotFoundException('Chat de suporte não encontrado');
+    }
+
+    if (supportChat.supportChatStatus?.is_final) {
+      throw new BadRequestException('Este atendimento já foi finalizado');
+    }
+
+    if (supportChat.support_chat_status_id !== SupportChatStatusId.EM_ANDAMENTO) {
+      throw new BadRequestException('Inicie o atendimento antes de finalizá-lo');
+    }
+
+    if (Number(supportChat.user_id) !== Number(user_id)) {
+      throw new ForbiddenException('Somente quem assumiu o atendimento pode finalizá-lo');
+    }
+
+    if (!supportChat.contact?.client_id) {
+      throw new BadRequestException(
+        'Associe o contato a um cliente antes de finalizar o atendimento',
+      );
+    }
+
+    const afetadas = await runInTransaction(this.dataSource, (manager) =>
+      this.supportChatsRepository.finalizar(
+        id,
+        new Date(),
+        dto.observation_user?.trim() || null,
+        manager,
+      ),
+    );
+
+    if (!afetadas) {
+      throw new ConflictException('O atendimento mudou de estado durante a finalização');
+    }
+
+    return this.recarregaEEmiteEstado(id);
+  }
+
+  /**
+   * Recarrega a conversa no formato canônico e avisa os clientes conectados.
+   *
+   * Os handlers de webhook emitem `chat_state` com o objeto que já tinham em
+   * mãos, cujo shape varia; aqui sempre sai completo, para o front poder
+   * mesclar sem perder o que já havia carregado.
+   */
+  private async recarregaEEmiteEstado(id: number): Promise<SupportChats> {
+    const atualizado = await this.supportChatsRepository.findParaEstado(id);
+    this.whatsappChatStateEmit(atualizado);
+    return atualizado;
   }
 
   whatsappChatStateEmit(supportChat: SupportChats) {

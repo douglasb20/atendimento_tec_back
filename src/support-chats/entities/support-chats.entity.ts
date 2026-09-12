@@ -11,8 +11,9 @@ export class SupportChats {
   @PrimaryGeneratedColumn('increment', { type: 'bigint' })
   id: number;
 
-  @Column({ name: 'user_id', type: 'bigint' })
-  user_id: number;
+  /** Atendente que assumiu a conversa; nulo enquanto ninguém a pegou. */
+  @Column({ name: 'user_id', type: 'int', nullable: true })
+  user_id: number | null;
 
   @Column({ name: 'channel_id', type: 'bigint' })
   channel_id: number;

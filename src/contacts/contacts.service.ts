@@ -57,7 +57,9 @@ export class ContactsService {
           client_id,
         );
 
-        return { ...contact, ...updateContactDto };
+        // Recarregado com a relação: o `save` devolve só as colunas, e quem
+        // acabou de associar um cliente precisa do nome dele para exibir.
+        return (await this.contactRepository.findByIdComCliente(contact.id, manager)) ?? contact;
       } catch (err) {
         this.logger.error(err.message);
         throw new BadRequestException(err.message);

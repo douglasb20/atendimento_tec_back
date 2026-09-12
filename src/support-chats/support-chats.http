@@ -43,7 +43,7 @@ Content-Type: application/json
 
 #### 5) Enviar mídia (vídeo)
 # O backend monta a URL pública a partir da `media_key` e a repassa ao provider,
-# que baixa o arquivo direto — é o que permite vídeos grandes.
+# que baixa o arquivo direto - é o que permite vídeos grandes.
 POST {{url}}{{endpoint}}/1/send-media
 Authorization: Bearer {{authToken}}
 Content-Type: application/json

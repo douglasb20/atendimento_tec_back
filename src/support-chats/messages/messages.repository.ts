@@ -23,7 +23,7 @@ export class MessagesRepository extends Repository<SupportChatMessages> {
    *
    * Usado nos acks: o `messages.update` da Evolution traz o `remoteJid` no
    * formato `@lid` (identificador novo do WhatsApp), que não corresponde ao
-   * `remote_jid` gravado no contato — então não dá para chegar à conversa pelo
+   * `remote_jid` gravado no contato - então não dá para chegar à conversa pelo
    * JID. O id da mensagem, esse sim, é estável nos dois sentidos.
    */
   async findOneByMessageId(message_id: string): Promise<SupportChatMessages | null> {

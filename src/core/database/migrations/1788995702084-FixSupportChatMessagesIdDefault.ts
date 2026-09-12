@@ -3,7 +3,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 /**
  * A entidade declara `@PrimaryGeneratedColumn('uuid')`, mas a tabela foi criada
  * com `char(36)` sem valor padrão. Como o tipo não é `uuid`, o TypeORM não gera
- * o valor no insert e o banco também não — toda inserção falhava com violação
+ * o valor no insert e o banco também não - toda inserção falhava com violação
  * de NOT NULL na chave primária.
  *
  * O default no banco resolve sem exigir mudança de tipo (o que quebraria as

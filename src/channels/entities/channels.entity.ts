@@ -25,7 +25,7 @@ export class Channels {
   @Column({ type: 'varchar', length: 20, nullable: true })
   phone_number: string;
 
-  /** Identifica a sessão no provider — na Evolution é o `instanceName`. */
+  /** Identifica a sessão no provider - na Evolution é o `instanceName`. */
   @Column({ type: 'char', length: 36, nullable: true })
   session_id: string | null;
 

@@ -24,7 +24,7 @@ export interface WhatsappProvider {
   /** Encerra a sessão sem apagá-la no provider. */
   requestDisconnection(session: ProviderSessionRef): Promise<void>;
 
-  /** Dados da conta conectada — usado para descobrir o número do canal. */
+  /** Dados da conta conectada - usado para descobrir o número do canal. */
   getClientInfo(session: ProviderSessionRef): Promise<ProviderClientInfo>;
 
   getProfilePicUrl(session: ProviderSessionRef, remoteJid: string): Promise<string>;
@@ -78,7 +78,7 @@ export interface WhatsappProvider {
 
 /** Identifica a sessão no provider e traz o que é necessário para autenticar. */
 export type ProviderSessionRef = {
-  /** `session_id` do canal — na Evolution corresponde ao `instanceName`. */
+  /** `session_id` do canal - na Evolution corresponde ao `instanceName`. */
   sessionId: string;
   /** Token da própria instância, quando o provider oferecer um. */
   instanceToken?: string | null;

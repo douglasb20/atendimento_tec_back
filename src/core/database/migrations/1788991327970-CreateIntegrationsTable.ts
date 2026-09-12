@@ -43,7 +43,7 @@ export class CreateIntegrationsTable1788991327970 implements MigrationInterface 
           {
             // URL que o provider deve chamar de volta com os eventos. É uma
             // propriedade da integração (e não do ambiente) porque cada provider
-            // pode exigir um endereço diferente — o backend pode estar atrás de
+            // pode exigir um endereço diferente - o backend pode estar atrás de
             // um túnel para um, e acessível por IP interno para outro.
             name: 'webhook_url',
             type: 'varchar',

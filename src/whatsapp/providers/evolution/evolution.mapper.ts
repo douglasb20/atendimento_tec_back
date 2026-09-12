@@ -259,7 +259,7 @@ export class EvolutionMapper {
   static mapDeleted(data: EvolutionDeleteData): MessageData {
     // Duas formas convivem aqui: achatada (revogação vinda do aparelho) e com
     // `key` aninhado (revogação pedida pela API). No aninhado, `data.id` é o id
-    // interno da Evolution — a chave do WhatsApp está em `key.id`.
+    // interno da Evolution - a chave do WhatsApp está em `key.id`.
     const chave = (data as EvolutionDeleteData & { key?: EvolutionDeleteData }).key;
     const remoteJid = data.remoteJid ?? chave?.remoteJid ?? '';
     const fromMe = data.fromMe ?? chave?.fromMe ?? false;
@@ -361,7 +361,7 @@ export class EvolutionMapper {
 
   /**
    * Resolve o tipo interno. Diferencia áudio de voz (`ptt`) e, quando o
-   * `messageType` é desconhecido, cai em UNKNOWN em vez de deixar undefined —
+   * `messageType` é desconhecido, cai em UNKNOWN em vez de deixar undefined -
    * o switch de `saveIncoming` não tem branch default.
    */
   static mapMessageType(messageType: string, message?: EvolutionMessageContent): MessageTypes {

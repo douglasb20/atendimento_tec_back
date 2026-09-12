@@ -1,7 +1,7 @@
 /**
  * Tipos do payload da Evolution API v2.3.7.
  *
- * Espelham o que a Evolution realmente envia — conferido no código-fonte
+ * Espelham o que a Evolution realmente envia - conferido no código-fonte
  * (`src/api/integrations/channel/whatsapp/whatsapp.baileys.service.ts` e
  * `src/api/integrations/event/webhook/webhook.controller.ts`). Ficam confinados
  * a esta pasta: acima da camada de provider o resto da aplicação só vê os tipos
@@ -58,7 +58,7 @@ export type EvolutionWebhookBody<T = unknown> = {
   instance: string;
   data: T;
   sender?: string;
-  /** Vem nulo salvo AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true — não usar para autenticar. */
+  /** Vem nulo salvo AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true - não usar para autenticar. */
   apikey?: string | null;
   date_time?: string;
   destination?: string;
@@ -77,7 +77,7 @@ export type EvolutionMessageKey = {
   participantAlt?: string;
 };
 
-/** ContextInfo do Baileys — carrega a mensagem citada e as menções. */
+/** ContextInfo do Baileys - carrega a mensagem citada e as menções. */
 export type EvolutionContextInfo = {
   stanzaId?: string;
   participant?: string;
@@ -123,7 +123,7 @@ export type EvolutionMediaContent = {
   contextInfo?: EvolutionContextInfo;
 };
 
-/** Payload de `messages.upsert` e `send.message` — key aninhado. */
+/** Payload de `messages.upsert` e `send.message` - key aninhado. */
 export type EvolutionUpsertData = {
   key: EvolutionMessageKey;
   pushName?: string;
@@ -138,7 +138,7 @@ export type EvolutionUpsertData = {
   source?: string;
 };
 
-/** Payload de `messages.update` — achatado, sem `key` aninhado. */
+/** Payload de `messages.update` - achatado, sem `key` aninhado. */
 export type EvolutionUpdateData = {
   keyId: string;
   remoteJid: string;
@@ -155,7 +155,7 @@ export type EvolutionDeleteData = EvolutionMessageKey & {
   status?: string;
 };
 
-/** Payload de `qrcode.updated` — o QR vem num nível extra. */
+/** Payload de `qrcode.updated` - o QR vem num nível extra. */
 export type EvolutionQrCodeData = {
   qrcode?: {
     instance?: string;
@@ -211,7 +211,7 @@ export type EvolutionInstanceCreateResponse = {
 /**
  * Retorno de `GET /instance/connect/:instanceName`. É polimórfico
  * (`instance.controller.ts:309-344`): pode vir o estado, o objeto de QR cru,
- * ou um erro — sempre com HTTP 200.
+ * ou um erro - sempre com HTTP 200.
  */
 export type EvolutionConnectResponse = {
   instance?: { instanceName?: string; state?: string; status?: string };

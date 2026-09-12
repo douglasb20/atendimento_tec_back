@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { MessageWithLastMessage } from '@types';
+import { MessageWithLastMessage, SupportChatStatusId } from '@types';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { SupportChats } from './entities/support-chats.entity';
 import { ProtocolCountersRepository } from './protocol-counters.repository';
@@ -49,7 +49,15 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     let supportChat = await this.findOne({
       where: { id },
       order: { supportChatMessages: { datetime: 'ASC' } },
-      relations: ['contact', 'contact.client', 'channel', 'supportChatMessages', 'user'],
+      relations: [
+        'contact',
+        'contact.client',
+        'channel',
+        'supportChatMessages',
+        'user',
+        // O front decide pelo id do status, mas a relação traz o rótulo legível.
+        'supportChatStatus',
+      ],
     });
 
     return supportChat;
@@ -77,13 +85,84 @@ export class SupportChatsRepository extends Repository<SupportChats> {
         user_id: user_id || null,
         channel_id,
         contact_id,
-        support_chat_status_id: 1, // aberto
+        support_chat_status_id: SupportChatStatusId.AGUARDANDO,
         protocol,
       });
 
       supportChat = await manager.save(SupportChats, supportChatToSave);
     }
     return supportChat;
+  }
+
+  /**
+   * Conversa com tudo que descreve seu estado, sem as mensagens.
+   *
+   * É o formato canônico do evento `whatsapp:chat_state` e a resposta dos
+   * endpoints de iniciar/finalizar: um shape único evita que o front receba
+   * ora com `supportChatStatus`, ora sem.
+   */
+  async findParaEstado(id: number): Promise<SupportChats> {
+    return this.findOne({
+      where: { id },
+      relations: ['contact', 'contact.client', 'channel', 'supportChatStatus', 'user'],
+    });
+  }
+
+  /**
+   * Atribui a conversa a um atendente.
+   *
+   * O status entra no WHERE de propósito: dois atendentes clicando em Iniciar
+   * ao mesmo tempo fariam o segundo sobrescrever `user_id` e `answered_at`.
+   * Assim o banco decide quem chegou primeiro, e o perdedor recebe 0 linhas.
+   */
+  async assumir(
+    id: number,
+    user_id: number,
+    answered_at: Date,
+    manager: EntityManager,
+  ): Promise<number> {
+    const resultado = await manager
+      .createQueryBuilder()
+      .update(SupportChats)
+      .set({
+        user_id,
+        answered_at,
+        is_waiting: false,
+        support_chat_status_id: SupportChatStatusId.EM_ANDAMENTO,
+      })
+      .where('id = :id AND support_chat_status_id IN (:...naoAssumidos)', {
+        id,
+        naoAssumidos: [SupportChatStatusId.AGUARDANDO, SupportChatStatusId.EM_FILA],
+      })
+      .execute();
+
+    return resultado.affected ?? 0;
+  }
+
+  /** Encerra a conversa. Só sai de "Em andamento", pelo mesmo motivo do `assumir`. */
+  async finalizar(
+    id: number,
+    finished_at: Date,
+    observation_user: string | null,
+    manager: EntityManager,
+  ): Promise<number> {
+    const resultado = await manager
+      .createQueryBuilder()
+      .update(SupportChats)
+      .set({
+        finished_at,
+        observation_user,
+        is_waiting: false,
+        unread_count: 0,
+        support_chat_status_id: SupportChatStatusId.FINALIZADO,
+      })
+      .where('id = :id AND support_chat_status_id = :emAndamento', {
+        id,
+        emAndamento: SupportChatStatusId.EM_ANDAMENTO,
+      })
+      .execute();
+
+    return resultado.affected ?? 0;
   }
 
   async updateLastMessage(

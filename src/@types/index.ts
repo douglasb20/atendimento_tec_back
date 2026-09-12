@@ -63,3 +63,18 @@ export type MessageWithLastMessage = SupportChatMessages & {
     content: string;
   };
 };
+
+/**
+ * Status de um atendimento, conforme semeado em `support_chat_status`.
+ *
+ * Os de id 4 e 5 têm `is_final = true`: o `findOrOpen` só reaproveita conversas
+ * não finais, então encerrar um atendimento faz a próxima mensagem do contato
+ * abrir outro, com protocolo novo.
+ */
+export enum SupportChatStatusId {
+  AGUARDANDO = 1,
+  EM_ANDAMENTO = 2,
+  EM_FILA = 3,
+  FINALIZADO_SEM_RESPOSTA = 4,
+  FINALIZADO = 5,
+}

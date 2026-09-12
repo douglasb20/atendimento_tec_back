@@ -55,7 +55,7 @@ export class ProviderFactory {
   }
 
   /**
-   * Invalida o cache — necessário quando as credenciais de uma integração mudam,
+   * Invalida o cache - necessário quando as credenciais de uma integração mudam,
    * já que o cliente HTTP é montado na construção do provider.
    */
   invalidate(integrationId?: number): void {

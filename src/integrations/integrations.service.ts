@@ -124,7 +124,7 @@ export class IntegrationsService {
   }
 
   /**
-   * Segredo de webhook da integração. Sem `id` — canal ainda não vinculado —
+   * Segredo de webhook da integração. Sem `id` - canal ainda não vinculado -
    * cai na integração padrão, do mesmo modo que `resolveForProvider`: é a mesma
    * integração que atendeu o envio, então é dela que o evento volta.
    */

@@ -4,8 +4,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Nome original do arquivo enviado ou recebido.
  *
  * O campo já circulava pelo DTO de envio e pelo front, mas nunca teve coluna:
- * era repassado ao provider — por isso o destinatário via o nome certo no
- * WhatsApp — e descartado em seguida. Na nossa conversa o documento aparecia
+ * era repassado ao provider - por isso o destinatário via o nome certo no
+ * WhatsApp - e descartado em seguida. Na nossa conversa o documento aparecia
  * como "Documento", sem identificar qual arquivo era.
  *
  * 255 acompanha `media_url`; nomes maiores que isso são truncados pelo próprio

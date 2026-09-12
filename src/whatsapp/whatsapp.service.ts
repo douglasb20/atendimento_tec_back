@@ -44,7 +44,7 @@ export class WhatsappService {
   /**
    * Normaliza o envelope da Evolution e enfileira o evento.
    *
-   * Eventos sem interesse para o domínio são descartados silenciosamente — a
+   * Eventos sem interesse para o domínio são descartados silenciosamente - a
    * Evolution pode enviar mais tipos do que assinamos.
    */
   async processWebhook(body: EvolutionWebhookBody): Promise<void> {

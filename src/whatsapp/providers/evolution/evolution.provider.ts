@@ -21,7 +21,7 @@ import {
   EvolutionSendResponse,
 } from './evolution.types';
 
-/** Eventos que pedimos à Evolution — nomes em UPPER_SNAKE, como a config dela espera. */
+/** Eventos que pedimos à Evolution - nomes em UPPER_SNAKE, como a config dela espera. */
 const SUBSCRIBED_EVENTS = [
   'QRCODE_UPDATED',
   'CONNECTION_UPDATE',
@@ -258,7 +258,7 @@ export class EvolutionProvider implements WhatsappProvider {
     fromMe: boolean,
   ): Promise<void> {
     try {
-      // A Evolution recebe a chave no corpo de um DELETE — não em query string.
+      // A Evolution recebe a chave no corpo de um DELETE - não em query string.
       await this.http.delete(`/chat/deleteMessageForEveryone/${session.sessionId}`, {
         data: { id: messageId, remoteJid: this.toJid(chatId), fromMe },
       });
@@ -279,7 +279,7 @@ export class EvolutionProvider implements WhatsappProvider {
     const { to, mediaType, media, mimetype, caption, fileName, quotedMessageId } = payload;
 
     // Vídeo/áudio/documento são aceitos por URL: a Evolution repassa ao Baileys,
-    // que baixa direto — sem trafegar bytes por aqui nem passar por browser.
+    // que baixa direto - sem trafegar bytes por aqui nem passar por browser.
     const body: Record<string, unknown> = {
       number: this.toNumber(to),
       mediatype: MEDIA_TYPE_MAP[mediaType],
@@ -321,7 +321,7 @@ export class EvolutionProvider implements WhatsappProvider {
     }
 
     // O provider baixa a mídia da URL que enviamos, e esse download pode falhar
-    // por instabilidade de rede até o storage — sem timeout configurável do lado
+    // por instabilidade de rede até o storage - sem timeout configurável do lado
     // dele. Uma nova tentativa costuma resolver, então vale insistir antes de
     // devolver erro ao atendente.
     const tentativas = 3;
@@ -421,7 +421,7 @@ export class EvolutionProvider implements WhatsappProvider {
 
   /**
    * Conecta e normaliza o retorno, que é polimórfico: pode trazer o estado, o
-   * objeto de QR cru, ou um erro — sempre com HTTP 200.
+   * objeto de QR cru, ou um erro - sempre com HTTP 200.
    */
   private async connectInstance(session: ProviderSessionRef): Promise<ProviderConnectionResult> {
     try {
@@ -455,7 +455,7 @@ export class EvolutionProvider implements WhatsappProvider {
     };
   }
 
-  /** Extrai apenas os dígitos do JID — é o formato que o campo `number` espera. */
+  /** Extrai apenas os dígitos do JID - é o formato que o campo `number` espera. */
   private toNumber(jidOrNumber: string): string {
     return (jidOrNumber ?? '').split('@')[0].replace(/\D/g, '');
   }

@@ -29,7 +29,7 @@ Authorization: Bearer {{authToken}}
 #
 # Os dois endereços costumam ser diferentes: com a Evolution em container e o
 # backend no host, o backend a alcança por localhost:8080, mas de dentro do
-# container o "localhost" é o próprio container — daí o IP do gateway Docker.
+# container o "localhost" é o próprio container - daí o IP do gateway Docker.
 #
 # A apiKey é a AUTHENTICATION_API_KEY global da Evolution (obrigatória para criar
 # instâncias). É gravada criptografada e nunca retorna nas leituras.

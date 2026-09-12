@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Query,
   ParseIntPipe,
   Patch,
   UseGuards,
@@ -42,17 +43,23 @@ export class ContactsController {
   @HttpCode(HttpStatus.OK)
   async updateContact(
     @Body() updateContactDto: UpdateContactsDto,
-    @Param('client_id', ParseIntPipe) client_id: number,
     @Param('contact_id', ParseIntPipe) contact_id: number,
   ) {
-    return this.contactsService.updateContact(updateContactDto, contact_id, client_id);
+    // O `client_id` vem do corpo: a rota não tem esse parâmetro, e declará-lo
+    // como @Param fazia o ParseIntPipe receber undefined e responder 400 em
+    // toda chamada. `?? null` porque o repositório distingue ausência de valor.
+    return this.contactsService.updateContact(
+      updateContactDto,
+      contact_id,
+      updateContactDto.client_id ?? null,
+    );
   }
 
   @Get('/contact')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('contact:view_by_client')
   @HttpCode(HttpStatus.OK)
-  async getAllContactsByClients(@Param('client_id', ParseIntPipe) client_id: number) {
+  async getAllContactsByClients(@Query('client_id', ParseIntPipe) client_id: number) {
     return this.contactsService.getAllContactsByClients(client_id);
   }
 }
