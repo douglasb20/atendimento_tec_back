@@ -24,6 +24,8 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       .leftJoinAndSelect('sc.channel', 'ch')
       .leftJoinAndSelect('c.client', 'cl')
       .leftJoinAndSelect('sc.supportChatStatus', 'ms')
+      // Quem assumiu a conversa, para a lista poder separar "meus atendimentos".
+      .leftJoinAndSelect('sc.user', 'u')
       .innerJoin('support_chat_status', 'scs', 'scs.id = sc.support_chat_status_id')
       .andWhere('scs.is_final = false')
       // Conversa com mensagem mais recente primeiro, como em qualquer
@@ -163,6 +165,41 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       .execute();
 
     return resultado.affected ?? 0;
+  }
+
+  /**
+   * Soma uma mensagem não lida à conversa.
+   *
+   * A contagem é nossa, não a do WhatsApp: o `chats.update` da Evolution chega
+   * sem `unreadCount` (só `remoteJid` e `instanceId`), e o "lido" do protocolo
+   * reflete qualquer aparelho conectado à conta — se alguém abre no celular, a
+   * mensagem fica lida sem nenhum atendente ter visto. Aqui, não lida significa
+   * que ninguém abriu a conversa no painel.
+   */
+  async incrementaNaoLidas(support_chat_id: number, manager: EntityManager): Promise<number> {
+    // Incremento e leitura na mesma instrução: o `RETURNING` evita a segunda
+    // consulta e garante o valor pós-update, mesmo com duas mensagens
+    // chegando ao mesmo tempo.
+    const resultado = await manager.query(
+      `UPDATE support_chats
+          SET unread_count = unread_count + 1
+        WHERE id = $1
+      RETURNING unread_count`,
+      [support_chat_id],
+    );
+
+    // Num UPDATE ... RETURNING, o driver devolve `[linhas, quantidade]`, e não
+    // as linhas direto — acessar `resultado[0].unread_count` pega o array e
+    // resulta em undefined. As duas formas são aceitas aqui porque o retorno
+    // varia entre versões do driver.
+    const linhas = Array.isArray(resultado?.[0]) ? resultado[0] : resultado;
+
+    return Number(linhas?.[0]?.unread_count ?? 0);
+  }
+
+  /** Zera a contagem quando o atendente abre a conversa. */
+  async zeraNaoLidas(support_chat_id: number): Promise<void> {
+    await this.update({ id: support_chat_id }, { unread_count: 0 });
   }
 
   async updateLastMessage(

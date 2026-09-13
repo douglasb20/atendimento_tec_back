@@ -68,6 +68,21 @@ export type EvolutionWebhookBody<T = unknown> = {
   progress?: number;
 };
 
+/**
+ * Payload de `send.message.update` — a edição partida da nossa instância.
+ * Formato próprio: o texto novo vem em `editedMessage`, e o instante em
+ * milissegundos, ao contrário do `messageTimestamp` em segundos do upsert.
+ */
+export type EvolutionEditedData = {
+  key?: EvolutionMessageKey;
+  editedMessage?: {
+    extendedTextMessage?: { text?: string };
+    conversation?: string;
+  };
+  timestampMs?: number;
+  type?: number;
+};
+
 export type EvolutionMessageKey = {
   remoteJid: string;
   fromMe: boolean;

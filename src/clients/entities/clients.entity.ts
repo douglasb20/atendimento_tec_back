@@ -13,10 +13,10 @@ export class Clients {
   @Column({ length: 14, nullable: true, default: null })
   cnpj: string;
 
-  @CreateDateColumn({ type: 'timestamp' })
+  @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 
-  @Column({ type: 'timestamp', nullable: true, default: null, onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamptz', nullable: true, default: null, onUpdate: 'CURRENT_TIMESTAMP' })
   updated_at: Date | null;
 
   @Column({ default: 1, nullable: true })

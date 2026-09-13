@@ -44,13 +44,13 @@ export class Integrations {
   @Column({ type: 'boolean', default: true })
   is_active: boolean;
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
-  @Column({ type: 'timestamp', nullable: true, default: null, onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamptz', nullable: true, default: null, onUpdate: 'CURRENT_TIMESTAMP' })
   updated_at: Date | null;
 
-  @Column({ type: 'timestamp', nullable: true, default: null })
+  @Column({ type: 'timestamptz', nullable: true, default: null })
   deleted_at: Date | null;
 
   // == Relations ==

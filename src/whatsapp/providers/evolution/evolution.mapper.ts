@@ -7,6 +7,8 @@ import {
   WhatsappWebhookPayload,
 } from '@types';
 import {
+  EvolutionEditedData,
+  EvolutionMessageKey,
   EvolutionChatData,
   EvolutionConnectionData,
   EvolutionContextInfo,
@@ -80,9 +82,12 @@ export class EvolutionMapper {
       case EvolutionEvent.SEND_MESSAGE:
         return DataTypeWhatsapp.MESSAGE_CREATE;
       case EvolutionEvent.MESSAGES_UPDATE:
-      case EvolutionEvent.SEND_MESSAGE_UPDATE:
         return DataTypeWhatsapp.MESSAGE_ACK;
       case EvolutionEvent.MESSAGES_EDITED:
+      // A Evolution separa a edição por origem: `messages.edited` quando parte
+      // do contato, `send.message.update` quando parte da nossa instância. Para
+      // nós é a mesma coisa — o texto da mensagem mudou.
+      case EvolutionEvent.SEND_MESSAGE_UPDATE:
         return DataTypeWhatsapp.MESSAGE_EDIT;
       case EvolutionEvent.MESSAGES_DELETE:
         return DataTypeWhatsapp.MESSAGE_REVOKED_EVERYONE;
@@ -91,8 +96,9 @@ export class EvolutionMapper {
       case EvolutionEvent.CONTACTS_UPDATE:
       case EvolutionEvent.CONTACTS_UPSERT:
         return DataTypeWhatsapp.CONTACT_CHANGED;
-      case EvolutionEvent.CHATS_UPDATE:
-        return DataTypeWhatsapp.UNREAD_COUNT;
+      // CHATS_UPDATE não é roteado: chega apenas com `remoteJid` (em formato
+      // `@lid`) e `instanceId`, sem o `unreadCount` que justificaria tratá-lo.
+      // A contagem de não lidas é mantida por nós, em `SupportChatsService`.
       case EvolutionEvent.CONNECTION_UPDATE:
         // Resolvido em mapConnectionState: o `state` decide entre ready e disconnected.
         return DataTypeWhatsapp.STATE_CHANGED;
@@ -128,8 +134,15 @@ export class EvolutionMapper {
       case EvolutionEvent.SEND_MESSAGE:
         return (data as EvolutionUpsertData).key?.remoteJid ?? null;
       case EvolutionEvent.MESSAGES_UPDATE:
-      case EvolutionEvent.SEND_MESSAGE_UPDATE:
         return (data as EvolutionUpdateData).remoteJid ?? null;
+      case EvolutionEvent.SEND_MESSAGE_UPDATE:
+        // Apesar do nome parecido com `messages.update`, este traz a chave
+        // aninhada, como o upsert — e não o `remoteJid` no topo.
+        return (
+          (data as EvolutionEditedData).key?.remoteJid ??
+          (data as EvolutionUpdateData).remoteJid ??
+          null
+        );
       case EvolutionEvent.MESSAGES_DELETE: {
         // A revogação chega ora achatada, ora com a chave aninhada em `key`,
         // conforme a origem (celular do atendente ou a própria API).
@@ -247,9 +260,50 @@ export class EvolutionMapper {
     } as MessageData;
   }
 
-  /** Mensagem editada: o texto novo vem no próprio conteúdo. */
-  static mapEdited(data: EvolutionUpsertData): MessageData {
-    return this.mapUpsert(data);
+  /**
+   * Mensagem editada.
+   *
+   * Dois formatos convivem, conforme a origem da alteração:
+   *
+   * - `messages.edited` (o contato editou) chega no formato de upsert, com o
+   *   texto novo no lugar do antigo;
+   * - `send.message.update` (nós editamos) chega achatado, com o texto em
+   *   `editedMessage.extendedTextMessage.text` e sem os campos de contexto.
+   */
+  static mapEdited(data: EvolutionUpsertData & EvolutionEditedData): MessageData {
+    const textoEditado =
+      data.editedMessage?.extendedTextMessage?.text ??
+      data.editedMessage?.conversation ??
+      null;
+
+    // Sem `editedMessage` é o formato de upsert, que o mapa padrão resolve.
+    if (!textoEditado) {
+      return this.mapUpsert(data);
+    }
+
+    const chave = data.key ?? ({} as EvolutionMessageKey);
+    const remoteJid = chave.remoteJid ?? '';
+
+    return {
+      id: {
+        fromMe: chave.fromMe ?? true,
+        remote: remoteJid,
+        id: chave.id ?? '',
+        _serialized: `${chave.fromMe ?? true}_${remoteJid}_${chave.id ?? ''}`,
+      },
+      body: textoEditado,
+      type: MessageTypes.TEXT,
+      // `timestampMs` vem em milissegundos, ao contrário do `messageTimestamp`
+      // do upsert, que é em segundos.
+      timestamp: Math.floor((data.timestampMs ?? Date.now()) / 1000),
+      from: remoteJid,
+      to: remoteJid,
+      fromMe: chave.fromMe ?? true,
+      hasMedia: false,
+      links: [],
+      rawData: data as unknown as object,
+      _data: { notifyName: '' },
+    } as MessageData;
   }
 
   /**

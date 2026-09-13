@@ -12,7 +12,7 @@ export class Services {
   @Column({ default: null, nullable: true, type: 'decimal' })
   service_price: number;
 
-  @CreateDateColumn({ type: 'timestamp' })
+  @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 
   @Column({ default: 1, nullable: true })

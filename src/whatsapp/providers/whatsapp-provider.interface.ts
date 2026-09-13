@@ -70,6 +70,25 @@ export interface WhatsappProvider {
   ): Promise<void>;
 
   /**
+   * Altera o texto de uma mensagem já enviada.
+   *
+   * O WhatsApp só permite editar texto, e dentro de uma janela de 15 minutos
+   * a partir do envio.
+   */
+  editMessage(
+    session: ProviderSessionRef,
+    chatId: string,
+    messageId: string,
+    texto: string,
+  ): Promise<void>;
+
+  /**
+   * Marca mensagens recebidas como lidas no WhatsApp do contato — o que produz
+   * o tique azul do lado dele.
+   */
+  markAsRead(session: ProviderSessionRef, mensagens: ProviderMessageRef[]): Promise<void>;
+
+  /**
    * Envia mídia a partir de uma URL pública ou base64.
    * Preferir URL: evita trafegar bytes e não tem limite de tamanho de corpo.
    */
@@ -120,6 +139,13 @@ export type ProviderMediaPayload = {
   fileName?: string;
   /** Quando presente, a mídia é enviada como resposta a esta mensagem. */
   quotedMessageId?: string;
+};
+
+/** Identifica uma mensagem para o provider: o trio que o WhatsApp exige. */
+export type ProviderMessageRef = {
+  messageId: string;
+  chatId: string;
+  fromMe: boolean;
 };
 
 export type ProviderSentMessage = {

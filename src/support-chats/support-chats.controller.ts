@@ -111,6 +111,13 @@ export class SupportChatsController {
     return this.supportChatsService.deleteMessage(id, message_id);
   }
 
+  @Post('/:id/marcar-lida')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async marcarComoLida(@Param('id', ParseIntPipe) id: number) {
+    return this.supportChatsService.marcarComoLida(id);
+  }
+
   @Post('/:id/iniciar')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('support.chat:update')
@@ -132,6 +139,27 @@ export class SupportChatsController {
       id,
       req.user['id'],
       finalizarAtendimentoDto,
+    );
+  }
+
+  @Post('/:id/edit-message')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async editMessage(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() { message_id, message }: { message_id: string; message: string },
+    @Req() req: Request,
+  ) {
+    if (!message_id || !message?.trim()) {
+      throw new BadRequestException('Informe a mensagem e o texto da edição');
+    }
+
+    // O prefixo acompanha o texto editado, como no envio: sem ele a mensagem
+    // perderia a identificação do atendente ao ser alterada.
+    return this.supportChatsService.editMessage(
+      id,
+      message_id,
+      `*${req.user['name']}:*\n${message.trim()}`,
     );
   }
 

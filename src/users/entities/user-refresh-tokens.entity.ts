@@ -19,7 +19,7 @@ export class UserRefreshTokens {
   @Column({ type: 'text', nullable: false })
   refresh_token: string;
 
-  @CreateDateColumn({ type: 'timestamp' })
+  @CreateDateColumn({ type: 'timestamptz' })
   expires_at: Date;
 
   @ManyToOne(() => Users, (user) => user.userRefreshTokens)

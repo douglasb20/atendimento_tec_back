@@ -17,7 +17,7 @@ export class SupportChatMessages {
   @Column({ name: 'message_id', length: 50, type: 'varchar', unique: true })
   message_id: string;
 
-  @Column({ name: 'datetime', type: 'timestamp' })
+  @Column({ name: 'datetime', type: 'timestamptz' })
   datetime: Date;
 
   @Column({ name: 'ack', type: 'int' })
@@ -64,7 +64,7 @@ export class SupportChatMessages {
   @Column({ name: 'media_expired', type: 'boolean', default: false })
   media_expired: boolean;
 
-  @Column({ name: 'media_expired_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'media_expired_at', type: 'timestamptz', nullable: true })
   media_expired_at: Date | null;
 
   @Column({ name: 'has_quoted', type: 'boolean', default: false })
@@ -119,12 +119,12 @@ export class SupportChatMessages {
   @Column({ name: 'raw_payload', type: 'text', nullable: false, select: false })
   raw_payload: string;
 
-  @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ name: 'created_at', type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   @Column({
     name: 'updated_at',
-    type: 'timestamp',
+    type: 'timestamptz',
     default: () => 'CURRENT_TIMESTAMP',
     onUpdate: 'CURRENT_TIMESTAMP',
   })

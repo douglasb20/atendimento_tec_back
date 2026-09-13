@@ -9,6 +9,7 @@ import {
   ProviderMediaPayload,
   ProviderMediaType,
   ProviderSentMessage,
+  ProviderMessageRef,
   ProviderSessionRef,
   WhatsappProvider,
 } from '../whatsapp-provider.interface';
@@ -27,7 +28,11 @@ const SUBSCRIBED_EVENTS = [
   'CONNECTION_UPDATE',
   'MESSAGES_UPSERT',
   'MESSAGES_UPDATE',
+  // Edição feita pelo contato.
   'MESSAGES_EDITED',
+  // Edição feita por nós: a Evolution usa um evento distinto para a alteração
+  // que parte da própria instância.
+  'SEND_MESSAGE_UPDATE',
   'MESSAGES_DELETE',
   'SEND_MESSAGE',
   'CONTACTS_UPDATE',
@@ -248,6 +253,56 @@ export class EvolutionProvider implements WhatsappProvider {
         throw new BadRequestException('Mensagem não encontrada para adicionar reação.');
       }
       this.fail('Não foi possível enviar a reação', error);
+    }
+  }
+
+  async editMessage(
+    session: ProviderSessionRef,
+    chatId: string,
+    messageId: string,
+    texto: string,
+  ): Promise<void> {
+    const jid = this.toJid(chatId);
+
+    try {
+      await this.http.post(`/chat/updateMessage/${session.sessionId}`, {
+        number: this.toNumber(chatId),
+        key: { id: messageId, remoteJid: jid, fromMe: true },
+        text: texto,
+      });
+
+      this.logger.log(`Mensagem ${messageId} editada`);
+    } catch (error) {
+      const mensagem = this.messageOf(error);
+      this.logger.error(`Não foi possível editar a mensagem: ${mensagem}`);
+
+      throw new BadRequestException(
+        // A janela de 15 minutos é a recusa mais provável, e a mensagem crua da
+        // Evolution não explica isso a quem está na tela.
+        this.statusOf(error) === 400
+          ? 'Não foi possível editar: o WhatsApp permite alterar a mensagem apenas nos primeiros 15 minutos.'
+          : `Não foi possível editar a mensagem: ${mensagem}`,
+      );
+    }
+  }
+
+  async markAsRead(session: ProviderSessionRef, mensagens: ProviderMessageRef[]): Promise<void> {
+    if (!mensagens.length) return;
+
+    try {
+      await this.http.post(`/chat/markMessageAsRead/${session.sessionId}`, {
+        readMessages: mensagens.map(({ messageId, chatId, fromMe }) => ({
+          id: messageId,
+          remoteJid: this.toJid(chatId),
+          fromMe,
+        })),
+      });
+
+      this.logger.log(`${mensagens.length} mensagem(ns) marcada(s) como lida(s)`);
+    } catch (error) {
+      // Não propaga: o "visto" é cortesia para o contato, e falhar aqui não
+      // pode derrubar o envio da resposta, que é o que importa.
+      this.logger.warn(`Não foi possível marcar como lida: ${this.messageOf(error)}`);
     }
   }
 

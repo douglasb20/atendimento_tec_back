@@ -38,9 +38,9 @@ export class WhatsappMessagesProcessor extends WorkerHost {
           await this.supportChatsService.onMessageRevokeEveryone(payload);
           break;
 
-        case DataTypeWhatsapp.UNREAD_COUNT:
-          await this.supportChatsService.onMessagesUnreadCount(payload);
-          break;
+        // `chats.update` não é mais roteado (ver `resolveDataType`): chega sem
+        // `unreadCount` e identificado por `@lid`. A contagem é mantida por
+        // nós, no recebimento da mensagem e na abertura da conversa.
       }
 
       return true;

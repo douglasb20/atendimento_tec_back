@@ -38,10 +38,10 @@ export class Contacts {
   @Column({ type: 'varchar', length: 60, nullable: false })
   remote_jid: string;
 
-  @CreateDateColumn({ type: 'timestamp' })
+  @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 
-  @Column({ type: 'timestamp', nullable: true, default: null, onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamptz', nullable: true, default: null, onUpdate: 'CURRENT_TIMESTAMP' })
   updated_at: Date | null;
 
   @Column({ type: 'smallint', nullable: false, default: 1 })

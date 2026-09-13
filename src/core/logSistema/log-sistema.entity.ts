@@ -17,7 +17,7 @@ export class LogSistema {
   @Column({ type: 'varchar', length: 10 })
   metodo: string;
 
-  @CreateDateColumn({ type: 'timestamp' })
+  @CreateDateColumn({ type: 'timestamptz' })
   datetime_request: Date;
 
   @Column({ type: 'jsonb' })

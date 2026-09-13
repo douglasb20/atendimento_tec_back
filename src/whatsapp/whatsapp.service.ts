@@ -12,6 +12,7 @@ import {
   ProviderClientInfo,
   ProviderConnectionResult,
   ProviderMediaPayload,
+  ProviderMessageRef,
   ProviderSentMessage,
 } from './providers/whatsapp-provider.interface';
 import { WhatsappGateway } from './whatsapp.gateway';
@@ -49,6 +50,8 @@ export class WhatsappService {
    */
   async processWebhook(body: EvolutionWebhookBody): Promise<void> {
     const { event, instance } = body;
+
+
     const dataType = this.resolveDataType(body);
 
     if (!dataType) {
@@ -278,6 +281,21 @@ export class WhatsappService {
   async sendMedia(sessionId: string, media: ProviderMediaPayload): Promise<ProviderSentMessage> {
     const { provider, session } = await this.resolve(sessionId);
     return provider.sendMedia(session, media);
+  }
+
+  async editMessage(
+    sessionId: string,
+    chatId: string,
+    messageId: string,
+    texto: string,
+  ): Promise<void> {
+    const { provider, session } = await this.resolve(sessionId);
+    return provider.editMessage(session, chatId, messageId, texto);
+  }
+
+  async markAsRead(sessionId: string, mensagens: ProviderMessageRef[]): Promise<void> {
+    const { provider, session } = await this.resolve(sessionId);
+    return provider.markAsRead(session, mensagens);
   }
 
   async deleteMessage(

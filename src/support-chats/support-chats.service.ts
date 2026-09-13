@@ -12,7 +12,6 @@ import { randomUUID } from 'node:crypto';
 import { ContactsService } from '@/contacts/contacts.service';
 import { WhatsappService } from '@/whatsapp/whatsapp.service';
 import {
-  ChatPayload,
   MessageEditPayload,
   MessagePayload,
   MessageTypes,
@@ -61,7 +60,8 @@ export class SupportChatsService {
 
     const supportChat = await this.supportChatsRepository.findOne({
       where: { id },
-      relations: ['channel'],
+      // `contact` é necessário para marcar as lidas no WhatsApp após a resposta.
+      relations: ['channel', 'contact'],
     });
     if (!supportChat) {
       throw new NotFoundException('Chat de suporte não encontrado');
@@ -91,7 +91,8 @@ export class SupportChatsService {
     this.logger.log(`Enviando mensagem de para ${chat_id} com mensagem: ${message}`);
     const supportChat = await this.supportChatsRepository.findOne({
       where: { id },
-      relations: ['channel'],
+      // `contact` é necessário para marcar as lidas no WhatsApp após a resposta.
+      relations: ['channel', 'contact'],
     });
     if (!supportChat) {
       throw new NotFoundException('Chat de suporte não encontrado');
@@ -130,7 +131,8 @@ export class SupportChatsService {
 
     const supportChat = await this.supportChatsRepository.findOne({
       where: { id },
-      relations: ['channel'],
+      // `contact` é necessário para marcar as lidas no WhatsApp após a resposta.
+      relations: ['channel', 'contact'],
     });
     if (!supportChat) {
       throw new NotFoundException('Chat de suporte não encontrado');
@@ -202,6 +204,21 @@ export class SupportChatsService {
     } catch (err) {
       this.logger.warn(`Não foi possível registrar o envio ${dados.messageId}: ${err.message}`);
     }
+
+    // Responder é a prova de que o atendente leu: só aí a contagem zera.
+    // Abrir a conversa não basta — ele pode abrir, ler pela metade e sair, e o
+    // pendente continua pendente até alguém de fato responder.
+    //
+    // Fora do try acima de propósito: falhar ao gravar a mensagem não impede
+    // que a resposta tenha sido enviada, e a contagem precisa refletir isso.
+    try {
+      // Sem checar o valor em memória antes: o `supportChat` foi carregado no
+      // início do envio e pode já estar defasado se chegou mensagem no meio.
+      await this.marcarComoLida(dados.supportChat.id);
+      await this.marcarLidasNoWhatsapp(dados.supportChat);
+    } catch (err) {
+      this.logger.warn(`Não foi possível zerar as não lidas: ${err.message}`);
+    }
   }
 
   async listAllSupportChats() {
@@ -228,7 +245,8 @@ export class SupportChatsService {
       );
       const supportChat = await this.supportChatsRepository.findOne({
         where: { id },
-        relations: ['channel'],
+        // `contact` é necessário para marcar as lidas no WhatsApp após a resposta.
+      relations: ['channel', 'contact'],
       });
       if (!supportChat) {
         throw new NotFoundException('Chat de suporte não encontrado');
@@ -250,6 +268,46 @@ export class SupportChatsService {
    * Revoga a mensagem no WhatsApp. A marcação local fica por conta do webhook
    * `messages.delete`, que é quem confirma que o WhatsApp aceitou a revogação.
    */
+  /**
+   * Altera o texto de uma mensagem já enviada.
+   *
+   * A marcação visual na conversa chega depois, pelo webhook `messages.edited`
+   * — é ele que confirma que o WhatsApp aceitou a alteração.
+   */
+  async editMessage(id: number, messageId: string, texto: string) {
+    const supportChat = await this.supportChatsRepository.findOne({
+      where: { id },
+      relations: ['channel', 'contact'],
+    });
+    if (!supportChat) {
+      throw new NotFoundException('Chat de suporte não encontrado');
+    }
+
+    const message = await this.messagesService.findByMessageId(messageId);
+    if (!message) {
+      throw new NotFoundException('Mensagem não encontrada');
+    }
+
+    if (!message.from_me) {
+      throw new BadRequestException('Só é possível editar mensagens enviadas por você');
+    }
+
+    if (message.is_deleted) {
+      throw new BadRequestException('Esta mensagem foi apagada');
+    }
+
+    this.logger.log(`Editando mensagem ${messageId} de ${supportChat.contact?.remote_jid}`);
+
+    await this.whatsappService.editMessage(
+      supportChat.channel.session_id,
+      supportChat.contact?.remote_jid,
+      messageId,
+      texto,
+    );
+
+    return { status: 'message edited' };
+  }
+
   async deleteMessage(id: number, messageId: string) {
     const supportChat = await this.supportChatsRepository.findOne({
       where: { id },
@@ -321,6 +379,22 @@ export class SupportChatsService {
         );
 
         if (savedMessage) {
+          // Só o que vem do cliente conta como não lido; o que nós enviamos já
+          // nasce visto por quem enviou.
+          if (!savedMessage.from_me) {
+            const naoLidas = await this.supportChatsRepository.incrementaNaoLidas(
+              supportChat.id,
+              manager,
+            );
+
+            supportChat.unread_count = naoLidas;
+
+            this.whatsappService.emitEvent('whatsapp:unread_count', {
+              chatId: supportChat.id,
+              unreadCount: naoLidas,
+            });
+          }
+
           // `lastMessage` só vem preenchido quando a mensagem afetada era a
           // última da conversa; nas demais, a prévia do chat não muda.
           if (savedMessage.lastMessage) {
@@ -386,7 +460,6 @@ export class SupportChatsService {
         const { sessionId, data } = payload;
         const channel = await this.channelsRepository.findBySessionId(sessionId);
         const phoneContact = data.message.id.remote;
-
         const contact = await manager.findOneBy(Contacts, {
           remote_jid: phoneContact,
         });
@@ -537,39 +610,39 @@ export class SupportChatsService {
     });
   }
 
-  async onMessagesUnreadCount(payload: WhatsappWebhookPayload<ChatPayload>) {
-    return runInTransaction(this.dataSource, async (manager) => {
-      try {
-        const { sessionId, data } = payload;
-        const channel = await this.channelsRepository.findBySessionId(sessionId);
-        const phoneContact = data.chat.id._serialized;
+  /**
+   * Marca a conversa como lida — acionado quando o atendente a abre no painel.
+   *
+   * É o único caminho que zera a contagem. O `chats.update` da Evolution não
+   * serve: chega identificado por `@lid` (que não é o `remote_jid` gravado) e
+   * sem o `unreadCount`, trazendo apenas `remoteJid` e `instanceId`.
+   */
+  /**
+   * Marca no WhatsApp as mensagens que o contato enviou — o tique azul dele.
+   *
+   * Acontece quando o atendente responde, não quando abre a conversa: abrir e
+   * sair sem responder não é atendimento, e o "visto" cria no contato a
+   * expectativa de que alguém está ali.
+   */
+  private async marcarLidasNoWhatsapp(supportChat: SupportChats): Promise<void> {
+    const pendentes = await this.messagesService.buscaNaoLidasParaMarcar(supportChat.id);
+    if (!pendentes.length) return;
 
-        // `chats.update` identifica o contato pelo `@lid`, e não pelo JID que
-        // gravamos - por isso a busca considera os dois endereços.
-        const contact = await manager.findOneBy(Contacts, {
-          remote_jid: phoneContact,
-        });
+    const chatId = supportChat.contact?.remote_jid;
+    if (!chatId) return;
 
-        // Conversa que ainda não existe aqui: não há contagem a atualizar.
-        if (!contact) {
-          this.logger.debug(`Contagem ignorada: contato ${phoneContact} não cadastrado.`);
-          return;
-        }
+    await this.whatsappService.markAsRead(
+      supportChat.channel.session_id,
+      pendentes.map((m) => ({ messageId: m.message_id, chatId, fromMe: false })),
+    );
+  }
 
-        const supportChat = await this.findOrOpen(contact.id, channel.id, manager);
+  async marcarComoLida(id: number): Promise<void> {
+    await this.supportChatsRepository.zeraNaoLidas(id);
 
-        await manager.update(SupportChats, supportChat.id, {
-          unread_count: data.chat.unreadCount || 0,
-        });
-
-        this.whatsappService.emitEvent('whatsapp:unread_count', {
-          chatId: supportChat.id,
-          unreadCount: data.chat.unreadCount || 0,
-        });
-      } catch (err) {
-        this.logger.error(`Erro ao processar mensagem: ${err.message}`);
-        throw err;
-      }
+    this.whatsappService.emitEvent('whatsapp:unread_count', {
+      chatId: id,
+      unreadCount: 0,
     });
   }
 
@@ -686,7 +759,45 @@ export class SupportChatsService {
     return atualizado;
   }
 
-  whatsappChatStateEmit(supportChat: SupportChats) {
-    this.whatsappService.emitEvent('whatsapp:chat_state', supportChat);
+  /**
+   * Emite o estado da conversa para os clientes conectados.
+   *
+   * Recarrega antes de emitir: os chamadores passam o objeto que tinham em
+   * mãos, vindo de `findOrOpen`, que não traz `contact.client` nem o
+   * `unread_count` já incrementado. O front faz merge do que chega, então um
+   * payload incompleto apagava o nome do cliente e zerava o contador na tela.
+   *
+   * Os campos de prévia (`last_message*`) vêm de quem chama, porque são
+   * calculados a partir da mensagem que acabou de ser salva.
+   */
+  async whatsappChatStateEmit(supportChat: SupportChats) {
+    const completo = await this.supportChatsRepository.findParaEstado(supportChat.id);
+
+    // As colunas guardam a key do storage, não a URL. A leitura HTTP já traduz
+    // isso; aqui precisa ser feito na mão, senão o socket sobrescreve na tela a
+    // URL boa por um caminho relativo que o navegador não resolve.
+    if (completo?.user?.avatar_url) {
+      completo.user.avatar_url = this.storageService.getPublicUrl(completo.user.avatar_url);
+    }
+    if (completo?.contact?.avatar_url && !completo.contact.is_avatar_external) {
+      completo.contact.avatar_url = this.storageService.getPublicUrl(completo.contact.avatar_url);
+    }
+
+    this.whatsappService.emitEvent('whatsapp:chat_state', {
+      ...(completo ?? supportChat),
+      // Estes quatro vêm de quem chama, não da releitura: o método roda dentro
+      // da transação que ainda não commitou, então o banco devolve os valores
+      // anteriores. A prévia é calculada da mensagem recém-salva, e o contador
+      // acabou de ser incrementado na mesma transação.
+      last_message: supportChat.last_message,
+      last_message_type: supportChat.last_message_type,
+      last_message_id: supportChat.last_message_id,
+      unread_count: supportChat.unread_count ?? completo?.unread_count ?? 0,
+      // O `updated_at` do banco ainda é o anterior ao commit desta transação, e
+      // é por ele que a lista se ordena — sem isto a conversa com mensagem nova
+      // não sobe para o topo.
+      updated_at: new Date(),
+    });
+
   }
 }

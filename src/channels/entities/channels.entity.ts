@@ -43,19 +43,19 @@ export class Channels {
   @Column({ type: 'text', nullable: true })
   qr_code: string | null;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   connected_at: Date | null;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   disconnected_at: Date | null;
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
-  @Column({ type: 'timestamp', nullable: true, default: null, onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamptz', nullable: true, default: null, onUpdate: 'CURRENT_TIMESTAMP' })
   updated_at: Date | null;
 
-  @Column({ type: 'timestamp', nullable: true, default: null })
+  @Column({ type: 'timestamptz', nullable: true, default: null })
   deleted_at: Date | null;
 
   // == Relations ==

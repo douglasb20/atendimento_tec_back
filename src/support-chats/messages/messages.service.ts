@@ -620,6 +620,11 @@ export class MessagesService {
     };
   }
 
+  /** Mensagens do contato ainda não marcadas como lidas no WhatsApp. */
+  async buscaNaoLidasParaMarcar(support_chat_id: number) {
+    return this.messagesRepository.findNaoLidasParaMarcar(support_chat_id);
+  }
+
   async processUploadMedia(
     sessionId: string,
     chatId: string,

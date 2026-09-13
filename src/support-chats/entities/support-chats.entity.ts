@@ -46,12 +46,12 @@ export class SupportChats {
   })
   is_waiting: boolean;
 
-  @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ name: 'created_at', type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   @Column({
     name: 'answered_at',
-    type: 'timestamp',
+    type: 'timestamptz',
     nullable: true,
     default: null,
   })
@@ -59,7 +59,7 @@ export class SupportChats {
 
   @Column({
     name: 'finished_at',
-    type: 'timestamp',
+    type: 'timestamptz',
     nullable: true,
     default: null,
   })
@@ -67,7 +67,7 @@ export class SupportChats {
 
   @Column({
     name: 'updated_at',
-    type: 'timestamp',
+    type: 'timestamptz',
     nullable: true,
     default: () => 'CURRENT_TIMESTAMP',
     onUpdate: 'CURRENT_TIMESTAMP',
