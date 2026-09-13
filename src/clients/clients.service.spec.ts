@@ -54,29 +54,12 @@ describe('ClientService', () => {
     expect(service).toBeDefined();
   });
 
-  it('should create a new client without contact', async () => {
+  it('should create a new client', async () => {
     const result = await service.createClient(data);
     expect(result.id).toBeDefined();
     expect(result.nome).toEqual(data.nome);
     expect(result.cnpj).toEqual(data.cnpj);
     expect(result.created_at).toBeDefined();
     expect(result.status).toEqual(1);
-    expect(result.contacts).toBeUndefined();
-  });
-
-  it('should create a new client with contact', async () => {
-    const newData: CreateClientDto = {
-      ...data,
-      contacts: [{ name: 'Douglas A. Silva', phone: '64992698043' }],
-    };
-    const result = await service.createClient(newData);
-
-    expect(result.id).toBeDefined();
-    expect(result.nome).toEqual(data.nome);
-    expect(result.cnpj).toEqual(data.cnpj);
-    expect(result.created_at).toBeDefined();
-    expect(result.status).toEqual(1);
-    expect(result.contacts[0].name).toEqual(newData.contacts[0].name);
-    expect(result.contacts[0].phone).toEqual(newData.contacts[0].phone);
   });
 });

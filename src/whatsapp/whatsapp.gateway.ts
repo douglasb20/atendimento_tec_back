@@ -10,6 +10,7 @@ import { Server, Socket } from 'socket.io';
 import { verify } from 'jsonwebtoken';
 
 import { AuthService } from 'auth/auth.service';
+import { origensPermitidas } from 'core/origens-permitidas';
 import { JwtPayload } from '@types';
 import { Users } from '@/users/entities/users.entity';
 
@@ -19,8 +20,11 @@ type ClientInfo = {
 };
 
 @WebSocketGateway({
+  // Mesma lista do CORS da API. O handshake já valida o JWT antes de entrar na
+  // sala, mas manter as duas portas com a mesma regra evita que uma origem
+  // recusada no HTTP passe pelo WebSocket.
   cors: {
-    origin: '*',
+    origin: origensPermitidas(),
   },
 })
 export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect {

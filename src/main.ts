@@ -5,6 +5,7 @@ import * as bodyParser from 'body-parser';
 import * as path from 'path';
 
 import { AppModule } from './app.module';
+import { origensPermitidas } from './core/origens-permitidas';
 import { Queue } from 'bullmq';
 
 async function bootstrap() {
@@ -25,7 +26,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.enableCors({
-    origin: 'http://localhost:3000',
+    origin: origensPermitidas(),
   });
 
   // aumenta o limite de tamanho aceito (por exemplo, 10MB)

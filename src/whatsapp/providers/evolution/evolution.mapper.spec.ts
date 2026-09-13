@@ -38,13 +38,22 @@ describe('EvolutionMapper', () => {
         DataTypeWhatsapp.MESSAGE_REVOKED_EVERYONE,
       );
       expect(EvolutionMapper.mapEventType('qrcode.updated')).toBe(DataTypeWhatsapp.QR_RECEIVED);
-      expect(EvolutionMapper.mapEventType('chats.update')).toBe(DataTypeWhatsapp.UNREAD_COUNT);
+      expect(EvolutionMapper.mapEventType('send.message.update')).toBe(
+        DataTypeWhatsapp.MESSAGE_EDIT,
+      );
     });
 
     it('devolve null para eventos que o domínio não consome', () => {
       expect(EvolutionMapper.mapEventType('presence.update')).toBeNull();
       expect(EvolutionMapper.mapEventType('labels.edit')).toBeNull();
       expect(EvolutionMapper.mapEventType('evento.inexistente')).toBeNull();
+    });
+
+    // O payload real de `chats.update` traz apenas `{ remoteJid, instanceId }`
+    // — sem `unreadCount`. Roteá-lo como UNREAD_COUNT zerava o contador a cada
+    // evento; a contagem passou a ser mantida por nós, em SupportChatsService.
+    it('não roteia chats.update, que chega sem a contagem', () => {
+      expect(EvolutionMapper.mapEventType('chats.update')).toBeNull();
     });
   });
 
