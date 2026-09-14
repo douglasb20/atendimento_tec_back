@@ -27,6 +27,12 @@ export class StorageService {
       accessKeyId: process.env.STORAGE_ACCESS_KEY!,
       secretAccessKey: process.env.STORAGE_SECRET_KEY!,
     },
+    // O SDK v3 passou a calcular um checksum CRC32 por padrão e a exigi-lo de
+    // volta na resposta. O Backblaze não implementa esses cabeçalhos: o
+    // `x-amz-checksum-crc32` entra na assinatura da URL, o browser precisa
+    // enviá-lo, e o preflight de CORS falha antes mesmo do upload acontecer.
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
   });
 
   async createPresignedPost(path: string, contentType?: string): Promise<PresignedUpload> {
