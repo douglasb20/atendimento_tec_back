@@ -27,6 +27,7 @@ import { ContactsModule } from '@/contacts/contacts.module';
 import { StorageModule } from '@/storage/storage.module';
 import { RedisCacheModule } from '@/redis-cache/redis-cache.module';
 import { IntegrationsModule } from '@/integrations/integrations.module';
+import { HealthModule } from '@/health/health.module';
 
 // const destPath = path.resolve(__dirname, '..', '..', 'files', 'tmp');
 @Global()
@@ -83,6 +84,7 @@ import { IntegrationsModule } from '@/integrations/integrations.module';
     StorageModule,
     RedisCacheModule,
     IntegrationsModule,
+    HealthModule,
   ],
   exports: [ QueryStorageService],
   providers: [

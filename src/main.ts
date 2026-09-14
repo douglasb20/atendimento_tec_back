@@ -41,7 +41,10 @@ async function bootstrap() {
     .then(() => console.log('Redis conectado ao Bull ✔'))
     .catch((err) => console.error('Erro ao conectar no Redis Bull:', err));
 
-  await app.listen(process.env.APP_ENV || 3001);
+  // `APP_ENV` guarda a porta, não o ambiente — o nome engana, mas é o que os
+  // ambientes existentes já usam. `PORT` é o nome convencional e tem
+  // precedência; sem nenhuma das duas, 3001.
+  await app.listen(process.env.PORT || process.env.APP_ENV || 3001);
   console.log(`Application is running on: ${await app.getUrl()}`);
 }
 bootstrap();
