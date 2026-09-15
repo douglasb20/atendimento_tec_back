@@ -53,6 +53,21 @@ export class ChannelsController {
     return this.channelsService.closeSession(channelId);
   }
 
+  /**
+   * Consulta o estado real da sessão no provider e corrige o nosso registro.
+   *
+   * `channel:view` e não `:update` de propósito: quem enxerga o canal precisa
+   * poder confirmar se ele está de pé, e a rota não muda nada por conta
+   * própria — só alinha o banco ao que o provider já diz.
+   */
+  @Get('/:channelId/sincronizar-status')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('channel:view')
+  @HttpCode(HttpStatus.OK)
+  async sincronizarStatus(@Param('channelId') channelId: number) {
+    return this.channelsService.sincronizarStatus(channelId);
+  }
+
   @Post()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('channel:create')

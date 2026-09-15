@@ -386,7 +386,13 @@ export class EvolutionMapper {
         id: targetKey.id ?? '',
         _serialized: `${targetKey.fromMe ? 'true' : 'false'}_${remoteJid}_${targetKey.id ?? ''}`,
       },
-      senderId: data.key?.participant ?? remoteJid,
+      // Quem reagiu. Em grupo vem em `participant`; numa conversa individual
+      // esse campo não existe, e cair no `remoteJid` daria o número do contato
+      // mesmo quando fomos nós que reagimos — as duas reações disputariam a
+      // mesma chave no mapa. O `fromMe` é o que separa os dois lados.
+      senderId: data.key?.fromMe
+        ? 'nos'
+        : (data.key?.participant ?? data.key?.remoteJid ?? remoteJid),
     } as Reaction;
   }
 

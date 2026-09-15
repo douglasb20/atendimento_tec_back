@@ -28,9 +28,6 @@ export class Contacts {
   @Column({ type: 'boolean', nullable: false, default: false })
   is_avatar_external: boolean;
 
-  @Column({ type: 'varchar', length: 150, nullable: true, default: null })
-  tags: string;
-
   @Column({ type: 'varchar', length: 14, nullable: true, default: null })
   phone: string;
 

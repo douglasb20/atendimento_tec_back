@@ -27,6 +27,7 @@ import { ContactsModule } from '@/contacts/contacts.module';
 import { StorageModule } from '@/storage/storage.module';
 import { RedisCacheModule } from '@/redis-cache/redis-cache.module';
 import { IntegrationsModule } from '@/integrations/integrations.module';
+import { TagsModule } from '@/tags/tags.module';
 import { HealthModule } from '@/health/health.module';
 
 // const destPath = path.resolve(__dirname, '..', '..', 'files', 'tmp');
@@ -84,6 +85,7 @@ import { HealthModule } from '@/health/health.module';
     StorageModule,
     RedisCacheModule,
     IntegrationsModule,
+    TagsModule,
     HealthModule,
   ],
   exports: [ QueryStorageService],

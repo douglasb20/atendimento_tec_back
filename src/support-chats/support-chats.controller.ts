@@ -111,6 +111,25 @@ export class SupportChatsController {
     return this.supportChatsService.deleteMessage(id, message_id);
   }
 
+  /**
+   * Oculta mensagens do portal, sem revogar no WhatsApp.
+   *
+   * Complementa o `delete-message`: aquele alcança o contato e só vale para
+   * mensagem própria dentro de 60h; este some apenas do nosso lado.
+   */
+  @Post('/:id/ocultar-mensagens')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async ocultarMensagens(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() { message_ids }: { message_ids: string[] },
+  ) {
+    if (!Array.isArray(message_ids) || message_ids.length === 0) {
+      throw new BadRequestException('O campo message_ids é obrigatório');
+    }
+    return this.supportChatsService.ocultarMensagens(id, message_ids);
+  }
+
   @Post('/:id/marcar-lida')
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)

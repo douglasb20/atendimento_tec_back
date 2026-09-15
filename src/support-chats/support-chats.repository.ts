@@ -54,6 +54,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       relations: [
         'contact',
         'contact.client',
+        'contact.client.tags',
         'channel',
         'supportChatMessages',
         'user',
@@ -106,7 +107,14 @@ export class SupportChatsRepository extends Repository<SupportChats> {
   async findParaEstado(id: number): Promise<SupportChats> {
     return this.findOne({
       where: { id },
-      relations: ['contact', 'contact.client', 'channel', 'supportChatStatus', 'user'],
+      relations: [
+        'contact',
+        'contact.client',
+        'contact.client.tags',
+        'channel',
+        'supportChatStatus',
+        'user',
+      ],
     });
   }
 

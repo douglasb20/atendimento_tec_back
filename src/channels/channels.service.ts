@@ -1,5 +1,5 @@
 import { runInTransaction } from '@/Utils';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ChannelStatus, WhatsappWebhookPayload } from '@types';
 import { randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
@@ -205,6 +205,65 @@ export class ChannelsService {
       this.logger.error('Erro ao processar conexão do canal WhatsApp:', error);
       throw error;
     }
+  }
+
+  /**
+   * Consulta o estado da sessão no provider e alinha o nosso banco a ele.
+   *
+   * O status que guardamos é o último que um evento `connection.update` nos
+   * contou — e evento se perde. Quando isso acontece o portal mostra
+   * "Conectado" para um canal que caiu, e a falha só aparece quando alguém
+   * tenta enviar. Este método é a fonte da verdade sob demanda.
+   */
+  async sincronizarStatus(channelId: number): Promise<Channels> {
+    // Com a relação carregada: quem chama mostra o nome do status ao usuário,
+    // e o `findChannel` devolve só as colunas.
+    const channel = await this.channelsRepository.findOne({
+      where: { id: channelId },
+      relations: ['channelStatus'],
+    });
+    if (!channel) {
+      throw new NotFoundException('Canal não localizado com este id');
+    }
+
+    if (!channel.session_id) {
+      throw new BadRequestException('O canal ainda não possui uma sessão para consultar.');
+    }
+
+    const estado = await this.whatsappService.fetchConnectionStatus(channel.session_id);
+
+    // Sessão inexistente no provider é tratada como desconectada: para o
+    // atendente o efeito é o mesmo, e o start recria a instância.
+    const statusReal =
+      estado === 'connected'
+        ? ChannelStatus.CONNECTED
+        : estado === 'connecting'
+          ? ChannelStatus.CONNECTING
+          : ChannelStatus.DISCONNECTED;
+
+    if (channel.channel_status_id === statusReal) {
+      return channel;
+    }
+
+    this.logger.warn(
+      `Status do canal ${channel.id} dessincronizado: banco=${channel.channel_status_id}, provider=${statusReal}. Corrigindo.`,
+    );
+
+    const conectou = statusReal === ChannelStatus.CONNECTED;
+
+    await this.channelsRepository.update(channel.id, {
+      channel_status_id: statusReal,
+      ...(conectou
+        ? { connected_at: channel.connected_at ?? new Date(), disconnected_at: null }
+        : { disconnected_at: new Date(), connected_at: null, qr_code: null }),
+    });
+
+    this.handleChannelStatus(channel.id);
+
+    return this.channelsRepository.findOne({
+      where: { id: channel.id },
+      relations: ['channelStatus'],
+    });
   }
 
   async handleChannelDisconnected(

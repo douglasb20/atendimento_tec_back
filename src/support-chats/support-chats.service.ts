@@ -252,11 +252,17 @@ export class SupportChatsService {
         throw new NotFoundException('Chat de suporte não encontrado');
       }
 
+      // A Evolution identifica a mensagem reagida pela chave completa, e o
+      // `fromMe` faz parte dela: reagir a uma mensagem nossa com `false` é
+      // aceito pela API e simplesmente não aplica a reação.
+      const mensagem = await this.messagesService.findByMessageId(messageId);
+
       await this.whatsappService.sendReaction(
         supportChat.channel.session_id,
         chat_id,
         messageId,
         reaction,
+        mensagem?.from_me ?? false,
       );
     } catch (error) {
       this.logger.error('Falha ao enviar reação:', error.response?.data || error.message);
@@ -332,6 +338,33 @@ export class SupportChatsService {
     );
 
     return { status: 'message deleted' };
+  }
+
+  /**
+   * Oculta mensagens do portal, sem tocar no WhatsApp do contato.
+   *
+   * É o "apagar para mim": serve quando a janela de revogação (60h) já passou,
+   * ou quando a mensagem é do contato — nos dois casos o WhatsApp não aceita
+   * revogar, mas o atendente ainda quer limpar a conversa do lado de cá.
+   *
+   * A linha é preservada com `hidden_at` preenchido: o histórico de um
+   * atendimento é registro de trabalho, e some da tela sem sumir do banco.
+   */
+  async ocultarMensagens(id: number, messageIds: string[]): Promise<{ ocultadas: number }> {
+    const supportChat = await this.supportChatsRepository.findOne({ where: { id } });
+    if (!supportChat) {
+      throw new NotFoundException('Chat de suporte não encontrado');
+    }
+
+    if (!messageIds?.length) {
+      throw new BadRequestException('Informe ao menos uma mensagem');
+    }
+
+    const ocultadas = await this.messagesService.ocultar(id, messageIds);
+
+    this.logger.log(`Ocultadas ${ocultadas} mensagem(ns) do chat ${id}`);
+
+    return { ocultadas };
   }
 
   async signMediaPost(signMediaPostDto: SignMediaPostDto): Promise<PresignedUpload> {
@@ -572,21 +605,30 @@ export class SupportChatsService {
   async onMessageReaction(payload: WhatsappWebhookPayload<ReactionPayload>) {
     return runInTransaction(this.dataSource, async (manager) => {
       try {
-        const { sessionId, data } = payload;
+        const { data } = payload;
 
-        const channel = await this.channelsRepository.findBySessionId(sessionId);
-        const phoneContact = data.reaction.msgId.remote;
+        // A mensagem reagida é localizada pelo `message_id`, que é único, e não
+        // pelo JID do contato: a Evolution entrega este evento ora em
+        // `@s.whatsapp.net`, ora em `@lid` — e o segundo não bate com o que
+        // está gravado, fazendo a reação ser descartada em silêncio.
+        const mensagemReagida = await this.messagesService.findByMessageId(data.reaction.msgId.id);
 
-        const contact = await manager.findOneBy(Contacts, {
-          remote_jid: phoneContact,
-        });
-
-        if (!contact) {
-          this.logger.debug(`Reação ignorada: contato ${phoneContact} não cadastrado.`);
+        if (!mensagemReagida) {
+          this.logger.debug(
+            `Reação ignorada: mensagem ${data.reaction.msgId.id} não está no histórico.`,
+          );
           return;
         }
 
-        const supportChat = await this.findOrOpen(contact.id, channel.id, manager);
+        const supportChat = await this.supportChatsRepository.findOne({
+          where: { id: mensagemReagida.support_chat_id },
+          relations: ['contact', 'channel'],
+        });
+
+        if (!supportChat) {
+          this.logger.debug(`Reação ignorada: conversa ${mensagemReagida.support_chat_id} sumiu.`);
+          return;
+        }
 
         const savedMessage = await this.messagesService.saveMessageReaction(
           supportChat.id,

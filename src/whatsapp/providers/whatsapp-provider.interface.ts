@@ -24,6 +24,17 @@ export interface WhatsappProvider {
   /** Encerra a sessão sem apagá-la no provider. */
   requestDisconnection(session: ProviderSessionRef): Promise<void>;
 
+  /**
+   * Estado da sessão **no provider**, consultado na hora.
+   *
+   * Existe porque o nosso banco guarda o último estado que um evento nos
+   * contou, e eventos se perdem: sem uma consulta direta não há como saber se
+   * o canal marcado como conectado ainda está.
+   *
+   * `null` quando a sessão não existe no provider — distinto de desconectada.
+   */
+  fetchConnectionStatus(session: ProviderSessionRef): Promise<ProviderConnectionStatus | null>;
+
   /** Dados da conta conectada - usado para descobrir o número do canal. */
   getClientInfo(session: ProviderSessionRef): Promise<ProviderClientInfo>;
 
@@ -51,11 +62,17 @@ export interface WhatsappProvider {
     message: string,
   ): Promise<ProviderSentMessage>;
 
+  /**
+   * @param fromMe se a mensagem **reagida** é nossa. A Evolution localiza a
+   * mensagem pela chave completa, e errar este campo faz a reação não ser
+   * aplicada — sem erro, porque a requisição em si é aceita.
+   */
   sendReaction(
     session: ProviderSessionRef,
     chatId: string,
     messageId: string,
     reaction: string,
+    fromMe: boolean,
   ): Promise<void>;
 
   /**
@@ -106,6 +123,9 @@ export type ProviderSessionRef = {
 };
 
 export type ProviderConnectionState = 'connecting' | 'connected' | 'disconnected' | 'refused';
+
+/** Estado bruto da sessão no provider, já normalizado. */
+export type ProviderConnectionStatus = 'connected' | 'connecting' | 'disconnected';
 
 export type ProviderConnectionResult = {
   state: ProviderConnectionState;

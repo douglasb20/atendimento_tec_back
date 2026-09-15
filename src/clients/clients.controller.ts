@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -6,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   UseGuards,
@@ -38,6 +40,27 @@ export class ClientController {
     @Body() updateClientDto: UpdateClientDto,
   ) {
     return await this.clientService.updateClient(Number(client_id), updateClientDto);
+  }
+
+  /**
+   * Só as etiquetas, sem reenviar o cadastro.
+   *
+   * É o que o painel do chat usa para classificar o cliente durante o
+   * atendimento — lá o nome e o CNPJ não estão em mãos, e mandá-los vazios no
+   * PATCH comum apagaria o que está gravado.
+   */
+  @Patch(':client_id/tags')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('client:update')
+  @HttpCode(HttpStatus.OK)
+  async atualizarEtiquetas(
+    @Param('client_id', ParseIntPipe) client_id: number,
+    @Body() { tag_ids }: { tag_ids: number[] },
+  ) {
+    if (!Array.isArray(tag_ids)) {
+      throw new BadRequestException('O campo tag_ids é obrigatório');
+    }
+    return this.clientService.atualizarEtiquetas(client_id, tag_ids);
   }
 
   @Delete(':client_id')

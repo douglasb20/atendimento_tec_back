@@ -10,9 +10,10 @@ import { Supports } from 'supports/entities/supports.entity';
 import { Contacts } from 'contacts/entities/contacts.entity';
 import { ContactsRepository } from 'contacts/contacts.repository';
 import { ContactsModule } from 'contacts/contacts.module';
+import { TagsModule } from '@/tags/tags.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Clients, Contacts, Supports]), ContactsModule],
+  imports: [TypeOrmModule.forFeature([Clients, Contacts, Supports]), ContactsModule, TagsModule],
   controllers: [ClientController],
   providers: [ClientService, ClientRepository, ContactsRepository],
 })

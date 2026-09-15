@@ -71,6 +71,12 @@ export class StorageService {
   getPublicUrl(key: string): string {
     if (!key) return '';
 
+    // Idempotente de propósito: os caminhos de mídia já substituem a key pela
+    // URL antes de o handler emitir pelo socket, e uma segunda conversão
+    // produzia `https://.../https%3A//...` — que o storage responde como
+    // `NoSuchKey`. Receber uma URL aqui significa que nada há a fazer.
+    if (/^https?:\/\//i.test(key)) return key;
+
     const encodedKey = key.split('/').map(encodeURIComponent).join('/');
 
     // Quando há um CDN na frente do bucket (STORAGE_PUBLIC_URL), servir por ele:

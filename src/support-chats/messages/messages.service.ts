@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { EntityManager } from 'typeorm';
+import { EntityManager, In, IsNull } from 'typeorm';
 
 import { MessageAck, MessageData, MessageTypes, MessageWithLastMessage, Reaction } from '@/@types';
 import { Channels } from '@/channels/entities/channels.entity';
@@ -160,6 +160,13 @@ export class MessagesService {
     return updatedMessage;
   }
 
+  /**
+   * Registra a reação de uma pessoa, preservando as das demais.
+   *
+   * Cada participante tem **uma** reação, que pode trocar ou remover — por isso
+   * o mapa é indexado por quem reagiu. Emoji vazio no payload significa que a
+   * pessoa desfez a reação, e a chave dela sai do mapa.
+   */
   async saveMessageReaction(
     support_chat_id: number,
     reactionPayload: Reaction,
@@ -170,10 +177,21 @@ export class MessagesService {
       reactionPayload.msgId.id,
     );
 
+    const autor = reactionPayload.senderId || 'desconhecido';
+    const emoji = reactionPayload.reaction;
+
+    const reacoes = { ...(messageToUpdate?.reaction ?? {}) };
+
+    if (emoji) {
+      reacoes[autor] = emoji;
+    } else {
+      delete reacoes[autor];
+    }
+
     const updatedMessage = this.messagesRepository.create({
       ...messageToUpdate,
-      reaction: reactionPayload.reaction || '',
-      has_reaction: !!reactionPayload.reaction,
+      reaction: reacoes,
+      has_reaction: Object.keys(reacoes).length > 0,
     });
 
     return this.saveMessage(updatedMessage, manager);
@@ -258,7 +276,8 @@ export class MessagesService {
       this.logger.log('Processing image message...');
 
       const key = `chat/images/${randomUUID()}`;
-      const { presignedUrl, mimeType, mediaSize, keyWithExtension } = await this.processUploadMedia(
+      const { presignedUrl, mimeType, mediaSize, keyWithExtension, fileName } =
+      await this.processUploadMedia(
         channel.session_id,
         messagePayload.id.remote,
         messagePayload.id.id,
@@ -275,6 +294,9 @@ export class MessagesService {
         media_url: keyWithExtension,
         media_type: mimeType,
         media_size: mediaSize,
+        // Sem isto o documento recebido chega sem nome, e a bolha mostra
+        // "Documento" — o download também sairia com o uuid da key.
+        file_name: fileName,
       });
 
       const savedMessage = await this.saveMessage(messageToSave, manager, support_chat);
@@ -296,7 +318,8 @@ export class MessagesService {
     this.logger.log('Processing sticker message...');
 
     const key = `chat/images/${randomUUID()}`;
-    const { presignedUrl, mimeType, mediaSize, keyWithExtension } = await this.processUploadMedia(
+    const { presignedUrl, mimeType, mediaSize, keyWithExtension, fileName } =
+      await this.processUploadMedia(
       channel.session_id,
       messagePayload.id.remote,
       messagePayload.id.id,
@@ -311,6 +334,7 @@ export class MessagesService {
       media_url: keyWithExtension,
       media_type: mimeType,
       media_size: mediaSize,
+      file_name: fileName,
     });
 
     const savedMessage = await this.saveMessage(messageToSave, manager, support_chat);
@@ -327,6 +351,7 @@ export class MessagesService {
     this.logger.log('Processing voice message...');
 
     const key = `chat/voices/${randomUUID()}`;
+    // Sem `fileName`: áudio de voz é gravado no microfone, não tem nome.
     const { presignedUrl, mimeType, mediaSize, keyWithExtension } = await this.processUploadMedia(
       channel.session_id,
       messagePayload.id.remote,
@@ -359,7 +384,8 @@ export class MessagesService {
     this.logger.log('Processing video message...');
 
     const key = `chat/videos/${randomUUID()}`;
-    const { presignedUrl, mimeType, mediaSize, keyWithExtension } = await this.processUploadMedia(
+    const { presignedUrl, mimeType, mediaSize, keyWithExtension, fileName } =
+      await this.processUploadMedia(
       channel.session_id,
       messagePayload.id.remote,
       messagePayload.id.id,
@@ -374,6 +400,7 @@ export class MessagesService {
       media_url: keyWithExtension,
       media_type: mimeType,
       media_size: mediaSize,
+      file_name: fileName,
       is_gif: messagePayload.isGif,
     });
 
@@ -391,7 +418,8 @@ export class MessagesService {
     this.logger.log('Processing document message...');
 
     const key = `chat/documents/${randomUUID()}`;
-    const { presignedUrl, mimeType, mediaSize, keyWithExtension } = await this.processUploadMedia(
+    const { presignedUrl, mimeType, mediaSize, keyWithExtension, fileName } =
+      await this.processUploadMedia(
       channel.session_id,
       messagePayload.id.remote,
       messagePayload.id.id,
@@ -406,6 +434,7 @@ export class MessagesService {
       media_url: keyWithExtension,
       media_type: mimeType,
       media_size: mediaSize,
+      file_name: fileName,
     });
 
     const savedMessage = await this.saveMessage(messageToSave, manager, support_chat);
@@ -434,6 +463,34 @@ export class MessagesService {
   /** Busca pela chave do provider, que tem constraint UNIQUE. */
   async findByMessageId(messageId: string): Promise<SupportChatMessages | null> {
     return this.messagesRepository.findOneByMessageId(messageId);
+  }
+
+  /**
+   * Marca mensagens como ocultas do portal ("apagar para mim").
+   *
+   * O `support_chat_id` entra no filtro para uma conversa não ocultar mensagem
+   * de outra; e `hidden_at IS NULL` deixa a operação idempotente, preservando o
+   * instante da primeira ocultação.
+   */
+  async ocultar(supportChatId: number, messageIds: string[]): Promise<number> {
+    const resultado = await this.messagesRepository.update(
+      {
+        support_chat_id: supportChatId,
+        message_id: In(messageIds),
+        hidden_at: IsNull(),
+      },
+      {
+        hidden_at: new Date(),
+        // Mesmo tratamento da revogação: a mensagem continua na conversa como
+        // marcador, mas sem o texto nem a mídia. O que o front recebe já não
+        // traz o conteúdo original.
+        content: '',
+        media_url: null,
+        has_media: false,
+      },
+    );
+
+    return resultado.affected ?? 0;
   }
 
   /**
@@ -512,6 +569,14 @@ export class MessagesService {
       // provisória guardou, e o documento voltaria a aparecer sem nome.
       message.file_name ??= existente.file_name;
       message.media_size ||= existente.media_size;
+
+      // Reações não vêm nos eventos de mensagem: um `messages.update` traria o
+      // mapa vazio e apagaria o que as pessoas já reagiram. Só o handler de
+      // reação mexe nelas, e ele monta o mapa completo.
+      if (!message.reaction || Object.keys(message.reaction).length === 0) {
+        message.reaction = existente.reaction ?? {};
+        message.has_reaction = existente.has_reaction;
+      }
     }
 
     const savedMessage = await manager.save(SupportChatMessages, message);
@@ -635,6 +700,8 @@ export class MessagesService {
     mimeType: string;
     mediaSize: number;
     keyWithExtension: string;
+    /** Nome original do arquivo; `null` quando não há o que atualizar. */
+    fileName: string | null;
   }> {
     // Mídia que nós mesmos enviamos já está no storage: baixá-la de volta do
     // provider seria trabalho perdido - e falha, porque a mensagem enviada não
@@ -655,13 +722,23 @@ export class MessagesService {
         mimeType: jaNoStorage.mimetype ?? '',
         mediaSize: jaNoStorage.mediaSize ?? 0,
         keyWithExtension: jaNoStorage.mediaKey,
+        // Envio nosso: o nome já foi gravado no `registraEnvio`, e a reserva
+        // não o carrega. `null` aqui significa "não mexer".
+        fileName: null as string | null,
       };
     }
 
     this.logger.log('Processing upload media message...');
     const messageMedia = await this.whatsappService.downloadMedia(sessionId, messageId, chatId);
 
-    const keyWithExtension = key + '.' + getExtension(messageMedia.mimetype);
+    // A extensão sai do nome original quando há um: derivá-la do mimetype
+    // renomeia o arquivo sem necessidade (`text/markdown` vira `.markdown`,
+    // mas o contato enviou `.md`), e é esse nome que o atendente reconhece.
+    const extensaoDoNome = messageMedia.filename?.includes('.')
+      ? messageMedia.filename.split('.').pop()
+      : null;
+    const keyWithExtension =
+      key + '.' + (extensaoDoNome || getExtension(messageMedia.mimetype));
 
     await this.storageService.uploadFileBase64(
       messageMedia.data,
@@ -674,6 +751,9 @@ export class MessagesService {
       mimeType: messageMedia.mimetype,
       mediaSize: messageMedia?.filesize || 0,
       keyWithExtension,
+      // O provider informa o nome original; sem ele a bolha mostraria só
+      // "Documento", e o download salvaria com o uuid da key.
+      fileName: messageMedia.filename ?? null,
     };
   }
 

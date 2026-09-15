@@ -1,6 +1,16 @@
 import { Contacts } from 'contacts/entities/contacts.entity';
 import { Supports } from 'supports/entities/supports.entity';
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinTable,
+  ManyToMany,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+
+import { Tags } from '@/tags/entities/tags.entity';
 
 @Entity('clients')
 export class Clients {
@@ -27,4 +37,18 @@ export class Clients {
 
   @OneToMany(() => Supports, (supports) => supports.client)
   supports: Supports[];
+
+  /**
+   * Etiquetas do cliente.
+   *
+   * A tabela de junção é criada pela migration (`synchronize` está desligado);
+   * o `@JoinTable` apenas aponta para ela pelo nome.
+   */
+  @ManyToMany(() => Tags, (tag) => tag.clients)
+  @JoinTable({
+    name: 'client_x_tag',
+    joinColumn: { name: 'client_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'tag_id', referencedColumnName: 'id' },
+  })
+  tags: Tags[];
 }

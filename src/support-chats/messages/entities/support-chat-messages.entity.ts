@@ -92,6 +92,16 @@ export class SupportChatMessages {
   })
   is_deleted: boolean;
 
+  /**
+   * Quando a mensagem foi ocultada do portal ("apagar para mim").
+   *
+   * Distinta de `is_deleted`, que é a revogação no WhatsApp: aqui a mensagem
+   * segue no aparelho do contato, apenas não aparece mais para os atendentes.
+   * A linha é preservada para não perder o registro do atendimento.
+   */
+  @Column({ name: 'hidden_at', type: 'timestamptz', nullable: true })
+  hidden_at: Date | null;
+
   @Column({
     name: 'is_edited',
     type: 'boolean',
@@ -113,8 +123,15 @@ export class SupportChatMessages {
   })
   has_reaction: boolean;
 
-  @Column({ name: 'reaction', type: 'varchar', length: 20, default: '', nullable: true })
-  reaction: string;
+  /**
+   * Reações da mensagem, um emoji por pessoa: `{ "<jid>": "<emoji>" }`.
+   *
+   * O mapa por autor é o que permite trocar e remover a reação de alguém sem
+   * mexer nas outras — o WhatsApp dá a cada participante uma reação, que ele
+   * pode alterar ou tirar.
+   */
+  @Column({ name: 'reaction', type: 'jsonb', default: () => "'{}'::jsonb" })
+  reaction: Record<string, string>;
 
   @Column({ name: 'raw_payload', type: 'text', nullable: false, select: false })
   raw_payload: string;

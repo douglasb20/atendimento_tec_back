@@ -10,6 +10,7 @@ import { EvolutionWebhookBody } from './providers/evolution/evolution.types';
 import { ProviderFactory } from './providers/provider.factory';
 import {
   ProviderClientInfo,
+  ProviderConnectionStatus,
   ProviderConnectionResult,
   ProviderMediaPayload,
   ProviderMessageRef,
@@ -231,6 +232,12 @@ export class WhatsappService {
     return provider.requestDisconnection(session);
   }
 
+  /** Estado da sessão no provider, consultado na hora. */
+  async fetchConnectionStatus(sessionId: string): Promise<ProviderConnectionStatus | null> {
+    const { provider, session } = await this.resolve(sessionId);
+    return provider.fetchConnectionStatus(session);
+  }
+
   async getClientInfo(sessionId: string): Promise<ProviderClientInfo> {
     const { provider, session } = await this.resolve(sessionId);
     return provider.getClientInfo(session);
@@ -273,9 +280,10 @@ export class WhatsappService {
     chatId: string,
     messageId: string,
     reaction: string,
+    fromMe: boolean,
   ): Promise<void> {
     const { provider, session } = await this.resolve(sessionId);
-    return provider.sendReaction(session, chatId, messageId, reaction);
+    return provider.sendReaction(session, chatId, messageId, reaction, fromMe);
   }
 
   async sendMedia(sessionId: string, media: ProviderMediaPayload): Promise<ProviderSentMessage> {

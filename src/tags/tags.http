@@ -1,0 +1,47 @@
+# @name login
+POST {{url}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "douglasdev.cn@gmail.com",
+  "password": 1234
+}
+###
+
+@authToken = {{login.response.body.$.access_token}}
+
+@endpoint = /tags
+
+#### 1) Listar etiquetas
+GET {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+
+#### 2) Buscar por id
+GET {{url}}{{endpoint}}/1
+Authorization: Bearer {{authToken}}
+
+#### 3) Criar
+# A cor vem no formato completo `#RRGGBB`; o ColorPicker do front devolve sem o
+# `#` e a normalização acontece lá.
+POST {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Premium",
+  "color": "#22c55e"
+}
+
+#### 4) Atualizar (campo omitido fica como está)
+PATCH {{url}}{{endpoint}}/1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "color": "#ef4444"
+}
+
+#### 5) Remover
+# Recusa com 400 enquanto houver cliente usando a etiqueta.
+DELETE {{url}}{{endpoint}}/1
+Authorization: Bearer {{authToken}}

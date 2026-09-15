@@ -6,6 +6,7 @@ import { ResolvedIntegration } from 'integrations/integrations.service';
 import {
   ProviderClientInfo,
   ProviderConnectionResult,
+  ProviderConnectionStatus,
   ProviderMediaPayload,
   ProviderMediaType,
   ProviderSentMessage,
@@ -23,6 +24,13 @@ import {
 } from './evolution.types';
 
 /** Eventos que pedimos à Evolution - nomes em UPPER_SNAKE, como a config dela espera. */
+/** Tamanho em bytes de um conteúdo base64, sem precisar decodificá-lo. */
+function tamanhoDoBase64(base64: string): number {
+  const limpo = base64.replace(/^data:[^,]+,/, '');
+  const padding = limpo.endsWith('==') ? 2 : limpo.endsWith('=') ? 1 : 0;
+  return Math.floor((limpo.length * 3) / 4) - padding;
+}
+
 const SUBSCRIBED_EVENTS = [
   'QRCODE_UPDATED',
   'CONNECTION_UPDATE',
@@ -191,7 +199,10 @@ export class EvolutionProvider implements WhatsappProvider {
         mimetype: data.mimetype ?? 'application/octet-stream',
         data: data.base64,
         filename: data.fileName ?? null,
-        filesize: Number(data.size?.fileLength ?? 0) || null,
+        // A Evolution nem sempre preenche `size.fileLength`; quando falta, o
+        // tamanho sai do próprio base64 (3 bytes a cada 4 caracteres, menos o
+        // padding). Sem isso a bolha exibiria "0 B".
+        filesize: Number(data.size?.fileLength ?? 0) || tamanhoDoBase64(data.base64),
       };
     } catch (error) {
       this.fail('Falha ao baixar a mídia da mensagem', error);
@@ -241,11 +252,15 @@ export class EvolutionProvider implements WhatsappProvider {
     chatId: string,
     messageId: string,
     reaction: string,
+    fromMe: boolean,
   ): Promise<void> {
     try {
       // sendReaction não usa `number`: o destino sai do próprio key.remoteJid.
+      // O `fromMe` compõe a chave que identifica a mensagem reagida — fixá-lo
+      // em `false` fazia a Evolution não achar as nossas próprias mensagens, e
+      // a reação era aceita sem nunca aparecer no WhatsApp.
       await this.http.post(`/message/sendReaction/${session.sessionId}`, {
-        key: { id: messageId, remoteJid: this.toJid(chatId), fromMe: false },
+        key: { id: messageId, remoteJid: this.toJid(chatId), fromMe },
         reaction,
       });
     } catch (error) {
@@ -424,6 +439,26 @@ export class EvolutionProvider implements WhatsappProvider {
   // == Internos ==
 
   /** Estado atual da instância, ou null quando ela não existe na Evolution. */
+  /**
+   * Estado da sessão consultado na hora, para reconciliar com o nosso banco.
+   *
+   * A Evolution devolve o vocabulário do Baileys (`open`/`connecting`/`close`);
+   * aqui ele vira o do domínio.
+   */
+  async fetchConnectionStatus(
+    session: ProviderSessionRef,
+  ): Promise<ProviderConnectionStatus | null> {
+    const estado = await this.fetchConnectionState(session.sessionId);
+
+    // Instância inexistente no provider: não é o mesmo que desconectada, e
+    // quem chama precisa poder distinguir para recriá-la.
+    if (estado === null) return null;
+
+    if (estado === 'open') return 'connected';
+    if (estado === 'connecting') return 'connecting';
+    return 'disconnected';
+  }
+
   private async fetchConnectionState(instanceName: string): Promise<string | null> {
     try {
       const { data } = await this.http.get<EvolutionConnectionStateResponse>(
