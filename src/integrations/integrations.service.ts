@@ -1,8 +1,12 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { randomBytes } from 'node:crypto';
 
 import { Channels } from 'channels/entities/channels.entity';
+import { ProviderFactory } from 'whatsapp/providers/provider.factory';
+import { ProviderTesteConexao } from 'whatsapp/providers/whatsapp-provider.interface';
+import { IntegrationProviders } from './entities/integration-provider.entity';
+import { TestarConexaoDto } from './dto/testar-conexao.dto';
 import { decrypt, encrypt, runInTransaction } from 'Utils';
 import { CreateIntegrationDto } from './dto/create-integration.dto';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
@@ -21,7 +25,80 @@ export class IntegrationsService {
   constructor(
     private readonly integrationsRepository: IntegrationsRepository,
     private readonly dataSource: DataSource,
+    // `forwardRef` porque a factory depende deste service para resolver as
+    // credenciais — o ciclo é real e intencional.
+    @Inject(forwardRef(() => ProviderFactory))
+    private readonly providerFactory: ProviderFactory,
   ) {}
+
+  /** Providers disponíveis, para o formulário montar a seleção. */
+  async listarProviders(): Promise<IntegrationProviders[]> {
+    return this.integrationsRepository.findProvidersAtivos();
+  }
+
+  /**
+   * Devolve as credenciais em claro, para a tela exibi-las sob demanda.
+   *
+   * É o **único** caminho em que elas saem da API: a coluna é `select: false` e
+   * nem a listagem nem o `findOne` as trazem. Existe porque o formulário de
+   * edição precisa mostrar o que está configurado — um campo vazio não
+   * distingue "tem chave gravada" de "nunca foi preenchida".
+   *
+   * Protegido por `integration:update`, não por `view`: quem pode substituir a
+   * chave já tem o poder que vê-la concede, enquanto `view` é dado a quem só
+   * precisa conferir se a integração está no ar. O acesso fica registrado pelo
+   * log de auditoria, como toda requisição autenticada.
+   */
+  async revelarCredenciais(id: number): Promise<Record<string, string>> {
+    const integration = await this.integrationsRepository.findByIdWithCredentials(id);
+
+    this.logger.log(`Credenciais da integração ${integration.name} (id ${id}) foram exibidas`);
+
+    return this.decryptCredentials(integration.credentials);
+  }
+
+  /**
+   * Verifica se a integração conversa com o provider.
+   *
+   * Aceita credencial avulsa (`dto.credentials`) para o teste rodar **antes** de
+   * salvar — é o ponto de existir: descobrir a apikey errada no formulário, e
+   * não quando o primeiro canal falhar ao conectar. Sem credencial no corpo,
+   * usa a que está gravada, o que cobre o "testar de novo" na listagem.
+   */
+  async testarConexao(dto: TestarConexaoDto): Promise<ProviderTesteConexao> {
+    let slug = dto.slug;
+    let baseUrl = dto.base_url;
+    let credentials = dto.credentials;
+
+    // Integração existente: completa o que o formulário não mandou. O caso
+    // típico é editar sem trocar a apikey — o campo vem vazio de propósito.
+    if (dto.integration_id) {
+      const gravada = await this.resolveForProvider(dto.integration_id);
+      slug ??= gravada.integrationProvider?.slug;
+      baseUrl ??= gravada.base_url;
+      if (!credentials || Object.keys(credentials).length === 0) {
+        credentials = gravada.credentials;
+      }
+    }
+
+    if (!slug) {
+      throw new BadRequestException('Selecione o provider antes de testar.');
+    }
+
+    try {
+      const provider = this.providerFactory.provisorio({
+        slug,
+        base_url: baseUrl,
+        credentials: credentials ?? {},
+      });
+
+      return await provider.testarConexao();
+    } catch (err) {
+      // Provider sem implementação, URL malformada: vira resposta, não 500 —
+      // a tela precisa mostrar o motivo no lugar de um erro genérico.
+      return { ok: false, mensagem: err?.message ?? 'Não foi possível validar a integração.' };
+    }
+  }
 
   async findAll(): Promise<Integrations[]> {
     return this.integrationsRepository.findAllActive();

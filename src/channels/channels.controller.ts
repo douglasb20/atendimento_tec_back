@@ -70,7 +70,7 @@ export class ChannelsController {
 
   @Post()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('channel:create')
+  @Permissions('channel:add')
   @HttpCode(HttpStatus.CREATED)
   async createChannel(@Body() createChannelDto: CreateOrChannelDto) {
     return this.channelsService.createChannel(createChannelDto);

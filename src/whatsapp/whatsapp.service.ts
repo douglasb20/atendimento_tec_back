@@ -207,7 +207,10 @@ export class WhatsappService {
   // == Chamadas ao provider ==
 
   async requestConnection(sessionId: string): Promise<ProviderConnectionResult> {
-    const channel = await this.channelsRepository.findBySessionId(sessionId);
+    // Com o token: reconectar uma instância que já existe deve usar o token
+    // dela, e `findBySessionId` não traz a coluna (`select: false`) — o canal
+    // chegaria sem ele e a chamada cairia na chave global.
+    const channel = await this.channelsRepository.findBySessionIdWithToken(sessionId);
     const { provider, session } = await this.providerFactory.forChannel(channel);
 
     const result = await provider.requestConnection(session);

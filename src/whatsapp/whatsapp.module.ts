@@ -15,7 +15,10 @@ import { WhatsappService } from './whatsapp.service';
 @Module({
   imports: [
     AuthModule,
-    IntegrationsModule,
+    // `forwardRef` dos dois lados: o IntegrationsModule importa este para usar
+    // a ProviderFactory no teste de conexão, e a factory depende do
+    // IntegrationsService para resolver credenciais.
+    forwardRef(() => IntegrationsModule),
     BullModule.registerQueue(
       {
         name: 'whatsapp-messages-queue',

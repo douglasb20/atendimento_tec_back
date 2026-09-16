@@ -1,11 +1,25 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, IsNull, Repository } from 'typeorm';
+import { IntegrationProviders } from './entities/integration-provider.entity';
 import { Integrations } from './entities/integrations.entity';
 
 @Injectable()
 export class IntegrationsRepository extends Repository<Integrations> {
   constructor(protected dataSource: DataSource) {
     super(Integrations, dataSource.manager);
+  }
+
+  /** Providers disponíveis para o formulário — só os habilitados. */
+  async findProvidersAtivos(): Promise<IntegrationProviders[]> {
+    return this.manager.find(IntegrationProviders, {
+      where: { is_active: true },
+      order: { name: 'ASC' },
+    });
+  }
+
+  /** Quantos canais apontam para esta integração — usado antes de remover. */
+  async contarCanaisVinculados(id: number): Promise<number> {
+    return this.manager.count('Channels', { where: { integration_id: id } } as never);
   }
 
   async findAllActive(): Promise<Integrations[]> {

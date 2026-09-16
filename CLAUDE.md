@@ -26,6 +26,37 @@ Não existe `migration:generate` nem `migration:revert` — migrations são escr
 nome engana, e preenchê-la com `production` fez o Nest escutar num socket Unix
 em vez de TCP (`main.ts:44`). `PORT` tem precedência; sem nenhuma das duas, 3001.
 
+**A sessão vive em cookies `httpOnly`, gravados por esta API.** O `signin` e o
+`refresh` devolvem os tokens no `Set-Cookie`, **nunca no corpo** — devolvê-los no
+JSON anularia o `httpOnly`, já que o front poderia guardá-los onde quisesse. O
+corpo traz só `{ expires_at }`, o timestamp que o cliente usa para saber quando
+renovar.
+
+Três cookies, em `core/cookies-de-sessao.ts`: `token` e `refresh_token`
+(httpOnly) e `expires_at` (legível — carrega só um timestamp). A `JwtStrategy`
+lê o access do cookie e **também** aceita `Authorization: Bearer`, que os
+arquivos `.http` continuam usando. O `WhatsappGateway` extrai o token de
+`handshake.headers.cookie`, porque com httpOnly o cliente não consegue montar o
+`auth.token`.
+
+⚠️ `CORS_ORIGINS` precisa listar a origem do front: com `credentials: true` o
+navegador recusa `Access-Control-Allow-Origin: *`.
+
+⚠️ **`COOKIE_DOMAIN`** — em produção front e API ficam em subdomínios distintos
+(`suporte.` e `api.automatecsistemasweb.com.br`); sem essa variável apontando
+para o domínio-pai (`.automatecsistemasweb.com.br`), o cookie fica preso ao host
+da API e o front nunca o recebe de volta. Em desenvolvimento fica vazia.
+
+**Validade dos tokens:** `ACCESS_JWT_EXPIRATION` (padrão 30min) e
+`REFRESH_JWT_EXPIRATION` (padrão 30d). O access é curto porque viaja em toda
+requisição, fica em cookie legível por JavaScript e **não é revogável**; o
+refresh é longo porque só trafega em `/auth/refresh`, rotaciona a cada uso e fica
+em `user_refresh_tokens`, revogável pelo banco.
+
+⚠️ A variável antiga `JWT_EXPIRATION` configurava o **refresh**, apesar do nome
+— a mesma armadilha do `APP_ENV`. Ela continua funcionando como fallback (a VPS
+ainda a define), mas o nome novo é o que vale.
+
 `CRYPTO_KEY` (64 hex) e `CRYPTO_IV` (32 hex) são lidos no **import** de
 `src/Utils/index.ts` — ausentes, o processo quebra no boot, não em runtime.
 Trocar a `CRYPTO_KEY` torna ilegíveis todas as credenciais de integração já
@@ -34,6 +65,13 @@ gravadas.
 `CORS_ORIGINS` (lista separada por vírgula) alimenta tanto o CORS HTTP quanto o
 do gateway Socket.IO, pela mesma função `origensPermitidas()`. Vazio equivale a
 `http://localhost:3000`.
+
+**Redis compartilhado entre ambientes** exige `REDIS_PREFIX` (ex.: `hom`): os
+nomes das filas do BullMQ são fixos (`whatsapp-messages-queue`), e sem prefixo
+prod e homologação escutam a mesma chave — o BullMQ entrega o job a qualquer
+worker disponível, então uma mensagem de cliente real pode ser processada pelo
+backend de teste. `REDIS_DB_FILAS` (0) e `REDIS_DB_CACHE` (1) permitem separar
+também por banco.
 
 `./files` precisa existir — é servida estaticamente em `/files/` e o Nest não
 sobe sem ela.
@@ -113,6 +151,33 @@ por outro mecanismo.
 
 ## Providers
 
+**Um canal aponta para uma integração** (`channels.integration_id`), escolhida no
+formulário de canais. Nulo é opção válida e significa "usar a marcada como
+`is_default`" — suficiente enquanto houver um servidor de provider só; informar
+passa a importar quando coexistem vários. Sem vínculo e sem padrão, conectar
+falha com mensagem explícita.
+
+
+A gestão das integrações é feita pela tela `/integracoes` do portal. Dois
+endpoints existem só para ela: `GET /integrations/providers` (alimenta a seleção)
+e `POST /integrations/testar-conexao`, que valida endereço e credencial **sem
+tocar em sessão** — `testarConexao()` faz parte do contrato do provider, e na
+Evolution usa `/instance/fetchInstances`, que exige a apikey global e responde
+401 quando ela não confere. O teste aceita credencial avulsa no corpo para rodar
+*antes* de salvar; com apenas `integration_id`, usa a que está gravada.
+
+`GET /integrations/:id/credenciais` é o **único** caminho em que as credenciais
+saem da API — a tela de edição as exibe atrás de um botão de olho. Exige
+`integration:update`, não `view`: quem pode substituir a chave já dispõe do
+poder que lê-la concede, enquanto `view` é dado a quem só confere se a
+integração está no ar. Nem a listagem nem o `findOne` a trazem.
+
+⚠️ `ProviderFactory.provisorio()` monta um provider fora do cache e sem
+persistir, exclusivamente para esse teste. `IntegrationsModule` e
+`WhatsappModule` se importam com `forwardRef` dos **dois lados** por causa desse
+uso — sem isso o Nest não resolve a dependência e o boot falha.
+
+
 `whatsapp-provider.interface.ts` é o contrato (15 métodos, vocabulário de
 domínio, nenhum termo de provider). `provider.factory.ts` resolve pelo
 `integration_providers.slug` e cacheia **por integração**, com chave
@@ -128,6 +193,23 @@ absorve as irregularidades do provider:
   **milissegundos** — o upsert usa segundos.
 - `mapStatusToAck` tem fallback diferente por origem: no upsert, mensagem
   recebida sem status é `ACK_DEVICE`; no update, `ACK_SERVER`.
+
+**Autenticação por instância.** O cliente HTTP nasce com a chave **global** no
+header, mas toda operação sobre uma instância específica a sobrescreve com o
+`instance_token` daquela instância, via `comToken(session)`. A Evolution emite
+esse token no `/instance/create` e o recusa (401) para qualquer outra instância
+— testado. Assim um vazamento compromete um canal, não o servidor inteiro, o que
+é a diferença entre um cliente derrubar o próprio número ou o de todos num
+backend multi-tenant.
+
+A global continua obrigatória em `/instance/create` e `/instance/fetchInstances`,
+que recusam o token de instância. O `comToken` devolve `undefined` quando o canal
+não tem token — aí vale o header padrão, o que cobre canais criados antes de a
+coluna passar a ser preenchida.
+
+⚠️ `instance_token` é `select: false`: carregue o canal com
+`findBySessionIdWithToken`, senão ele chega `undefined` e a chamada silenciosamente
+cai na chave global.
 
 `evolution.provider.ts` normaliza retornos polimórficos: o `connect` devolve
 estado, QR cru **ou erro — sempre com HTTP 200**; `fetchConnectionState` trata
@@ -198,14 +280,22 @@ propósito. O front exibe mensagens diferentes.
 Strings no formato `<recurso>:<ação>`, com o recurso podendo ter ponto. O guard:
 
 - lê o metadado **só do handler** — `@Permissions` na classe é ignorado;
-- metadado ausente **libera**;
+- metadado ausente **libera** — e como não há `APP_GUARD` global, esquecer o
+  decorator não falha em lugar nenhum. Hoje 11 dos 13 handlers de
+  `support-chats`, os 6 de `services` e os dois de escrita de `permissions`
+  estão só com `AuthGuard`, acessíveis a qualquer autenticado;
 - a checagem é **OR** entre as permissões passadas;
 - `is_superuser` ignora tudo, mas é verificado **depois** da consulta.
 
-⚠️ **Algumas permissões usadas no código não existem no seed** — `supports:view`
-(o seed tem `support:view`, singular), `channel:create` (seed tem `channel:add`),
-`contact:view_by_client` e `permission:view`. Essas rotas hoje só funcionam para
-superusuário. Ao mexer nelas, corrija a string ou acrescente o seed.
+⚠️ **Seis permissões usadas no código não existem no seed** (conferido contra a
+tabela `permissions`): `contact:view_by_client`, `permission:view` e as quatro do
+módulo `supports` — ele usa o prefixo no **plural** (`supports:view/add/update/
+delete`) enquanto o seed tem no singular (`support:*`), em todos os 8 handlers.
+Essas rotas hoje só funcionam para superusuário; é falha-fechada, mas pressiona
+a distribuir superuser. O `supports` está parado por decisão (é a base das
+tarefas de atendimento, ainda não em uso) — ao retomá-lo, alinhe as strings.
+
+O `channel:create` já foi corrigido para `channel:add`.
 
 O `LogSistemaInterceptor` (global) registra cada requisição autenticada **e todas
 as queries SQL** daquela requisição. Código que não passe pelo TypeORM não
@@ -261,8 +351,6 @@ lista sem motivo visível ao atendente.
 
 ## Pontas soltas conhecidas
 
-- `StorageController.getPresignedUrl` tem uma **key hardcoded** e nenhum guard —
-  é código de teste exposto.
 - `MessagesController` está vazio.
 - `ChannelsListener` escuta eventos `whatsapp.*` do EventEmitter que **ninguém
   emite** — o fluxo real passa pela fila. Caminho morto.

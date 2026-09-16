@@ -436,7 +436,7 @@ export class SupportChatsService {
               savedMessage.lastMessage,
               manager,
             );
-            this.whatsappChatStateEmit({
+            await this.whatsappChatStateEmit({
               ...supportChat,
               last_message: savedMessage.lastMessage.content,
               last_message_type: savedMessage.lastMessage.type,
@@ -517,7 +517,7 @@ export class SupportChatsService {
             savedMessage?.lastMessage,
             manager,
           );
-          this.whatsappChatStateEmit({
+          await this.whatsappChatStateEmit({
             ...supportChat,
             last_message: savedMessage?.lastMessage?.content,
             last_message_type: savedMessage?.lastMessage?.type,
@@ -578,7 +578,7 @@ export class SupportChatsService {
               savedMessage.lastMessage,
               manager,
             );
-            this.whatsappChatStateEmit({
+            await this.whatsappChatStateEmit({
               ...supportChat,
               last_message: savedMessage.lastMessage.content,
               last_message_type: savedMessage.lastMessage.type,
@@ -797,7 +797,7 @@ export class SupportChatsService {
    */
   private async recarregaEEmiteEstado(id: number): Promise<SupportChats> {
     const atualizado = await this.supportChatsRepository.findParaEstado(id);
-    this.whatsappChatStateEmit(atualizado);
+    await this.whatsappChatStateEmit(atualizado);
     return atualizado;
   }
 
@@ -827,10 +827,14 @@ export class SupportChatsService {
 
     this.whatsappService.emitEvent('whatsapp:chat_state', {
       ...(completo ?? supportChat),
-      // Estes quatro vêm de quem chama, não da releitura: o método roda dentro
-      // da transação que ainda não commitou, então o banco devolve os valores
-      // anteriores. A prévia é calculada da mensagem recém-salva, e o contador
-      // acabou de ser incrementado na mesma transação.
+      // Estes quatro vêm de quem chama, não da releitura. O motivo é que a
+      // releitura acima usa o repositório comum — uma conexão própria, fora da
+      // transação do handler —, então ela não enxerga o que a transação ainda
+      // não commitou e devolve os valores anteriores. A prévia é calculada da
+      // mensagem recém-salva, e o contador acabou de ser incrementado.
+      //
+      // Passar o `manager` até aqui resolveria na raiz e dispensaria a
+      // sobrescrita, mas mudaria a assinatura dos quatro chamadores.
       last_message: supportChat.last_message,
       last_message_type: supportChat.last_message_type,
       last_message_id: supportChat.last_message_id,

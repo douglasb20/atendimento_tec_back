@@ -71,6 +71,30 @@ export class ProviderFactory {
     }
   }
 
+  /**
+   * Provider montado a partir de dados avulsos, **sem persistir nem cachear**.
+   *
+   * Serve ao botão "Testar conexão" da tela de cadastro: o usuário precisa
+   * saber se a credencial funciona *antes* de salvar, e não horas depois,
+   * quando um canal falha ao conectar. Sem isto, testar exigiria gravar
+   * primeiro — e uma integração com credencial errada já fica no ar.
+   */
+  provisorio(dados: {
+    slug: string;
+    base_url?: string | null;
+    credentials: Record<string, string>;
+  }): WhatsappProvider {
+    return this.instantiate({
+      id: 0,
+      name: 'Teste de conexão',
+      base_url: dados.base_url ?? null,
+      credentials: dados.credentials,
+      // O teste não dispara webhook; o valor só precisa passar pela validação.
+      webhook_url: 'http://localhost/api/whatsapp/webhook',
+      integrationProvider: { slug: dados.slug },
+    } as ResolvedIntegration);
+  }
+
   private instantiate(integration: ResolvedIntegration): WhatsappProvider {
     const slug = integration.integrationProvider?.slug;
 

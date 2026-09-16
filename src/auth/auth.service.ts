@@ -51,7 +51,17 @@ export class AuthService {
       },
       {
         secret: process.env.REFRESH_JWT_SECRET,
-        expiresIn: process.env.JWT_EXPIRATION as any,
+        // Longo porque é barato aqui: o refresh só trafega em `/auth/refresh`,
+        // fica persistido em `user_refresh_tokens` e **é revogável pelo banco**
+        // — nada disso vale para o access. Ele também rotaciona a cada uso, de
+        // modo que o anterior deixa de servir.
+        //
+        // `JWT_EXPIRATION` é o nome antigo, mantido como fallback: o ambiente
+        // de produção ainda o define, e o nome não dizia qual dos dois tokens
+        // configurava.
+        expiresIn: (process.env.REFRESH_JWT_EXPIRATION ||
+          process.env.JWT_EXPIRATION ||
+          '30d') as any,
       },
     );
     const refreshDecoded = this.jwtService.decode<{ exp: number }>(refresh_token);

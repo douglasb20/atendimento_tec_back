@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ConsoleLogger, ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as bodyParser from 'body-parser';
+import cookieParser from 'cookie-parser';
 import * as path from 'path';
 
 import { AppModule } from './app.module';
@@ -27,7 +28,15 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.enableCors({
     origin: origensPermitidas(),
+    // Sem isto o navegador não envia os cookies de sessão em requisição
+    // cross-origin — e em produção front e API estão em subdomínios distintos.
+    // Note que `credentials: true` é incompatível com `origin: '*'`: a origem
+    // precisa ser explícita, e é o que `origensPermitidas()` devolve.
+    credentials: true,
   });
+
+  // Popula `req.cookies`, de onde a JwtStrategy lê o access token.
+  app.use(cookieParser());
 
   // aumenta o limite de tamanho aceito (por exemplo, 10MB)
   app.use(bodyParser.json({ limit: '10mb' }));

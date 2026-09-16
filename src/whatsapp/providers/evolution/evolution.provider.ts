@@ -12,6 +12,7 @@ import {
   ProviderSentMessage,
   ProviderMessageRef,
   ProviderSessionRef,
+  ProviderTesteConexao,
   WhatsappProvider,
 } from '../whatsapp-provider.interface';
 import { EvolutionMapper } from './evolution.mapper';
@@ -87,14 +88,38 @@ export class EvolutionProvider implements WhatsappProvider {
       headers: {
         'Content-Type': 'application/json',
         // A Evolution autentica por um header `apikey` simples (não Bearer).
+        // Este é o padrão: a chave **global**, necessária para criar, listar e
+        // remover instâncias. As operações sobre uma instância específica o
+        // sobrescrevem com o token dela — ver `comToken`.
         apikey: integration.credentials?.apiKey ?? '',
       },
       timeout: 30_000,
     });
   }
 
+  /**
+   * Config da requisição autenticada com o token **da instância**, quando ela
+   * tem um.
+   *
+   * A Evolution emite um token por instância no `/instance/create` e o aceita
+   * no lugar da chave global nas operações daquela instância — recusando-o
+   * (401) para qualquer outra. Usá-lo limita o estrago de um vazamento a um
+   * canal, em vez de entregar a chave que apaga todas as instâncias do
+   * servidor. Num backend multi-tenant, é a diferença entre um cliente poder
+   * derrubar só o próprio número ou o de todo mundo.
+   *
+   * O fallback para a global cobre dois casos reais: canais criados antes de
+   * o token passar a ser gravado, e as rotas que **exigem** a global —
+   * `/instance/create` e `/instance/fetchInstances` a recusam.
+   */
+  private comToken(session: ProviderSessionRef) {
+    if (!session?.instanceToken) return undefined;
+
+    return { headers: { apikey: session.instanceToken } };
+  }
+
   async requestConnection(session: ProviderSessionRef): Promise<ProviderConnectionResult> {
-    const state = await this.fetchConnectionState(session.sessionId);
+    const state = await this.fetchConnectionState(session);
 
     // Instância ainda não existe na Evolution: cria já com o webhook configurado.
     if (state === null) {
@@ -115,7 +140,7 @@ export class EvolutionProvider implements WhatsappProvider {
 
   async requestDisconnection(session: ProviderSessionRef): Promise<void> {
     try {
-      await this.http.delete(`/instance/logout/${session.sessionId}`);
+      await this.http.delete(`/instance/logout/${session.sessionId}`, this.comToken(session));
       this.logger.log(`Sessão encerrada: ${session.sessionId}`);
     } catch (error) {
       // Já desconectada ou inexistente: não é falha do ponto de vista do domínio.
@@ -124,6 +149,60 @@ export class EvolutionProvider implements WhatsappProvider {
         return;
       }
       this.fail('Falha ao encerrar a sessão do WhatsApp', error);
+    }
+  }
+
+  /**
+   * Confere endereço e apikey sem tocar em sessão nenhuma.
+   *
+   * `/instance/fetchInstances` serve porque exige a apikey **global** — a mesma
+   * que criar instância exige — e responde 401 quando ela não confere. O
+   * `catch` traduz cada falha para uma frase que diz o que corrigir: sem isso,
+   * a tela mostraria `ECONNREFUSED` ou `Request failed with status code 401`.
+   */
+  async testarConexao(): Promise<ProviderTesteConexao> {
+    try {
+      const { data } = await this.http.get<unknown[]>('/instance/fetchInstances');
+      const instancias = Array.isArray(data) ? data.length : 0;
+
+      return {
+        ok: true,
+        mensagem:
+          instancias > 0
+            ? `Conexão estabelecida. ${instancias} ${instancias === 1 ? 'instância encontrada' : 'instâncias encontradas'}.`
+            : 'Conexão estabelecida. Nenhuma instância criada ainda.',
+        instancias,
+      };
+    } catch (error) {
+      if (isAxiosError(error)) {
+        const status = error.response?.status;
+
+        if (status === 401 || status === 403) {
+          return { ok: false, mensagem: 'A API Key foi recusada pelo servidor.' };
+        }
+        if (status === 404) {
+          return {
+            ok: false,
+            mensagem: 'Endereço respondeu, mas não parece ser uma Evolution API.',
+          };
+        }
+        if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+          return {
+            ok: false,
+            mensagem:
+              'Não foi possível alcançar o endereço. Confira a URL e se o serviço está no ar.',
+          };
+        }
+        if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+          return { ok: false, mensagem: 'O servidor não respondeu a tempo.' };
+        }
+        if (status) {
+          return { ok: false, mensagem: `O servidor respondeu com erro ${status}.` };
+        }
+      }
+
+      this.logger.warn(`Teste de conexão falhou: ${error?.message}`);
+      return { ok: false, mensagem: 'Não foi possível validar a integração.' };
     }
   }
 
@@ -161,6 +240,7 @@ export class EvolutionProvider implements WhatsappProvider {
       const { data } = await this.http.post<{ profilePictureUrl?: string }>(
         `/chat/fetchProfilePictureUrl/${session.sessionId}`,
         { number: this.toNumber(remoteJid) },
+        this.comToken(session),
       );
       return data?.profilePictureUrl ?? '';
     } catch (error) {
@@ -189,6 +269,7 @@ export class EvolutionProvider implements WhatsappProvider {
           // Só a key basta: a Evolution completa a mensagem a partir do banco dela.
           message: { key: { id: messageId, remoteJid: chatId } },
         },
+        this.comToken(session),
       );
 
       if (!data?.base64) {
@@ -218,6 +299,7 @@ export class EvolutionProvider implements WhatsappProvider {
       const { data } = await this.http.post<EvolutionSendResponse>(
         `/message/sendText/${session.sessionId}`,
         { number: this.toNumber(to), text: message },
+        this.comToken(session),
       );
       return this.toSentMessage(data);
     } catch (error) {
@@ -240,6 +322,7 @@ export class EvolutionProvider implements WhatsappProvider {
           // Informando só a key.id, a Evolution recupera a mensagem citada.
           quoted: { key: { id: messageId } },
         },
+        this.comToken(session),
       );
       return this.toSentMessage(data);
     } catch (error) {
@@ -259,10 +342,14 @@ export class EvolutionProvider implements WhatsappProvider {
       // O `fromMe` compõe a chave que identifica a mensagem reagida — fixá-lo
       // em `false` fazia a Evolution não achar as nossas próprias mensagens, e
       // a reação era aceita sem nunca aparecer no WhatsApp.
-      await this.http.post(`/message/sendReaction/${session.sessionId}`, {
-        key: { id: messageId, remoteJid: this.toJid(chatId), fromMe },
-        reaction,
-      });
+      await this.http.post(
+        `/message/sendReaction/${session.sessionId}`,
+        {
+          key: { id: messageId, remoteJid: this.toJid(chatId), fromMe },
+          reaction,
+        },
+        this.comToken(session),
+      );
     } catch (error) {
       if (this.statusOf(error) === 400) {
         throw new BadRequestException('Mensagem não encontrada para adicionar reação.');
@@ -280,11 +367,15 @@ export class EvolutionProvider implements WhatsappProvider {
     const jid = this.toJid(chatId);
 
     try {
-      await this.http.post(`/chat/updateMessage/${session.sessionId}`, {
-        number: this.toNumber(chatId),
-        key: { id: messageId, remoteJid: jid, fromMe: true },
-        text: texto,
-      });
+      await this.http.post(
+        `/chat/updateMessage/${session.sessionId}`,
+        {
+          number: this.toNumber(chatId),
+          key: { id: messageId, remoteJid: jid, fromMe: true },
+          text: texto,
+        },
+        this.comToken(session),
+      );
 
       this.logger.log(`Mensagem ${messageId} editada`);
     } catch (error) {
@@ -305,13 +396,17 @@ export class EvolutionProvider implements WhatsappProvider {
     if (!mensagens.length) return;
 
     try {
-      await this.http.post(`/chat/markMessageAsRead/${session.sessionId}`, {
-        readMessages: mensagens.map(({ messageId, chatId, fromMe }) => ({
-          id: messageId,
-          remoteJid: this.toJid(chatId),
-          fromMe,
-        })),
-      });
+      await this.http.post(
+        `/chat/markMessageAsRead/${session.sessionId}`,
+        {
+          readMessages: mensagens.map(({ messageId, chatId, fromMe }) => ({
+            id: messageId,
+            remoteJid: this.toJid(chatId),
+            fromMe,
+          })),
+        },
+        this.comToken(session),
+      );
 
       this.logger.log(`${mensagens.length} mensagem(ns) marcada(s) como lida(s)`);
     } catch (error) {
@@ -331,6 +426,7 @@ export class EvolutionProvider implements WhatsappProvider {
       // A Evolution recebe a chave no corpo de um DELETE - não em query string.
       await this.http.delete(`/chat/deleteMessageForEveryone/${session.sessionId}`, {
         data: { id: messageId, remoteJid: this.toJid(chatId), fromMe },
+        ...this.comToken(session),
       });
     } catch (error) {
       if (this.statusOf(error) === 400) {
@@ -397,7 +493,11 @@ export class EvolutionProvider implements WhatsappProvider {
     const tentativas = 3;
     for (let tentativa = 1; tentativa <= tentativas; tentativa++) {
       try {
-        const { data } = await this.http.post<EvolutionSendResponse>(endpoint, body);
+        const { data } = await this.http.post<EvolutionSendResponse>(
+          endpoint,
+          body,
+          this.comToken(session),
+        );
         this.logger.log(`Mídia (${mediaType}) enviada para ${to}`);
         return this.toSentMessage(data);
       } catch (error) {
@@ -448,7 +548,7 @@ export class EvolutionProvider implements WhatsappProvider {
   async fetchConnectionStatus(
     session: ProviderSessionRef,
   ): Promise<ProviderConnectionStatus | null> {
-    const estado = await this.fetchConnectionState(session.sessionId);
+    const estado = await this.fetchConnectionState(session);
 
     // Instância inexistente no provider: não é o mesmo que desconectada, e
     // quem chama precisa poder distinguir para recriá-la.
@@ -459,10 +559,15 @@ export class EvolutionProvider implements WhatsappProvider {
     return 'disconnected';
   }
 
-  private async fetchConnectionState(instanceName: string): Promise<string | null> {
+  /**
+   * Estado da instância. Recebe a sessão inteira, não só o nome, para poder
+   * autenticar com o token dela em vez da chave global.
+   */
+  private async fetchConnectionState(session: ProviderSessionRef): Promise<string | null> {
     try {
       const { data } = await this.http.get<EvolutionConnectionStateResponse>(
-        `/instance/connectionState/${instanceName}`,
+        `/instance/connectionState/${session.sessionId}`,
+        this.comToken(session),
       );
       return data?.instance?.state ?? 'close';
     } catch (error) {
@@ -517,6 +622,7 @@ export class EvolutionProvider implements WhatsappProvider {
     try {
       const { data } = await this.http.get<EvolutionConnectResponse>(
         `/instance/connect/${session.sessionId}`,
+        this.comToken(session),
       );
 
       if (data?.error) {

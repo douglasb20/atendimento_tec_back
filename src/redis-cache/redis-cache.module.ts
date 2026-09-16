@@ -10,7 +10,11 @@ import { RedisCacheRepository } from './redis-cache.repository';
         port: parseInt(process.env.REDIS_PORT, 10),
         password: process.env.REDIS_PASSWORD,
         username: process.env.REDIS_USERNAME,
-        db: 1,
+        db: Number(process.env.REDIS_DB_CACHE ?? 1),
+        // Prefixo por ambiente: o cache guarda reservas de envio de mídia
+        // (`reservaEnvioComMidia`) chaveadas por `message_id`, e ids de
+        // ambientes distintos podem colidir num Redis compartilhado.
+        ...(process.env.REDIS_PREFIX && { keyPrefix: process.env.REDIS_PREFIX }),
       },
     }),
   ],

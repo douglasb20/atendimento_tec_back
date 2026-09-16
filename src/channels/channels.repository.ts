@@ -12,7 +12,10 @@ export class ChannelsRepository extends Repository<Channels> {
   async findActives() {
     return this.find({
       where: { channel_status_id: Not(5), deleted_at: null },
-      relations: ['channelStatus'],
+      // `integration` entra para a tela mostrar qual provider atende o canal —
+      // sem isso não há como distinguir um canal que usa a integração padrão de
+      // outro apontando para um servidor próprio.
+      relations: ['channelStatus', 'integration'],
     });
   }
 

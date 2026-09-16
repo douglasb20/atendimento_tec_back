@@ -13,6 +13,13 @@ export interface WhatsappProvider {
   readonly slug: string;
 
   /**
+   * Verifica se a integração está utilizável: endereço alcançável e credencial
+   * aceita. Não envolve sessão nenhuma — serve à tela de cadastro, para o erro
+   * aparecer ali e não horas depois, quando um canal falha ao conectar.
+   */
+  testarConexao(): Promise<ProviderTesteConexao>;
+
+  /**
    * Garante que a sessão exista e esteja conectando/conectada.
    * Cria a sessão no provider quando ainda não existe.
    */
@@ -176,3 +183,12 @@ export type ProviderSentMessage = {
 
 /** Token de injeção para a implementação resolvida pela factory. */
 export const WHATSAPP_PROVIDER = 'WHATSAPP_PROVIDER';
+
+/** Resultado do teste de conexão de uma integração. */
+export type ProviderTesteConexao = {
+  ok: boolean;
+  /** Mensagem pronta para a tela — já traduzida do erro do provider. */
+  mensagem: string;
+  /** Quantas sessões o provider já conhece; ajuda a confirmar que é o servidor certo. */
+  instancias?: number;
+};

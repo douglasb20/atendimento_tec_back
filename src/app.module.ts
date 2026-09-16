@@ -40,8 +40,13 @@ import { HealthModule } from '@/health/health.module';
         port: parseInt(process.env.REDIS_PORT, 10),
         password: process.env.REDIS_PASSWORD,
         username: process.env.REDIS_USERNAME,
-        db: 0,
+        db: Number(process.env.REDIS_DB_FILAS ?? 0),
       },
+      // Isola as filas por ambiente quando o Redis é compartilhado. Sem isto,
+      // prod e homologação escrevem nas mesmas chaves (`whatsapp-messages-queue`)
+      // e o BullMQ entrega o job a qualquer worker que esteja escutando — uma
+      // mensagem de cliente real podia ser processada pelo backend de teste.
+      ...(process.env.REDIS_PREFIX && { prefix: process.env.REDIS_PREFIX }),
       defaultJobOptions: {
         removeOnComplete: 2,
         removeOnFail: 5,
