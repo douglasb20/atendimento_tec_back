@@ -76,8 +76,10 @@ também por banco.
 `./files` precisa existir — é servida estaticamente em `/files/` e o Nest não
 sobe sem ela.
 
-⚠️ O `.env.exemple` está parcialmente desatualizado: traz `URL_WHATSAPP_API` e
-`BUCKET_*` (obsoletos) e não lista `REDIS_*` nem `MEDIA_RETENTION_MONTHS`.
+O `.env.exemple` foi auditado contra o que o código de fato lê (`process.env` e
+`ConfigService`): as obsoletas saíram (`URL_WHATSAPP_API` e `WHATSAPP_API_KEY`,
+do transporte anterior; `BUCKET_*`; e `ENCRYPT_*_JWT_SECRET`, que nunca chegaram
+a ser implementadas) e o bloco `REDIS_*` foi documentado.
 
 ## Ciclo de vida do atendimento
 
