@@ -436,12 +436,15 @@ export class SupportChatsService {
               savedMessage.lastMessage,
               manager,
             );
-            await this.whatsappChatStateEmit({
-              ...supportChat,
-              last_message: savedMessage.lastMessage.content,
-              last_message_type: savedMessage.lastMessage.type,
-              last_message_id: savedMessage.lastMessage.id,
-            });
+            await this.whatsappChatStateEmit(
+              {
+                ...supportChat,
+                last_message: savedMessage.lastMessage.content,
+                last_message_type: savedMessage.lastMessage.type,
+                last_message_id: savedMessage.lastMessage.id,
+              },
+              manager,
+            );
           }
 
           const supoportChatsWhitMessage = {
@@ -517,12 +520,15 @@ export class SupportChatsService {
             savedMessage?.lastMessage,
             manager,
           );
-          await this.whatsappChatStateEmit({
-            ...supportChat,
-            last_message: savedMessage?.lastMessage?.content,
-            last_message_type: savedMessage?.lastMessage?.type,
-            last_message_id: savedMessage?.lastMessage?.id,
-          });
+          await this.whatsappChatStateEmit(
+            {
+              ...supportChat,
+              last_message: savedMessage?.lastMessage?.content,
+              last_message_type: savedMessage?.lastMessage?.type,
+              last_message_id: savedMessage?.lastMessage?.id,
+            },
+            manager,
+          );
 
           const supoportChatsWhitMessage = {
             ...supportChat,
@@ -578,12 +584,15 @@ export class SupportChatsService {
               savedMessage.lastMessage,
               manager,
             );
-            await this.whatsappChatStateEmit({
-              ...supportChat,
-              last_message: savedMessage.lastMessage.content,
-              last_message_type: savedMessage.lastMessage.type,
-              last_message_id: savedMessage.lastMessage.id,
-            });
+            await this.whatsappChatStateEmit(
+              {
+                ...supportChat,
+                last_message: savedMessage.lastMessage.content,
+                last_message_type: savedMessage.lastMessage.type,
+                last_message_id: savedMessage.lastMessage.id,
+              },
+              manager,
+            );
           }
 
           const supoportChatsWhitMessage = {
@@ -812,8 +821,8 @@ export class SupportChatsService {
    * Os campos de prévia (`last_message*`) vêm de quem chama, porque são
    * calculados a partir da mensagem que acabou de ser salva.
    */
-  async whatsappChatStateEmit(supportChat: SupportChats) {
-    const completo = await this.supportChatsRepository.findParaEstado(supportChat.id);
+  async whatsappChatStateEmit(supportChat: SupportChats, manager?: EntityManager) {
+    const completo = await this.supportChatsRepository.findParaEstado(supportChat.id, manager);
 
     // As colunas guardam a key do storage, não a URL. A leitura HTTP já traduz
     // isso; aqui precisa ser feito na mão, senão o socket sobrescreve na tela a
@@ -827,14 +836,10 @@ export class SupportChatsService {
 
     this.whatsappService.emitEvent('whatsapp:chat_state', {
       ...(completo ?? supportChat),
-      // Estes quatro vêm de quem chama, não da releitura. O motivo é que a
-      // releitura acima usa o repositório comum — uma conexão própria, fora da
-      // transação do handler —, então ela não enxerga o que a transação ainda
-      // não commitou e devolve os valores anteriores. A prévia é calculada da
-      // mensagem recém-salva, e o contador acabou de ser incrementado.
-      //
-      // Passar o `manager` até aqui resolveria na raiz e dispensaria a
-      // sobrescrita, mas mudaria a assinatura dos quatro chamadores.
+      // Estes quatro vêm de quem chama, não da releitura: a prévia é calculada
+      // da mensagem recém-salva e o contador acabou de ser incrementado, ambos
+      // em memória. Quando o `manager` é passado a releitura já enxerga a
+      // transação, mas mantê-los custa nada e cobre o chamador que não passa.
       last_message: supportChat.last_message,
       last_message_type: supportChat.last_message_type,
       last_message_id: supportChat.last_message_id,

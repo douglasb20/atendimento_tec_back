@@ -88,6 +88,16 @@ export class ContactsService {
   ): Promise<Contacts> {
     let contact = await manager.findOneBy(Contacts, { remote_jid });
 
+    // Diagnóstico do avatar genérico: sem isto não dá para distinguir "contato
+    // novo", "já tinha foto" e "tem o campo vazio e vai reconsultar" — os três
+    // caminhos são silenciosos e levam ao mesmo resultado na tela.
+    this.logger.debug(
+      `findOrCreateByRemoteJid ${remote_jid}: ` +
+        (contact
+          ? `contato ${contact.id} existente, avatar_url=${JSON.stringify(contact.avatar_url)}`
+          : 'contato novo'),
+    );
+
     if (!contact) {
       const phone = await this.whatsappService.getFormattedNumber(sessionId, remote_jid);
       const profilePicUrl = await this.whatsappService.getProfilePicUrl(sessionId, remote_jid);

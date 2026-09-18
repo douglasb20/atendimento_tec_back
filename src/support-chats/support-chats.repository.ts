@@ -104,8 +104,15 @@ export class SupportChatsRepository extends Repository<SupportChats> {
    * endpoints de iniciar/finalizar: um shape único evita que o front receba
    * ora com `supportChatStatus`, ora sem.
    */
-  async findParaEstado(id: number): Promise<SupportChats> {
-    return this.findOne({
+  async findParaEstado(id: number, manager?: EntityManager): Promise<SupportChats> {
+    // O `manager` da transação em curso, quando há uma. Sem ele a leitura usa
+    // uma conexão própria, que não enxerga o que ainda não foi commitado — na
+    // primeira mensagem de um contato novo isso devolvia `null`, e a conversa
+    // seguia pelo socket sem a relação `contact`: a lista lateral aparecia sem
+    // nome e sem foto até o atendente recarregar a página.
+    const repo = manager ? manager.getRepository(SupportChats) : this;
+
+    return repo.findOne({
       where: { id },
       relations: [
         'contact',
