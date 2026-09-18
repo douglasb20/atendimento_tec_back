@@ -101,7 +101,28 @@ export class ContactsService {
       });
 
       await manager.save(Contacts, contact);
+      return contact;
     }
+
+    // Contato já existente sem foto: tenta de novo.
+    //
+    // A busca acontecia só na criação, então um contato criado enquanto a
+    // instância ainda subia — ou antes de o dono publicar uma foto — ficava com
+    // o avatar genérico para sempre, por mais conversas que tivesse depois.
+    //
+    // Só quando está vazia: refazer a chamada em toda mensagem somaria uma ida
+    // à Evolution por mensagem recebida, e a foto muda raramente.
+    if (!contact.avatar_url) {
+      const profilePicUrl = await this.whatsappService.getProfilePicUrl(sessionId, remote_jid);
+
+      if (profilePicUrl) {
+        contact.avatar_url = profilePicUrl;
+        contact.is_avatar_external = true;
+        await manager.save(Contacts, contact);
+        this.logger.log(`Foto de perfil preenchida para o contato ${contact.id}`);
+      }
+    }
+
     return contact;
   }
 }

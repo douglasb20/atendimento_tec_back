@@ -236,17 +236,32 @@ export class EvolutionProvider implements WhatsappProvider {
   }
 
   async getProfilePicUrl(session: ProviderSessionRef, remoteJid: string): Promise<string> {
+    const numero = this.toNumber(remoteJid);
+
     try {
       const { data } = await this.http.post<{ profilePictureUrl?: string }>(
         `/chat/fetchProfilePictureUrl/${session.sessionId}`,
-        { number: this.toNumber(remoteJid) },
+        { number: numero },
         this.comToken(session),
       );
-      return data?.profilePictureUrl ?? '';
+      const url = data?.profilePictureUrl ?? '';
+
+      // Resposta 200 sem URL é indistinguível, no log, de um contato que
+      // simplesmente não tem foto — e as duas coisas levam ao avatar genérico
+      // na tela. Sem esta linha a única pista era o campo vazio no banco,
+      // descoberto horas depois.
+      if (!url) {
+        this.logger.warn(
+          `Foto de perfil vazia para ${numero} (instância ${session.sessionId}); ` +
+            `resposta: ${JSON.stringify(data)}`,
+        );
+      }
+
+      return url;
     } catch (error) {
       // Contato sem foto ou com privacidade restrita é caso normal.
       this.logger.warn(
-        `Não foi possível obter a foto de perfil de ${remoteJid}: ${this.messageOf(error)}`,
+        `Não foi possível obter a foto de perfil de ${numero}: ${this.messageOf(error)}`,
       );
       return '';
     }
