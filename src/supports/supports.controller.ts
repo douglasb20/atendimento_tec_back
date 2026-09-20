@@ -25,7 +25,7 @@ export class SupportsController {
 
   @Get()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('supports:view')
+  @Permissions('support:view')
   @HttpCode(HttpStatus.OK)
   async findAll() {
     return await this.supportsService.findAll();
@@ -33,7 +33,7 @@ export class SupportsController {
 
   @Get('/status')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('supports:view')
+  @Permissions('support:view')
   @HttpCode(HttpStatus.OK)
   async getListStatus() {
     return await this.supportsService.getListStatus();
@@ -41,7 +41,7 @@ export class SupportsController {
 
   @Get('/:userId/filter')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('supports:view')
+  @Permissions('support:view')
   @HttpCode(HttpStatus.OK)
   async filterByDate(
     @Param('userId', ParseIntPipe) userId: number,
@@ -53,7 +53,7 @@ export class SupportsController {
 
   @Get('/get_by_user/:user_id')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('supports:view')
+  @Permissions('support:view')
   @HttpCode(HttpStatus.OK)
   async findByUserId(@Param('user_id', ParseIntPipe) user_id: number) {
     return await this.supportsService.findByUserId(user_id);
@@ -61,7 +61,7 @@ export class SupportsController {
 
   @Get('/:id')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('supports:view')
+  @Permissions('support:view')
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id', ParseIntPipe) id: number) {
     return await this.supportsService.findOne(id);
@@ -69,7 +69,7 @@ export class SupportsController {
 
   @Post()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('supports:add')
+  @Permissions('support:add')
   @HttpCode(HttpStatus.CREATED)
   async createSupport(@Body() createSupportDto: CreateSupportDto) {
     return await this.supportsService.createSupport(createSupportDto);
@@ -77,7 +77,7 @@ export class SupportsController {
 
   @Patch('/:id')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('supports:update')
+  @Permissions('support:update')
   @HttpCode(HttpStatus.OK)
   async updateSupport(
     @Param('id', ParseIntPipe) id: number,
@@ -88,7 +88,7 @@ export class SupportsController {
 
   @Delete('/:id')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('supports:delete')
+  @Permissions('support:delete')
   @HttpCode(HttpStatus.OK)
   async deleteSupport(@Param('id', ParseIntPipe) id: number) {
     return await this.supportsService.deleteSupport(id);

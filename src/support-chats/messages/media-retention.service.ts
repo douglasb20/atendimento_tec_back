@@ -3,10 +3,8 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { DataSource, IsNull, LessThan, Not } from 'typeorm';
 
 import { StorageService } from '@/storage/storage.service';
+import { SystemSettingsService } from '@/system-settings/system-settings.service';
 import { SupportChatMessages } from './entities/support-chat-messages.entity';
-
-/** Meses de retenção da mídia. Configurável por ambiente. */
-const MESES_RETENCAO_PADRAO = 3;
 
 /** Mensagens processadas por rodada, para não segurar transação longa demais. */
 const TAMANHO_LOTE = 200;
@@ -26,12 +24,13 @@ export class MediaRetentionService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly storageService: StorageService,
+    private readonly settings: SystemSettingsService,
   ) {}
 
   /** Roda de madrugada, quando o uso do sistema é menor. */
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async expirarMidiasAntigas(): Promise<{ expiradas: number; falhas: number }> {
-    const meses = Number(process.env.MEDIA_RETENTION_MONTHS) || MESES_RETENCAO_PADRAO;
+    const meses = await this.settings.getInteiro('midia_retencao_meses');
     const limite = new Date();
     limite.setMonth(limite.getMonth() - meses);
 

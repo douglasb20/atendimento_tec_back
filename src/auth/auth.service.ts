@@ -7,12 +7,12 @@ import { Request } from 'express';
 import { runInTransaction } from '@/Utils';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { JwtPayload } from '@types';
-import { ConfigMailerService } from 'core/mailer/configmailer.service';
 import { DataSource, EntityManager, LessThan } from 'typeorm';
 import { UpdateUserDto } from 'users/dto/update-user.dto';
 import { UserRefreshTokens } from 'users/entities/user-refresh-tokens.entity';
 import { Users } from 'users/entities/users.entity';
 import { UserRepository } from 'users/users.repository';
+import { SystemSettingsService } from '@/system-settings/system-settings.service';
 
 type TokenResponse = {
   access_token: string;
@@ -25,8 +25,8 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   constructor(
     private readonly usersRepository: UserRepository,
-    private readonly mailerService: ConfigMailerService,
     private readonly jwtService: JwtService,
+    private readonly settings: SystemSettingsService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -56,12 +56,11 @@ export class AuthService {
         // — nada disso vale para o access. Ele também rotaciona a cada uso, de
         // modo que o anterior deixa de servir.
         //
-        // `JWT_EXPIRATION` é o nome antigo, mantido como fallback: o ambiente
-        // de produção ainda o define, e o nome não dizia qual dos dois tokens
-        // configurava.
-        expiresIn: (process.env.REFRESH_JWT_EXPIRATION ||
-          process.env.JWT_EXPIRATION ||
-          '30d') as any,
+        // Vem do portal, em dias — a variável de ambiente segue valendo como
+        // padrão, pelo catálogo. `JWT_EXPIRATION` é o nome antigo, mantido
+        // como último recurso: produção ainda o define, e o nome não dizia
+        // qual dos dois tokens configurava.
+        expiresIn: `${await this.settings.getInteiro('refresh_expiracao_dias')}d` as any,
       },
     );
     const refreshDecoded = this.jwtService.decode<{ exp: number }>(refresh_token);
@@ -93,17 +92,6 @@ export class AuthService {
         throw new BadRequestException(err);
       }
     });
-  }
-
-  async forgottenPassword(email: string): Promise<void> {
-    const user = await this.findByEmail(email);
-    await this.mailerService.SendForgottenPassword(user.name, user.id, user.email);
-    const altRequestPassword = {
-      ...user,
-      is_requestpassword: 1,
-    };
-
-    await this.usersRepository.update(user.id, altRequestPassword);
   }
 
   async refresh(refreshToken: string, request: Request) {

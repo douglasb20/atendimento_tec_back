@@ -12,15 +12,34 @@ export class PermissionsRepository extends Repository<Permissions> {
     super(Permissions, dataSource.manager);
   }
 
-  async hasPermission(user_id: number, permissionName: string): Promise<boolean> {
-    const permission = await this.createQueryBuilder('p')
-      .innerJoinAndSelect('permission_x_user', 'pxu', 'pxu.permission_id = p.id')
-      .select('p.*')
-      .where('p.name in (:...permissionName)', { permissionName })
-      .andWhere('pxu.user_id = :userId', { userId: user_id })
-      .getExists();
+  /**
+   * O usuário tem ao menos uma das permissões? (semântica OU)
+   *
+   * O caminho é `users → permission_groups → permission_group_x_permission → permissions`. A tabela
+   * `permission_x_user` não entra: desde a adoção dos grupos ela está vazia, e
+   * fica reservada para as exceções individuais.
+   */
+  async hasPermission(user_id: number, permissionName: string[]): Promise<boolean> {
+    if (!permissionName?.length) return false;
 
-    return permission;
+    return this.createQueryBuilder('p')
+      .innerJoin('permission_group_x_permission', 'pgxp', 'pgxp.permission_id = p.id')
+      .innerJoin('users', 'u', 'u.permission_group_id = pgxp.permission_group_id')
+      .where('p.name IN (:...permissionName)', { permissionName })
+      .andWhere('u.id = :userId', { userId: user_id })
+      .getExists();
+  }
+
+  /** Os nomes das permissões do usuário, pelo grupo. */
+  async nomesPermissoesDoUsuario(user_id: number): Promise<string[]> {
+    const linhas = await this.createQueryBuilder('p')
+      .select('p.name', 'name')
+      .innerJoin('permission_group_x_permission', 'pgxp', 'pgxp.permission_id = p.id')
+      .innerJoin('users', 'u', 'u.permission_group_id = pgxp.permission_group_id')
+      .where('u.id = :userId', { userId: user_id })
+      .getRawMany<{ name: string }>();
+
+    return linhas.map((l) => l.name);
   }
 
   async findAllPermissions() {
@@ -33,13 +52,19 @@ export class PermissionsRepository extends Repository<Permissions> {
     return this.dataSource.manager.find(PermissionModule);
   }
 
+  /**
+   * As permissões do usuário, para `/users/info` alimentar a interface.
+   *
+   * Lê pelo grupo, como o guard. Antes lia `permission_x_user`, que hoje está
+   * vazia — a tela mostraria "sem acesso" para todo mundo.
+   */
   async permissionByUser(user_id: number): Promise<Permissions[]> {
-    const permissions = await this.createQueryBuilder('p')
-      .innerJoinAndSelect('permission_x_user', 'pxu', 'pxu.permission_id = p.id')
+    return this.createQueryBuilder('p')
       .select(['p.*'])
-      .where('pxu.user_id = :user_id', { user_id })
+      .innerJoin('permission_group_x_permission', 'pgxp', 'pgxp.permission_id = p.id')
+      .innerJoin('users', 'u', 'u.permission_group_id = pgxp.permission_group_id')
+      .where('u.id = :user_id', { user_id })
       .getRawMany();
-    return permissions;
   }
 
   async createPermission(

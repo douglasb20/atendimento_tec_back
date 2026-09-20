@@ -31,6 +31,7 @@ export class PermissionsController {
 
   @Post()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('permission:update')
   @HttpCode(HttpStatus.CREATED)
   async createPermission(@Body() createPermissionDto: CreatePermissionDto[]) {
     if (createPermissionDto.length === 0) {
@@ -41,6 +42,7 @@ export class PermissionsController {
 
   @Put(':id')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('permission:update')
   @HttpCode(HttpStatus.OK)
   async updatePermission(
     @Param('id', ParseIntPipe) id: number,

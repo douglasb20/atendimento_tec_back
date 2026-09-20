@@ -8,6 +8,7 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -28,7 +29,8 @@ export class SupportChatsController {
   constructor(private readonly supportChatsService: SupportChatsService) {}
 
   @Post('/:id/send-message')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:update')
   @HttpCode(HttpStatus.OK)
   async sendMessage(
     @Param('id', ParseIntPipe) id: number,
@@ -43,14 +45,16 @@ export class SupportChatsController {
   }
 
   @Post('/sign-media-post')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:update')
   @HttpCode(HttpStatus.OK)
   async signMediaPost(@Body() signMediaPostDto: SignMediaPostDto) {
     return this.supportChatsService.signMediaPost(signMediaPostDto);
   }
 
   @Post('/:id/send-reply')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:update')
   @HttpCode(HttpStatus.OK)
   async replyMessage(
     @Param('id', ParseIntPipe) id: number,
@@ -66,21 +70,56 @@ export class SupportChatsController {
   }
 
   @Get()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:view')
   @HttpCode(HttpStatus.OK)
   async listAllSupportChats() {
     return this.supportChatsService.listAllSupportChats();
   }
 
   @Get('/:id/messages')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:view')
   @HttpCode(HttpStatus.OK)
   async findSupportChatById(@Param('id', ParseIntPipe) id: number) {
     return this.supportChatsService.findSupportChatsById(id);
   }
 
+  /**
+   * Quantos atendimentos anteriores este contato tem.
+   *
+   * Mesma permissão de abrir a conversa: quem vê o atendimento atual pode ver
+   * os anteriores **do mesmo contato** — é o histórico dele, não de outro.
+   */
+  @Get('/:id/anteriores')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:view')
+  @HttpCode(HttpStatus.OK)
+  async contarAnteriores(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('antes_de') antes_de?: string,
+  ) {
+    return this.supportChatsService.contarAnteriores(
+      id,
+      antes_de ? Number(antes_de) : undefined,
+    );
+  }
+
+  /** O atendimento imediatamente anterior ao informado, com suas mensagens. */
+  @Get('/:id/anterior')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:view')
+  @HttpCode(HttpStatus.OK)
+  async findAnterior(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('antes_de', ParseIntPipe) antes_de: number,
+  ) {
+    return this.supportChatsService.findAnterior(id, antes_de);
+  }
+
   @Post('/:id/send-media')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:update')
   @HttpCode(HttpStatus.OK)
   async sendMedia(
     @Param('id', ParseIntPipe) id: number,
@@ -99,7 +138,8 @@ export class SupportChatsController {
   }
 
   @Post('/:id/delete-message')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('message:delete')
   @HttpCode(HttpStatus.OK)
   async deleteMessage(
     @Param('id', ParseIntPipe) id: number,
@@ -118,7 +158,8 @@ export class SupportChatsController {
    * mensagem própria dentro de 60h; este some apenas do nosso lado.
    */
   @Post('/:id/ocultar-mensagens')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('message:delete')
   @HttpCode(HttpStatus.OK)
   async ocultarMensagens(
     @Param('id', ParseIntPipe) id: number,
@@ -131,7 +172,8 @@ export class SupportChatsController {
   }
 
   @Post('/:id/marcar-lida')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:view')
   @HttpCode(HttpStatus.OK)
   async marcarComoLida(@Param('id', ParseIntPipe) id: number) {
     return this.supportChatsService.marcarComoLida(id);
@@ -162,7 +204,8 @@ export class SupportChatsController {
   }
 
   @Post('/:id/edit-message')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('message:update')
   @HttpCode(HttpStatus.OK)
   async editMessage(
     @Param('id', ParseIntPipe) id: number,
@@ -183,7 +226,8 @@ export class SupportChatsController {
   }
 
   @Post('/:id/send-reaction')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:update')
   @HttpCode(HttpStatus.OK)
   async sendReaction(
     @Param('id', ParseIntPipe) id: number,

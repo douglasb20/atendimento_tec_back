@@ -28,6 +28,9 @@ import { StorageModule } from '@/storage/storage.module';
 import { RedisCacheModule } from '@/redis-cache/redis-cache.module';
 import { IntegrationsModule } from '@/integrations/integrations.module';
 import { TagsModule } from '@/tags/tags.module';
+import { PermissionGroupsModule } from '@/permission-groups/permission-groups.module';
+import { PasswordResetModule } from '@/password-reset/password-reset.module';
+import { SystemSettingsModule } from '@/system-settings/system-settings.module';
 import { HealthModule } from '@/health/health.module';
 
 // const destPath = path.resolve(__dirname, '..', '..', 'files', 'tmp');
@@ -91,6 +94,9 @@ import { HealthModule } from '@/health/health.module';
     RedisCacheModule,
     IntegrationsModule,
     TagsModule,
+    PermissionGroupsModule,
+    PasswordResetModule,
+    SystemSettingsModule,
     HealthModule,
   ],
   exports: [ QueryStorageService],

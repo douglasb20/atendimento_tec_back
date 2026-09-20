@@ -18,6 +18,7 @@ import { UsersService } from './users.service';
 
 import { Permissions } from 'permissions/permissions.decorator';
 import { PermissionGuard } from 'permissions/permissions.guard';
+import { SemPermissao } from 'permissions/sem-permissao.decorator';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Users } from './entities/users.entity';
@@ -27,8 +28,11 @@ import { SignAvatarDto } from './dto/sign-avatar.dto';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  // Auto-consulta: é daqui que a interface sabe o que pode mostrar. Exigir
+  // permissão para o usuário ler as próprias permissões seria circular.
   @Get('/info')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @SemPermissao()
   @HttpCode(HttpStatus.OK)
   async userInfo(@Req() req: Request) {
     const user: Users = req.user as Users;

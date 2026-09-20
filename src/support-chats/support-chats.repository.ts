@@ -66,6 +66,81 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     return supportChat;
   }
 
+  /**
+   * Quantos atendimentos anteriores este contato tem, e qual é o próximo.
+   *
+   * Não traz mensagem nenhuma: é chamado ao abrir toda conversa, só para saber
+   * se existe histórico a oferecer. Carregar as mensagens aqui faria toda
+   * abertura pagar o custo do histórico inteiro, inclusive de quem nunca vai
+   * clicar no botão.
+   *
+   * O filtro é por `contact_id`, nunca por telefone ou nome: dois contatos
+   * podem ter o mesmo nome, e o vínculo que vale é o registro.
+   */
+  async contarAnteriores(
+    support_chat_id: number,
+    antes_de?: number,
+  ): Promise<{ total: number; proximo: SupportChats | null }> {
+    const atual = await this.findOne({
+      where: { id: support_chat_id },
+      select: { id: true, contact_id: true },
+    });
+
+    if (!atual) return { total: 0, proximo: null };
+
+    // `id <` e não data: os ids são sequenciais e é por eles que a ordem de
+    // criação se define sem ambiguidade — duas conversas abertas no mesmo
+    // segundo teriam a mesma data.
+    const limite = antes_de ?? support_chat_id;
+
+    const query = this.createQueryBuilder('sc')
+      .where('sc.contact_id = :contact_id', { contact_id: atual.contact_id })
+      .andWhere('sc.id < :limite', { limite })
+      .orderBy('sc.id', 'DESC');
+
+    const total = await query.getCount();
+    const proximo = total > 0 ? await query.clone().take(1).getOne() : null;
+
+    return { total, proximo };
+  }
+
+  /**
+   * Um atendimento anterior, com suas mensagens.
+   *
+   * Um por chamada, e não uma página de N mensagens: a unidade que faz sentido
+   * para quem atende é o atendimento inteiro, não "mais 50 linhas" cortadas no
+   * meio de uma conversa.
+   */
+  async findAnteriorComMensagens(
+    support_chat_id: number,
+    antes_de: number,
+  ): Promise<SupportChats | null> {
+    const atual = await this.findOne({
+      where: { id: support_chat_id },
+      select: { id: true, contact_id: true },
+    });
+
+    if (!atual) return null;
+
+    const anterior = await this.createQueryBuilder('sc')
+      .where('sc.contact_id = :contact_id', { contact_id: atual.contact_id })
+      .andWhere('sc.id < :antes_de', { antes_de })
+      .orderBy('sc.id', 'DESC')
+      .take(1)
+      .getOne();
+
+    if (!anterior) return null;
+
+    // Recarregado com as relações: o query builder acima serve para achar
+    // *qual* é o anterior, e trazer as mensagens junto ali complicaria a
+    // ordenação sem ganho.
+    return this.findOne({
+      where: { id: anterior.id },
+      order: { supportChatMessages: { datetime: 'ASC' } },
+      relations: ['supportChatMessages', 'user', 'supportChatStatus'],
+    });
+  }
+
   async findOrOpen(
     contact_id: number,
     channel_id: number,

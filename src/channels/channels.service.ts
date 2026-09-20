@@ -56,8 +56,23 @@ export class ChannelsService {
     await this.channelsRepository.save(channelRemoved);
   }
 
+  /**
+   * O canal com as relações que a tela precisa.
+   *
+   * Antes era `findOneBy`, que traz só as colunas: o `GET /channels/:id`
+   * devolvia `channelStatus` indefinido, e a tela de canais, ao abrir o modal,
+   * substituía o canal da listagem por essa versão incompleta. O aviso de
+   * sincronização passava a dizer que o status anterior era "desconhecido",
+   * mesmo estando na tela um instante antes.
+   *
+   * `integration` entra pelo mesmo motivo que na listagem: é o que distingue
+   * um canal na integração padrão de outro com servidor próprio.
+   */
   async findChannel(channelId: number): Promise<Channels> {
-    const channel = await this.channelsRepository.findOneBy({ id: channelId });
+    const channel = await this.channelsRepository.findOne({
+      where: { id: channelId },
+      relations: ['channelStatus', 'integration'],
+    });
     if (!channel) {
       this.logger.error(`Erro ao localizar canal: Canal não encontrado com este id`);
       throw new NotFoundException('Canal não encontrado com este id');
@@ -216,15 +231,7 @@ export class ChannelsService {
    * tenta enviar. Este método é a fonte da verdade sob demanda.
    */
   async sincronizarStatus(channelId: number): Promise<Channels> {
-    // Com a relação carregada: quem chama mostra o nome do status ao usuário,
-    // e o `findChannel` devolve só as colunas.
-    const channel = await this.channelsRepository.findOne({
-      where: { id: channelId },
-      relations: ['channelStatus'],
-    });
-    if (!channel) {
-      throw new NotFoundException('Canal não localizado com este id');
-    }
+    const channel = await this.findChannel(channelId);
 
     if (!channel.session_id) {
       throw new BadRequestException('O canal ainda não possui uma sessão para consultar.');

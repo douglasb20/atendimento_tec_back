@@ -1,8 +1,17 @@
 import { Supports } from 'supports/entities/supports.entity';
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { UserRefreshTokens } from './user-refresh-tokens.entity';
 import { PermissionXUser } from 'permissions/entities/permission-x-user.entity';
 import { SupportChats } from 'support-chats/entities/support-chats.entity';
+import { PermissionGroups } from 'permission-groups/entities/permission-groups.entity';
 
 @Entity('users')
 export class Users {
@@ -33,8 +42,16 @@ export class Users {
   @Column({ type: 'timestamptz' })
   lastlogin_at: Date;
 
+  /**
+   * Coluna legada, anterior aos grupos. Nenhum guard a lê — quem decide acesso
+   * é `permission_group_id`. Mantida porque removê-la é escopo à parte.
+   */
   @Column({ default: 'USER' })
   role: string;
+
+  /** Nulo é válido: usuário sem grupo não tem permissão alguma. */
+  @Column({ type: 'int', nullable: true, default: null })
+  permission_group_id: number | null;
 
   @Column({ default: 0, nullable: true })
   is_superuser: number;
@@ -46,6 +63,15 @@ export class Users {
   @OneToMany(() => Supports, (supports) => supports.user)
   supports: Supports[];
 
+  @ManyToOne(() => PermissionGroups, (grupo) => grupo.users, { nullable: true })
+  @JoinColumn({ name: 'permission_group_id' })
+  permissionGroup: PermissionGroups | null;
+
+  /**
+   * Vínculo direto usuário-permissão. Sem uso desde a adoção dos grupos; fica
+   * como base para as exceções individuais (o usuário que herda do grupo e ganha
+   * ou perde uma permissão pontual).
+   */
   @OneToMany(() => PermissionXUser, (permissionUser) => permissionUser.user)
   permissionUser: PermissionXUser[];
 

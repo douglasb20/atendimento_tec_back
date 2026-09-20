@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Param, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Request, Response } from 'express';
 
@@ -38,12 +38,6 @@ export class AuthController {
     // O `expires_at` também vai no corpo para o cliente decidir quando renovar
     // sem precisar ler cookie — é só um timestamp.
     return { expires_at: this.expDoAccess(sessao.access_token) };
-  }
-
-  @Post('/forgotten_password/:email')
-  @HttpCode(HttpStatus.OK)
-  async forgottenPassword(@Param('email') email: string) {
-    return this.authService.forgottenPassword(email);
   }
 
   /**

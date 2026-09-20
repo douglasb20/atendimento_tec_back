@@ -222,7 +222,14 @@ export class SupportChatsService {
   }
 
   async listAllSupportChats() {
-    return this.supportChatsRepository.findAllSupportChats();
+    const conversas = await this.supportChatsRepository.findAllSupportChats();
+
+    // A listagem carrega `user` e `contact`, e as colunas guardam a key. O
+    // `<img>` da lista lateral aceita caminho relativo sem reclamar - só nao
+    // mostra a foto -, entao a falha aqui era silenciosa.
+    conversas?.forEach((conversa) => this.traduzAvatares(conversa));
+
+    return conversas;
   }
 
   async findSupportChatsById(id: number) {
@@ -230,12 +237,41 @@ export class SupportChatsService {
     if (!supportChatMessages) {
       throw new NotFoundException('Chat de suporte não encontrado');
     }
-    if (supportChatMessages?.user && supportChatMessages.user.avatar_url) {
-      supportChatMessages.user.avatar_url = this.storageService.getPublicUrl(
-        supportChatMessages.user.avatar_url,
-      );
-    }
+    this.traduzAvatares(supportChatMessages);
+
     return this.messagesService.getUrlForMessageMedia(supportChatMessages);
+  }
+
+  /**
+   * Resumo do histórico do contato, para a conversa saber se há o que oferecer.
+   *
+   * Sem mensagens: é chamado ao abrir toda conversa, e o botão só aparece
+   * quando `total > 0`.
+   */
+  async contarAnteriores(
+    id: number,
+    antes_de?: number,
+  ): Promise<{ total: number; proximo: { id: number; protocol: string } | null }> {
+    const { total, proximo } = await this.supportChatsRepository.contarAnteriores(id, antes_de);
+
+    return {
+      total,
+      proximo: proximo ? { id: proximo.id, protocol: proximo.protocol } : null,
+    };
+  }
+
+  /** O atendimento anterior ao `antes_de`, com as mensagens prontas para a tela. */
+  async findAnterior(id: number, antes_de: number): Promise<SupportChats | null> {
+    const anterior = await this.supportChatsRepository.findAnteriorComMensagens(id, antes_de);
+
+    if (!anterior) return null;
+
+    // As colunas guardam a key, não a URL — sem esta conversão o front recebe
+    // `chat/media/xxx.jpeg` como se fosse endereço. Vale para a mídia das
+    // mensagens e para os avatares de quem atendeu.
+    this.traduzAvatares(anterior);
+
+    return this.messagesService.getUrlForMessageMedia(anterior);
   }
 
   async sendReactionMessage(id: number, chat_id: string, messageId: string, reaction: string) {
@@ -804,10 +840,41 @@ export class SupportChatsService {
    * mãos, cujo shape varia; aqui sempre sai completo, para o front poder
    * mesclar sem perder o que já havia carregado.
    */
+  /**
+   * Troca as keys de avatar pela URL pública, no lugar.
+   *
+   * As colunas guardam a key do storage, não a URL. Sem esta tradução o
+   * `next/image` do front recebe `user/avatar/xxx.jpeg` e quebra a tela
+   * inteira, porque exige caminho absoluto ou barra inicial.
+   *
+   * `getPublicUrl` é idempotente, então chamar duas vezes no mesmo objeto não
+   * faz mal - o que evita ter de rastrear por onde a conversa já passou.
+   */
+  private traduzAvatares(chat: SupportChats | null): SupportChats | null {
+    if (!chat) return chat;
+
+    if (chat.user?.avatar_url) {
+      chat.user.avatar_url = this.storageService.getPublicUrl(chat.user.avatar_url);
+    }
+
+    // O avatar externo é a URL que o WhatsApp devolve, e não passa pelo nosso
+    // storage: convertê-la produziria um caminho para um objeto que não existe.
+    if (chat.contact?.avatar_url && !chat.contact.is_avatar_external) {
+      chat.contact.avatar_url = this.storageService.getPublicUrl(chat.contact.avatar_url);
+    }
+
+    return chat;
+  }
+
   private async recarregaEEmiteEstado(id: number): Promise<SupportChats> {
     const atualizado = await this.supportChatsRepository.findParaEstado(id);
     await this.whatsappChatStateEmit(atualizado);
-    return atualizado;
+
+    // A tradução precisa acontecer aqui tambem, e nao so no emit: aquele
+    // metodo faz releitura propria e muta *o objeto dele*, outra instancia.
+    // Sem isto a resposta HTTP de iniciar/finalizar saía com a key crua,
+    // enquanto o socket recebia a URL boa.
+    return this.traduzAvatares(atualizado) ?? atualizado;
   }
 
   /**
@@ -824,15 +891,9 @@ export class SupportChatsService {
   async whatsappChatStateEmit(supportChat: SupportChats, manager?: EntityManager) {
     const completo = await this.supportChatsRepository.findParaEstado(supportChat.id, manager);
 
-    // As colunas guardam a key do storage, não a URL. A leitura HTTP já traduz
-    // isso; aqui precisa ser feito na mão, senão o socket sobrescreve na tela a
-    // URL boa por um caminho relativo que o navegador não resolve.
-    if (completo?.user?.avatar_url) {
-      completo.user.avatar_url = this.storageService.getPublicUrl(completo.user.avatar_url);
-    }
-    if (completo?.contact?.avatar_url && !completo.contact.is_avatar_external) {
-      completo.contact.avatar_url = this.storageService.getPublicUrl(completo.contact.avatar_url);
-    }
+    // Senão o socket sobrescreve na tela a URL boa por um caminho relativo
+    // que o navegador não resolve.
+    this.traduzAvatares(completo);
 
     this.whatsappService.emitEvent('whatsapp:chat_state', {
       ...(completo ?? supportChat),

@@ -18,7 +18,10 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "migration:run": "npm run build && npx typeorm migration:run -d ./dist/core/database/orm-cli-config.js"
+    "migration:run": "npm run build && npm run migration:deploy",
+    "migration:deploy": "npx typeorm migration:run -d ./dist/core/database/orm-cli-config.js",
+    "migration:revert": "npx typeorm migration:revert -d ./dist/core/database/orm-cli-config.js",
+    "migration:show": "npx typeorm migration:show -d ./dist/core/database/orm-cli-config.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1036.0",

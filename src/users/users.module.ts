@@ -15,5 +15,8 @@ import { RedisCacheModule } from '@/redis-cache/redis-cache.module';
   imports: [TypeOrmModule.forFeature([Users, Supports, UserRefreshTokens]), ConfigMailerModule, RedisCacheModule],
   controllers: [UsersController],
   providers: [UsersService, UserRepository, PermissionsRepository, StorageService],
+  // O `UserRepository` é usado pela redefinição de senha, que precisa achar o
+  // usuário pelo e-mail e gravar a senha nova.
+  exports: [UserRepository],
 })
 export class UsersModule {}
