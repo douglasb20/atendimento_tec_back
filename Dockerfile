@@ -27,8 +27,15 @@ WORKDIR /app
 RUN apk add --no-cache ffmpeg tzdata
 ENV TZ=America/Sao_Paulo
 
+# `--omit=optional` além de `--omit=dev`: o `@nestjs-modules/mailer` declara
+# `preview-email`, `mjml`, `pug` e outros motores de template como
+# optionalDependencies, e nenhum deles é usado aqui - só o Handlebars, que é
+# dependência direta. O `preview-email` ainda arrasta duas cópias antigas do
+# nodemailer (8.0.5 e 8.0.11), com as vulnerabilidades que a 10 corrigiu.
+# Elas nunca são carregadas, porque a opção `preview` fica desligada, mas
+# aparecem em qualquer varredura de segurança da imagem.
 COPY package*.json .npmrc ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev --omit=optional && npm cache clean --force
 
 COPY --from=build /app/dist ./dist
 
