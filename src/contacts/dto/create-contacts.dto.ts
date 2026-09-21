@@ -1,4 +1,13 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ValorCampoDto } from '@/custom-fields/dto/valor-campo.dto';
+import {
+  IsArray,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 
 export class CreateContactsDto {
   id?: number;
@@ -14,4 +23,16 @@ export class CreateContactsDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  /**
+   * Os campos personalizados que quem edita escolheu para este contato.
+   *
+   * Omitir preserva o que já existe; array vazio remove todos - a mesma
+   * semântica de `tag_ids` em clientes.
+   */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ValorCampoDto)
+  campos?: ValorCampoDto[];
 }

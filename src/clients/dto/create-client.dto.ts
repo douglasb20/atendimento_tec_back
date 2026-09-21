@@ -1,4 +1,6 @@
-import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, ValidateNested} from 'class-validator';
+import { Type } from 'class-transformer';
+import { ValorCampoDto } from '@/custom-fields/dto/valor-campo.dto';
 
 export class CreateClientDto {
   @IsString()
@@ -17,4 +19,15 @@ export class CreateClientDto {
   @IsArray()
   @IsInt({ each: true, message: 'Informe ids de etiqueta válidos' })
   tag_ids?: number[];
+
+  /**
+   * Campos personalizados escolhidos para este cliente.
+   *
+   * Mesma semântica de `tag_ids`: omitir preserva, array vazio remove todos.
+   */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ValorCampoDto)
+  campos?: ValorCampoDto[];
 }

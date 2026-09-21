@@ -27,6 +27,7 @@ import { ContactsModule } from '@/contacts/contacts.module';
 import { StorageModule } from '@/storage/storage.module';
 import { RedisCacheModule } from '@/redis-cache/redis-cache.module';
 import { IntegrationsModule } from '@/integrations/integrations.module';
+import { CustomFieldsModule } from '@/custom-fields/custom-fields.module';
 import { TagsModule } from '@/tags/tags.module';
 import { PermissionGroupsModule } from '@/permission-groups/permission-groups.module';
 import { PasswordResetModule } from '@/password-reset/password-reset.module';
@@ -94,6 +95,7 @@ import { HealthModule } from '@/health/health.module';
     RedisCacheModule,
     IntegrationsModule,
     TagsModule,
+    CustomFieldsModule,
     PermissionGroupsModule,
     PasswordResetModule,
     SystemSettingsModule,

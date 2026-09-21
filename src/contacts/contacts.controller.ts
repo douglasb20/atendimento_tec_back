@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Post,
   Query,
   ParseIntPipe,
   Patch,
@@ -15,6 +16,7 @@ import { ContactsService } from './contacts.service';
 import { AuthGuard } from '@nestjs/passport';
 import { Permissions } from 'permissions/permissions.decorator';
 import { PermissionGuard } from 'permissions/permissions.guard';
+import { CreateContactsDto } from './dto/create-contacts.dto';
 import { UpdateContactsDto } from './dto/update-contacts.dto';
 
 @Controller('contacts')
@@ -27,6 +29,14 @@ export class ContactsController {
   @HttpCode(HttpStatus.OK)
   async getAllContacts() {
     return this.contactsService.getAllContacts();
+  }
+
+  @Post()
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('contact:add')
+  @HttpCode(HttpStatus.CREATED)
+  async createContact(@Body() createContactDto: CreateContactsDto) {
+    return this.contactsService.createContact(createContactDto);
   }
 
   @Delete('/contact/:contact_id')

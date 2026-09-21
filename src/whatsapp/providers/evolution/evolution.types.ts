@@ -259,3 +259,16 @@ export type EvolutionBase64Response = {
   /** Base64 puro, sem o prefixo `data:`. */
   base64?: string;
 };
+
+/**
+ * Resposta de `POST /chat/whatsappNumbers` - um item por número consultado.
+ *
+ * `jid` é o identificador verdadeiro do contato no WhatsApp, e vem só quando
+ * `exists` é true.
+ */
+export type EvolutionNumeroVerificadoResponse = {
+  exists: boolean;
+  jid?: string | null;
+  number?: string | null;
+  name?: string | null;
+};

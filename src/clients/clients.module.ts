@@ -11,9 +11,10 @@ import { Contacts } from 'contacts/entities/contacts.entity';
 import { ContactsRepository } from 'contacts/contacts.repository';
 import { ContactsModule } from 'contacts/contacts.module';
 import { TagsModule } from '@/tags/tags.module';
+import { CustomFieldsModule } from '@/custom-fields/custom-fields.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Clients, Contacts, Supports]), ContactsModule, TagsModule],
+  imports: [CustomFieldsModule, TypeOrmModule.forFeature([Clients, Contacts, Supports]), ContactsModule, TagsModule],
   controllers: [ClientController],
   providers: [ClientService, ClientRepository, ContactsRepository],
 })

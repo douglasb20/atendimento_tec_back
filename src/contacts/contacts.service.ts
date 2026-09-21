@@ -1,12 +1,38 @@
 import { runInTransaction } from '@/Utils';
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
 import { Clients } from 'clients/entities/clients.entity';
 import { DataSource, EntityManager } from 'typeorm';
 import { WhatsappService } from 'whatsapp/whatsapp.service';
+import { CustomFieldsService } from '@/custom-fields/custom-fields.service';
 import { ContactsRepository } from './contacts.repository';
 import { CreateContactsDto } from './dto/create-contacts.dto';
 import { UpdateContactsDto } from './dto/update-contacts.dto';
 import { Contacts } from './entities/contacts.entity';
+
+/**
+ * Telefone em dígitos, com o DDI do Brasil quando for um número nacional.
+ *
+ * A máscara do formulário é nacional - `(64) 99269-8043` -, mas o WhatsApp
+ * identifica o contato pelo número internacional: sem o `55` a verificação
+ * responde que não existe, e um número válido seria marcado como sem WhatsApp.
+ *
+ * Só acrescenta o prefixo a 10 ou 11 dígitos, que é o formato nacional (DDD +
+ * 8 ou 9). Qualquer outro tamanho passa intacto: um `+1 555 123 4567` também
+ * tem 11 dígitos depois do `+`, mas já começa com o DDI dele, e prefixá-lo
+ * produziria um número diferente do digitado.
+ */
+function comDdiBrasil(telefone?: string): string {
+  const digitos = (telefone ?? '').replace(/\D/g, '');
+  if (!digitos) return '';
+
+  // Começar com 55 e ter 12 ou 13 dígitos já é o formato final.
+  if (digitos.startsWith('55') && digitos.length >= 12) return digitos;
+
+  // O `+` marca que quem digitou informou o país - respeitar sempre.
+  if (telefone?.trim().startsWith('+')) return digitos;
+
+  return digitos.length === 10 || digitos.length === 11 ? `55${digitos}` : digitos;
+}
 
 @Injectable()
 export class ContactsService {
@@ -15,11 +41,18 @@ export class ContactsService {
   constructor(
     private contactRepository: ContactsRepository,
     private whatsappService: WhatsappService,
+    private customFieldsService: CustomFieldsService,
     private dataSource: DataSource,
   ) {}
 
   async getAllContacts() {
-    return this.contactRepository.findBy({ status: 1 });
+    // `camposPersonalizados` vem junto: a listagem os exibe, e buscá-los
+    // depois seria uma consulta por linha.
+    return this.contactRepository.find({
+      where: { status: 1 },
+      relations: ['camposPersonalizados'],
+      order: { name: 'ASC' },
+    });
   }
 
   async saveContactsFromClient(contacts: CreateContactsDto[], client: Clients) {
@@ -30,6 +63,91 @@ export class ContactsService {
     })) as Contacts[];
 
     return await this.contactRepository.save(contactsNew);
+  }
+
+  /**
+   * Cadastro manual de contato, pela tela.
+   *
+   * Antes de gravar, pergunta ao provider se o número tem WhatsApp e qual é o
+   * JID. Sem isso o contato nasceria sem `remote_jid`, e a primeira mensagem
+   * dele criaria um segundo registro - o `findOrCreateByRemoteJid` busca só por
+   * esse campo. Montar o JID concatenando o telefone erraria: o nono dígito dos
+   * celulares brasileiros nem sempre coincide com o que o WhatsApp usa.
+   *
+   * A verificação é informativa, nunca bloqueante. Número sem WhatsApp, provider
+   * fora do ar ou nenhum canal conectado: o contato é gravado do mesmo jeito,
+   * com `remote_jid` nulo, e a resposta diz o que aconteceu.
+   */
+  async createContact(createContactDto: CreateContactsDto): Promise<Contacts & { aviso?: string }> {
+    const numero = comDdiBrasil(createContactDto.phone);
+    const verificado = numero ? await this.whatsappService.verificaNumero(numero) : null;
+
+    if (numero && !verificado) {
+      this.logger.warn(`Contato ${createContactDto.name}: número ${numero} não pôde ser verificado`);
+    }
+
+    const contact = await runInTransaction(this.dataSource, async (manager) => {
+      const jid = verificado?.existe ? verificado.remoteJid : null;
+
+      // Um contato com este JID já existe quando a pessoa já escreveu: nesse
+      // caso a tela estaria criando uma duplicata do que o webhook já criou.
+      if (jid) {
+        const existente = await manager.findOneBy(Contacts, { remote_jid: jid });
+        if (existente) {
+          throw new ConflictException(
+            `Este número já está cadastrado no contato "${existente.name}"`,
+          );
+        }
+      }
+
+      // O número que o WhatsApp reconheceu ganha do digitado: o provider
+      // devolve a forma canônica, e ela pode divergir - o nono dígito de
+      // celulares antigos existe no discado e não no JID. Gravar o digitado
+      // deixaria `phone` e `remote_jid` apontando para números diferentes.
+      const numeroCanonico = jid ? jid.split('@')[0] : numero;
+
+      const novo = manager.create(Contacts, {
+        name: createContactDto.name,
+        phone: numeroCanonico || null,
+        client_id: createContactDto.client_id ?? null,
+        remote_jid: jid,
+        status: 1,
+      });
+
+      const salvo = await manager.save(Contacts, novo);
+
+      // Validado antes de gravar: um valor fora do tipo derruba a transação
+      // inteira, e o contato não fica meio criado.
+      if (createContactDto.campos?.length) {
+        const valores = await this.customFieldsService.validaValores(
+          createContactDto.campos,
+          'contato',
+          manager,
+        );
+
+        await this.customFieldsService.sincronizaValores(salvo.id, valores, 'contato', manager);
+      }
+
+      return salvo;
+    });
+
+    this.logger.log(`Contato ${contact.id} criado (remote_jid=${contact.remote_jid ?? 'nenhum'})`);
+
+    // O aviso vai junto do contato, não como erro: o cadastro deu certo, e a
+    // tela decide como contá-lo a quem cadastrou.
+    if (!numero) return contact;
+    if (!verificado) {
+      return Object.assign(contact, {
+        aviso: 'Não foi possível verificar o número no WhatsApp agora. O contato foi salvo.',
+      });
+    }
+    if (!verificado.existe) {
+      return Object.assign(contact, {
+        aviso: 'Este número não tem WhatsApp. O contato foi salvo, mas não receberá mensagens.',
+      });
+    }
+
+    return contact;
   }
 
   async deleteContact(contact_id: number) {
@@ -57,6 +175,23 @@ export class ContactsService {
           client_id,
         );
 
+        // Só mexe nos campos quando vêm no corpo: um PATCH que não os mencione
+        // deixa os valores como estão.
+        if (updateContactDto.campos) {
+          const valores = await this.customFieldsService.validaValores(
+            updateContactDto.campos,
+            'contato',
+            manager,
+          );
+
+          await this.customFieldsService.sincronizaValores(
+            contact_id,
+            valores,
+            'contato',
+            manager,
+          );
+        }
+
         // Recarregado com a relação: o `save` devolve só as colunas, e quem
         // acabou de associar um cliente precisa do nome dele para exibir.
         return (await this.contactRepository.findByIdComCliente(contact.id, manager)) ?? contact;
@@ -68,9 +203,10 @@ export class ContactsService {
   }
 
   async getAllContactsByClients(client_id: number) {
-    return this.contactRepository.findBy({
-      client_id: client_id,
-      status: 1,
+    return this.contactRepository.find({
+      where: { client_id, status: 1 },
+      relations: ['camposPersonalizados'],
+      order: { name: 'ASC' },
     });
   }
 

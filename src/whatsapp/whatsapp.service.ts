@@ -14,6 +14,7 @@ import {
   ProviderConnectionResult,
   ProviderMediaPayload,
   ProviderMessageRef,
+  ProviderNumeroVerificado,
   ProviderSentMessage,
 } from './providers/whatsapp-provider.interface';
 import { WhatsappGateway } from './whatsapp.gateway';
@@ -254,6 +255,34 @@ export class WhatsappService {
   async getFormattedNumber(sessionId: string, remoteJid: string): Promise<string> {
     const { provider, session } = await this.resolve(sessionId);
     return provider.getFormattedNumber(session, remoteJid);
+  }
+
+  /**
+   * Se o número tem WhatsApp, e qual o JID dele.
+   *
+   * Sem `sessionId`, diferente dos demais: quem chama é o cadastro de contato,
+   * que não parte de uma conversa. Escolhe um canal conectado qualquer - a
+   * pergunta é sobre o número consultado, não sobre a sessão.
+   *
+   * `null` quando nenhum canal está conectado, quando o provider não responde
+   * ou quando o número é inválido. O cadastro segue sem o JID nesses casos:
+   * indisponibilidade de terceiro não pode travar o registro de um contato.
+   */
+  async verificaNumero(numero: string): Promise<ProviderNumeroVerificado | null> {
+    const channel = await this.channelsRepository.findQualquerConectado();
+
+    if (!channel) {
+      this.logger.warn('Nenhum canal conectado para verificar número no WhatsApp');
+      return null;
+    }
+
+    try {
+      const { provider, session } = await this.resolve(channel.session_id);
+      return provider.verificaNumero(session, numero);
+    } catch (erro) {
+      this.logger.warn(`Falha ao verificar número ${numero}: ${erro.message}`);
+      return null;
+    }
   }
 
   async downloadMedia(sessionId: string, messageId: string, chatId: string): Promise<MessageMedia> {

@@ -56,7 +56,10 @@ export class ContactsRepository extends Repository<Contacts> {
    */
   async findByIdComCliente(id: number, manager?: EntityManager) {
     const origem = manager ?? this.manager;
-    return origem.findOne(Contacts, { where: { id }, relations: ['client'] });
+    return origem.findOne(Contacts, {
+      where: { id },
+      relations: ['client', 'camposPersonalizados'],
+    });
   }
 
   async deleteContact(id: number, manager: EntityManager) {

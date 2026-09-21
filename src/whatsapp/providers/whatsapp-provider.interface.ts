@@ -50,6 +50,19 @@ export interface WhatsappProvider {
   /** Número em formato apenas dígitos, sem o sufixo do JID. */
   getFormattedNumber(session: ProviderSessionRef, remoteJid: string): Promise<string>;
 
+  /**
+   * Se o número tem WhatsApp, e qual é o JID dele.
+   *
+   * O caminho inverso do `getFormattedNumber`. Serve ao cadastro manual de
+   * contato: montar o JID a partir do telefone erraria, porque o nono dígito
+   * dos celulares brasileiros nem sempre coincide com o que o WhatsApp usa
+   * internamente - só o provider sabe o JID verdadeiro.
+   */
+  verificaNumero(
+    session: ProviderSessionRef,
+    numero: string,
+  ): Promise<ProviderNumeroVerificado | null>;
+
   downloadMedia(
     session: ProviderSessionRef,
     messageId: string,
@@ -140,6 +153,16 @@ export type ProviderConnectionResult = {
   qrCode?: string | null;
   /** Token da instância recém-criada, a ser persistido pelo chamador. */
   instanceToken?: string | null;
+};
+
+/** Resultado da consulta de um número no provider. */
+export type ProviderNumeroVerificado = {
+  /** Se o número tem conta no WhatsApp. */
+  existe: boolean;
+  /** O JID verdadeiro, quando existe - é o que vai para `contacts.remote_jid`. */
+  remoteJid: string | null;
+  /** Nome público do perfil, quando o provider o devolve. */
+  nome?: string | null;
 };
 
 export type ProviderClientInfo = {

@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 
 import { Tags } from '@/tags/entities/tags.entity';
+import { ClientCustomValues } from '@/custom-fields/entities/client-custom-values.entity';
 
 @Entity('clients')
 export class Clients {
@@ -51,4 +52,8 @@ export class Clients {
     inverseJoinColumn: { name: 'tag_id', referencedColumnName: 'id' },
   })
   tags: Tags[];
+
+  /** Campos personalizados preenchidos neste cliente. */
+  @OneToMany(() => ClientCustomValues, (valor) => valor.client)
+  camposPersonalizados: ClientCustomValues[];
 }

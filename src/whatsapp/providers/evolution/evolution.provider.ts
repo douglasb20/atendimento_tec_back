@@ -9,6 +9,7 @@ import {
   ProviderConnectionStatus,
   ProviderMediaPayload,
   ProviderMediaType,
+  ProviderNumeroVerificado,
   ProviderSentMessage,
   ProviderMessageRef,
   ProviderSessionRef,
@@ -21,6 +22,7 @@ import {
   EvolutionConnectionStateResponse,
   EvolutionConnectResponse,
   EvolutionInstanceCreateResponse,
+  EvolutionNumeroVerificadoResponse,
   EvolutionSendResponse,
 } from './evolution.types';
 
@@ -270,6 +272,43 @@ export class EvolutionProvider implements WhatsappProvider {
   async getFormattedNumber(_session: ProviderSessionRef, remoteJid: string): Promise<string> {
     // O JID já carrega o número; não é preciso ir à rede.
     return this.toNumber(remoteJid);
+  }
+
+  async verificaNumero(
+    session: ProviderSessionRef,
+    numero: string,
+  ): Promise<ProviderNumeroVerificado | null> {
+    const apenasDigitos = this.toNumber(numero);
+    if (!apenasDigitos) return null;
+
+    try {
+      const { data } = await this.http.post<EvolutionNumeroVerificadoResponse[]>(
+        `/chat/whatsappNumbers/${session.sessionId}`,
+        { numbers: [apenasDigitos] },
+        this.comToken(session),
+      );
+
+      // A rota aceita vários números e responde um array; aqui vai sempre um.
+      const item = Array.isArray(data) ? data[0] : null;
+      if (!item) return { existe: false, remoteJid: null };
+
+      return {
+        existe: Boolean(item.exists),
+        // O JID que a Evolution devolve é o verdadeiro, e pode divergir do que
+        // sairia de concatenar o número - é justamente por isso que se pergunta.
+        remoteJid: item.exists ? (item.jid ?? null) : null,
+        nome: item.name ?? null,
+      };
+    } catch (error) {
+      // Provider fora do ar não pode travar o cadastro: quem chama decide
+      // seguir sem o JID, e o contato nasce sem ele.
+      const corpo = isAxiosError(error) ? JSON.stringify(error.response?.data) : '';
+      this.logger.warn(
+        `Não foi possível verificar o número ${apenasDigitos}: ${this.messageOf(error)}` +
+          (corpo ? ` | resposta: ${corpo}` : ''),
+      );
+      return null;
+    }
   }
 
   async downloadMedia(

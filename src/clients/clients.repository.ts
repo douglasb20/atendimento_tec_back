@@ -14,13 +14,13 @@ export class ClientRepository extends Repository<Clients> {
   async findActives() {
     return this.find({
       where: { status: 1 },
-      relations: ['tags'],
+      relations: ['tags', 'camposPersonalizados'],
       order: { nome: 'ASC' },
     });
   }
 
   async findById(id: number) {
-    const client = await this.findOne({ where: { id: id }, relations: ['tags'] });
+    const client = await this.findOne({ where: { id: id }, relations: ['tags', 'camposPersonalizados'] });
     if (!client) {
       this.logger.error(`Erro de atualizar cliente: Cliente não localizado com este id`);
       throw new BadRequestException('Cliente não localizado com este id');

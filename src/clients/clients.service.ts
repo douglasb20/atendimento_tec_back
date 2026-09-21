@@ -9,6 +9,7 @@ import { Clients } from './entities/clients.entity';
 import { runInTransaction } from '@/Utils';
 import { ContactsRepository } from 'contacts/contacts.repository';
 import { TagsRepository } from '@/tags/tags.repository';
+import { CustomFieldsService } from '@/custom-fields/custom-fields.service';
 
 @Injectable()
 export class ClientService {
@@ -17,6 +18,7 @@ export class ClientService {
     private clientRepository: ClientRepository,
     private contactRepository: ContactsRepository,
     private tagsRepository: TagsRepository,
+    private customFieldsService: CustomFieldsService,
     private dataSource: DataSource,
   ) {}
 
@@ -27,6 +29,21 @@ export class ClientService {
 
         if (createClientDto.tag_ids) {
           await this.gravaEtiquetas(client, createClientDto.tag_ids, manager);
+        }
+
+        if (createClientDto.campos?.length) {
+          const valores = await this.customFieldsService.validaValores(
+            createClientDto.campos,
+            'cliente',
+            manager,
+          );
+
+          await this.customFieldsService.sincronizaValores(
+            client.id,
+            valores,
+            'cliente',
+            manager,
+          );
         }
 
         return client;
@@ -59,6 +76,22 @@ export class ClientService {
         if (updateClientDto.tag_ids) {
           await this.gravaEtiquetas(client, updateClientDto.tag_ids, manager);
         }
+
+        // Mesma regra das etiquetas: só mexe quando o campo vem no corpo.
+        if (updateClientDto.campos) {
+          const valores = await this.customFieldsService.validaValores(
+            updateClientDto.campos,
+            'cliente',
+            manager,
+          );
+
+          await this.customFieldsService.sincronizaValores(
+            client_id,
+            valores,
+            'cliente',
+            manager,
+          );
+        }
       } catch (err) {
         this.logger.error(err.message);
         throw new BadRequestException(err.message);
@@ -89,7 +122,7 @@ export class ClientService {
 
       // A releitura usa o manager da transação: o repository comum abriria
       // outra conexão e não enxergaria a alteração ainda não commitada.
-      return manager.findOne(Clients, { where: { id: client_id }, relations: ['tags'] });
+      return manager.findOne(Clients, { where: { id: client_id }, relations: ['tags', 'camposPersonalizados'] });
     });
   }
 
@@ -128,7 +161,7 @@ export class ClientService {
     // relação nenhuma.
     const client = await this.clientRepository.findOne({
       where: { id: client_id },
-      relations: ['tags'],
+      relations: ['tags', 'camposPersonalizados'],
     });
     if (!client) {
       this.logger.error(`Erro de localizar cliente: Cliente com id "${client_id}" não existe`);

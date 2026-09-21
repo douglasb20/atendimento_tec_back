@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ChannelStatus } from '@types';
 import { DataSource, Not, Repository } from 'typeorm';
 import { Channels } from './entities/channels.entity';
 
@@ -16,6 +17,23 @@ export class ChannelsRepository extends Repository<Channels> {
       // sem isso não há como distinguir um canal que usa a integração padrão de
       // outro apontando para um servidor próprio.
       relations: ['channelStatus', 'integration'],
+    });
+  }
+
+  /**
+   * Um canal conectado, para operações que não partem de uma conversa.
+   *
+   * O cadastro manual de contato precisa perguntar ao provider se o número tem
+   * WhatsApp, mas não tem canal em mãos - diferente de todo o resto, que chega
+   * aqui a partir de uma mensagem. Qualquer canal conectado serve: a consulta é
+   * sobre o número do contato, não sobre a sessão.
+   *
+   * `null` quando nenhum está conectado; quem chama decide o que fazer.
+   */
+  async findQualquerConectado(): Promise<Channels | null> {
+    return this.findOne({
+      where: { channel_status_id: ChannelStatus.CONNECTED, deleted_at: null },
+      order: { id: 'ASC' },
     });
   }
 

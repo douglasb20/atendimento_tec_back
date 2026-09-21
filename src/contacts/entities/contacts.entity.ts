@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Clients } from '../../clients/entities/clients.entity';
 import { SupportChats } from '@/support-chats/entities/support-chats.entity';
+import { ContactCustomValues } from '@/custom-fields/entities/contact-custom-values.entity';
 
 @Entity('contacts')
 export class Contacts {
@@ -53,4 +54,8 @@ export class Contacts {
 
   @OneToMany(() => SupportChats, (supportChat) => supportChat.contact)
   supportChats: SupportChats[];
+
+  /** Campos personalizados preenchidos neste contato. */
+  @OneToMany(() => ContactCustomValues, (valor) => valor.contact)
+  camposPersonalizados: ContactCustomValues[];
 }
