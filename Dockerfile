@@ -34,6 +34,12 @@ ENV TZ=America/Sao_Paulo
 # nodemailer (8.0.5 e 8.0.11), com as vulnerabilidades que a 10 corrigiu.
 # Elas nunca são carregadas, porque a opção `preview` fica desligada, mas
 # aparecem em qualquer varredura de segurança da imagem.
+#
+# ⚠️ **Foi isto que exigiu declarar o `lodash` no `package.json`.** O
+# `mailer.service.js` faz `require('lodash')` sem declará-lo em lugar nenhum
+# (bug da 2.3.7); localmente ele chegava de carona no `mjml`, que é optional.
+# Com `--omit=optional` o `mjml` some, o `lodash` vai junto e a imagem subia
+# com `MODULE_NOT_FOUND` em runtime - o build passava normalmente.
 COPY package*.json .npmrc ./
 RUN npm ci --omit=dev --omit=optional && npm cache clean --force
 
