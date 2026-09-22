@@ -27,21 +27,28 @@ WORKDIR /app
 RUN apk add --no-cache ffmpeg tzdata
 ENV TZ=America/Sao_Paulo
 
-# `--omit=optional` além de `--omit=dev`: o `@nestjs-modules/mailer` declara
-# `preview-email`, `mjml`, `pug` e outros motores de template como
-# optionalDependencies, e nenhum deles é usado aqui - só o Handlebars, que é
-# dependência direta. O `preview-email` ainda arrasta duas cópias antigas do
-# nodemailer (8.0.5 e 8.0.11), com as vulnerabilidades que a 10 corrigiu.
-# Elas nunca são carregadas, porque a opção `preview` fica desligada, mas
-# aparecem em qualquer varredura de segurança da imagem.
+# ⚠️ **Só `--omit=dev`, sem `--omit=optional`.** A segunda flag já esteve aqui,
+# para deixar de fora o `mjml` e o `preview-email` que o `@nestjs-modules/mailer`
+# declara como opcionais e que este projeto não usa (o adapter é o Handlebars).
+# Ela custava mais do que economizava:
 #
-# ⚠️ **Foi isto que exigiu declarar o `lodash` no `package.json`.** O
-# `mailer.service.js` faz `require('lodash')` sem declará-lo em lugar nenhum
-# (bug da 2.3.7); localmente ele chegava de carona no `mjml`, que é optional.
-# Com `--omit=optional` o `mjml` some, o `lodash` vai junto e a imagem subia
-# com `MODULE_NOT_FOUND` em runtime - o build passava normalmente.
+# - **Derruba binários nativos.** Pacotes como o `@css-inline/css-inline` -
+#   dependência obrigatória do mailer - distribuem um binário por plataforma,
+#   todos como `optionalDependencies`. Sem eles a imagem sobe e quebra no
+#   primeiro `require`, com o build passando normalmente.
+# - **Levava junto dependências não declaradas.** O `mailer.service.js` faz
+#   `require('lodash')` sem declará-lo (bug da 2.3.7); ele só chegava de carona
+#   no `mjml`.
+#
+# Cada caso desses exigia declarar o pacote à mão no `package.json` - remendos
+# de biblioteca de terceiros misturados com as dependências reais do projeto.
+#
+# O que a flag evitava não se confirmou: medido em 22/09/2026, a árvore
+# completa tem **uma só versão do nodemailer (10.0.10)** e `npm audit` acusa
+# **zero vulnerabilidades**. O custo real são ~70 MB de imagem, de pacotes que
+# nunca são carregados - o `preview-email` só entra com `preview: true`.
 COPY package*.json .npmrc ./
-RUN npm ci --omit=dev --omit=optional && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=build /app/dist ./dist
 
