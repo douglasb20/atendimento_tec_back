@@ -24,7 +24,7 @@ export class SeedGruposPermissaoPadrao1789480000004 implements MigrationInterfac
     );
 
     // Administrador: tudo que existir, inclusive o que for cadastrado por
-    // migrations futuras — daí o INSERT por seleção, em vez de uma lista.
+    // migrations futuras - daí o INSERT por seleção, em vez de uma lista.
     await queryRunner.query(
       `INSERT INTO permission_group_x_permission (permission_group_id, permission_id) SELECT 1, id FROM permissions;`,
     );
@@ -59,12 +59,12 @@ export class SeedGruposPermissaoPadrao1789480000004 implements MigrationInterfac
 
     // O superusuário existente ganha Administrador. Ele já passa por qualquer
     // permissão pelo desvio do guard, mas sem grupo a tela mostraria "sem
-    // acesso" — a interface lê as permissões, não o `is_superuser`.
+    // acesso" - a interface lê as permissões, não o `is_superuser`.
     await queryRunner.query(`UPDATE users SET permission_group_id = 1 WHERE is_superuser = 1;`);
 
     // Reposiciona a sequência depois dos ids explícitos acima. Sem isto o
     // primeiro grupo criado pela tela tentaria o id 1 e colidiria com
-    // "Administrador" — as seeds de permissão têm esse problema e ninguém notou
+    // "Administrador" - as seeds de permissão têm esse problema e ninguém notou
     // porque aquelas tabelas nunca recebem inserção pela aplicação.
     await queryRunner.query(
       `SELECT setval(pg_get_serial_sequence('permission_groups', 'id'), (SELECT MAX(id) FROM permission_groups));`,

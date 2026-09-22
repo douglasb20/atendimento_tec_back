@@ -1,4 +1,11 @@
-import { ConflictException, ForbiddenException, Injectable, Logger, Scope } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  Scope,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { DataSource, QueryRunner } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 
@@ -8,6 +15,7 @@ import { PresignedUpload, StorageService } from 'storage/storage.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { SignAvatarDto } from './dto/sign-avatar.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { PreferenciasTemaDto } from './dto/preferencias-tema.dto';
 import { Users } from './entities/users.entity';
 import { UserRepository } from './users.repository';
 import { RedisCacheRepository } from '@/redis-cache/redis-cache.repository';
@@ -88,8 +96,16 @@ export class UsersService {
     }
   }
 
-  async updateUser(user_id: number, updateUserDto: UpdateUserDto): Promise<Users> {
+  async updateUser(
+    user_id: number,
+    updateUserDto: UpdateUserDto,
+    solicitante?: Users,
+  ): Promise<Users> {
     await this.recusaSeSuperusuario(user_id, 'alterado');
+
+    if (solicitante) {
+      await this.recusaCamposSemPermissao(user_id, updateUserDto, solicitante);
+    }
 
     if (updateUserDto.email) {
       await this.recusaEmailEmUso(updateUserDto.email, user_id);
@@ -101,7 +117,7 @@ export class UsersService {
 
       // Só apaga se houver o que apagar: `deleteObject` com key vazia falha no
       // SDK ("No value provided for input HTTP label: Key") e derruba a
-      // atualização inteira com 500 — um usuário sem avatar não podia ser
+      // atualização inteira com 500 - um usuário sem avatar não podia ser
       // editado.
       if (!updateUserDto.avatar_url && user.avatar_url) {
         await this.storageService.deleteObject(user.avatar_url);
@@ -135,7 +151,7 @@ export class UsersService {
 
   async deleteUser(user_id: number): Promise<Users> {
     // Fora da transação, antes de qualquer escrita: excluir o superusuário
-    // deixaria o sistema sem quem administra, e ele nem aparece na tela — quem
+    // deixaria o sistema sem quem administra, e ele nem aparece na tela - quem
     // chegasse aqui teria descoberto o id por outro caminho.
     await this.recusaSeSuperusuario(user_id, 'removido');
 
@@ -167,7 +183,7 @@ export class UsersService {
    * O login busca o usuário **pelo e-mail** e usa o primeiro que encontrar:
    * com dois registros iguais, quem entra depende da ordem física da tabela, e
    * a senha correta de um deles passa a ser recusada. Havia duplicata até
-   * mesmo do usuário master, porque nada verificava — nem aqui, nem no banco.
+   * mesmo do usuário master, porque nada verificava - nem aqui, nem no banco.
    */
   private async recusaEmailEmUso(email: string, ignorarId?: number): Promise<void> {
     if (await this.usersRepository.emailEmUso(email, ignorarId)) {
@@ -182,9 +198,64 @@ export class UsersService {
    * guard, e por isso não está na listagem. Sem esta checagem, bastava saber o
    * id para desativá-lo pela API e deixar o sistema sem administrador.
    *
-   * Não impede o próprio usuário de mexer nos seus dados por outros caminhos —
+   * Não impede o próprio usuário de mexer nos seus dados por outros caminhos -
    * é especificamente o CRUD de usuários que fica de fora.
    */
+  /**
+   * Barra os campos de alcance maior quando a pessoa edita a si mesma.
+   *
+   * O e-mail é a credencial de login e o grupo define o que se pode fazer -
+   * sem isto, qualquer um com `user:update` se promoveria a administrador
+   * trocando o próprio grupo.
+   *
+   * ⚠️ **Só vale para auto-edição.** Alterar o e-mail ou o grupo de *outro*
+   * usuário segue sob `user:update`, que o handler já exige: quem administra
+   * usuários tem esse poder por definição, e exigir as duas faria um
+   * administrador não conseguir promover ninguém.
+   *
+   * O superusuário passa direto, como no `PermissionGuard` - o
+   * `hasPermission` sozinho não o cobre, a checagem vive no guard.
+   */
+  private async recusaCamposSemPermissao(
+    user_id: number,
+    dto: UpdateUserDto,
+    solicitante: Users,
+  ): Promise<void> {
+    const editandoOutro = Number(solicitante.id) !== Number(user_id);
+    if (editandoOutro || solicitante.is_superuser) return;
+
+    const atual = await this.usersRepository.findById(user_id);
+
+    // Só quando o valor muda de fato: reenviar o mesmo e-mail é o que o
+    // formulário faz a cada salvamento, e recusar isso impediria a pessoa de
+    // trocar o próprio avatar.
+    if (dto.email && dto.email !== atual.email) {
+      const pode = await this.permissionService.hasPermission(solicitante.id, [
+        'user:change_own_email',
+      ]);
+
+      if (!pode) {
+        throw new UnauthorizedException('Você não tem permissão para alterar o próprio e-mail');
+      }
+    }
+
+    const trocouGrupo =
+      dto.permission_group_id !== undefined &&
+      Number(dto.permission_group_id ?? 0) !== Number(atual.permission_group_id ?? 0);
+
+    if (trocouGrupo) {
+      const pode = await this.permissionService.hasPermission(solicitante.id, [
+        'user:change_group',
+      ]);
+
+      if (!pode) {
+        throw new UnauthorizedException(
+          'Você não tem permissão para alterar o grupo de permissão',
+        );
+      }
+    }
+  }
+
   private async recusaSeSuperusuario(user_id: number, acao: string): Promise<void> {
     const alvo = await this.usersRepository.findById(user_id);
 
@@ -204,7 +275,7 @@ export class UsersService {
     // O front guarda esta resposta no cookie `userInfo`, e cookie tem teto de
     // 4 KB. Com `id`, `label` e `permission_module_id` juntos, 45 permissões
     // davam 4,5 KB: o navegador recusava gravar em silêncio, o middleware
-    // achava o cookie ausente, chamava de novo — e o portal entrava em laço de
+    // achava o cookie ausente, chamava de novo - e o portal entrava em laço de
     // redirecionamento. Só os nomes cabem em 1,3 KB.
     //
     // O `label` e o módulo são usados apenas na tela de papéis, que os busca
@@ -214,6 +285,38 @@ export class UsersService {
     );
 
     return { ...userWithAvatar, permissions };
+  }
+
+  /**
+   * Grava a preferência de tema de quem está logado.
+   *
+   * O `user_id` vem sempre do token, nunca do corpo: no sistema que serviu de
+   * referência ele vinha do body, e qualquer autenticado podia sobrescrever a
+   * preferência de outro.
+   *
+   * Rota própria, separada do `update` de usuário, porque as validações são
+   * outras — lá um campo inválido do cadastro impediria salvar o tema, que foi
+   * exatamente o que aconteceu no sistema de referência (um CNPJ errado
+   * bloqueava a troca de cor).
+   */
+  async atualizaPreferenciasTema(
+    user_id: number,
+    dto: PreferenciasTemaDto,
+  ): Promise<{ tema: string | null; modo_tema: string | null }> {
+    const user = await this.usersRepository.findById(user_id);
+
+    // Omitir preserva: o toggle de modo manda só `modo_tema`, e os cards só a
+    // cor. Sobrescrever com `undefined` apagaria a outra metade da escolha.
+    const tema = dto.tema ?? user.tema;
+    const modo_tema = dto.modo_tema ?? user.modo_tema;
+
+    // `update` herdado do `Repository<Users>`: são duas colunas escalares, sem
+    // relação nem efeito colateral, e o `updateUser` daqui exige um DTO de
+    // cadastro inteiro mais o manager de uma transação.
+    await this.usersRepository.update({ id: user_id }, { tema, modo_tema });
+    this.logger.log(`Tema do usuário ${user_id}: ${tema ?? 'padrão'}/${modo_tema ?? 'padrão'}`);
+
+    return { tema, modo_tema };
   }
 
   /**

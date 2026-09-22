@@ -21,7 +21,7 @@ import {
 } from '@types';
 
 import { Contacts } from '@/contacts/entities/contacts.entity';
-import { runInTransaction } from '@/Utils';
+import { nomeCompleto, runInTransaction, separaNome } from '@/Utils';
 import { SupportChats } from './entities/support-chats.entity';
 import { MessagesService } from './messages/messages.service';
 import { SupportChatsRepository } from './support-chats.repository';
@@ -30,6 +30,13 @@ import { ChannelsRepository } from '@/channels/channels.repository';
 import { SignMediaPostDto } from './dto/sign-media-post.dto';
 import { SendMediaDto, SendMediaType } from './dto/send-media.dto';
 import { FinalizarAtendimentoDto } from './dto/finalizar-atendimento.dto';
+import { FinalizarSemAtendimentoDto } from './dto/finalizar-sem-atendimento.dto';
+import { TransferirAtendimentoDto } from './dto/transferir-atendimento.dto';
+import { SupportChatEvents } from './entities/support-chat-events.entity';
+import { SupportChatEventsRepository } from './support-chat-events.repository';
+import { montaMensagemAutomatica } from './mensagens-automaticas';
+import { UserRepository } from '@/users/users.repository';
+import { ServiceAlertsService } from '@/service-alerts/service-alerts.service';
 
 /** Tipo de mídia do envio → tipo interno persistido, o mesmo que o webhook grava. */
 const TIPO_INTERNO_POR_MIDIA: Record<SendMediaType, MessageTypes> = {
@@ -51,21 +58,149 @@ export class SupportChatsService {
     private readonly channelsRepository: ChannelsRepository,
     private readonly contactsService: ContactsService,
     private readonly supportChatsRepository: SupportChatsRepository,
+    private readonly supportChatEventsRepository: SupportChatEventsRepository,
+    private readonly userRepository: UserRepository,
     private readonly storageService: StorageService,
+    private readonly serviceAlertsService: ServiceAlertsService,
     private readonly dataSource: DataSource,
   ) {}
 
-  async sendMessage(id: number, chat_id: string, message: string) {
-    this.logger.log(`Enviando mensagem de para ${chat_id} com mensagem: ${message}`);
+  /**
+   * Envia uma mensagem que o sistema decidiu mandar, sem atendente por trás.
+   *
+   * Caminho separado do `sendMessage`, e não um parâmetro nele, por três
+   * motivos que não cabem no fluxo normal:
+   *
+   * 1. **Sem o guard de dono.** `carregaParaEscrita` exige que a conversa tenha
+   *    dono e que seja quem chama - e a saudação sai justamente numa conversa
+   *    recém-criada, que ainda não tem dono nenhum.
+   * 2. **Sem marcar como lida.** O `registraEnvio` zera `unread_count` e manda
+   *    o tique azul ao cliente. Numa saudação isso apagaria o aviso da
+   *    mensagem que o contato acabou de mandar - a conversa sumiria da fila
+   *    sem ninguém ter atendido.
+   * 3. **Sem o prefixo de autor.** O `*Nome:*` identifica quem respondeu, e
+   *    aqui não respondeu ninguém.
+   *
+   * ⚠️ **Nunca propaga erro.** É cortesia: falhar o envio não pode derrubar o
+   * processamento da mensagem do cliente nem impedir a finalização.
+   */
+  /**
+   * Os avisos ativos do canal, logo depois da saudação.
+   *
+   * O caso de uso: um serviço externo cai (a Sefaz, por exemplo) e todo mundo
+   * chama pelo mesmo motivo. O aviso chega antes de a pessoa digitar a dúvida.
+   *
+   * ⚠️ **Só na abertura**, como a saudação: quem já está conversando não recebe
+   * aviso no meio do atendimento.
+   *
+   * Uma mensagem por aviso, em sequência - dois problemas simultâneos são dois
+   * assuntos distintos, e juntá-los num texto só embaralharia os dois.
+   *
+   * ⚠️ **Nunca propaga erro**, como todo o resto do envio automático: uma falha
+   * aqui não pode derrubar o processamento da mensagem do cliente.
+   */
+  private async enviaAvisosAtivos(supportChat: SupportChats): Promise<void> {
+    if (!supportChat?.channel_id) return;
 
+    try {
+      const avisos = await this.serviceAlertsService.ativosParaCanal(supportChat.channel_id);
+
+      // Sequencial, não `Promise.all`: o WhatsApp entrega na ordem em que
+      // recebe, e em paralelo os avisos chegariam embaralhados entre si.
+      for (const aviso of avisos) {
+        await this.enviaMensagemAutomatica(supportChat, aviso.mensagem);
+      }
+
+      if (avisos.length) {
+        this.logger.log(`Conversa ${supportChat.id}: ${avisos.length} aviso(s) enviado(s)`);
+      }
+    } catch (err) {
+      this.logger.warn(`Falha ao enviar avisos da conversa ${supportChat.id}: ${err.message}`);
+    }
+  }
+
+  private async enviaMensagemAutomatica(
+    supportChat: SupportChats,
+    texto: string | null | undefined,
+  ): Promise<void> {
+    const mensagem = montaMensagemAutomatica(texto, supportChat);
+    if (!mensagem) return;
+
+    try {
+      const destino = supportChat.contact?.remote_jid;
+      if (!destino) {
+        this.logger.warn(`Conversa ${supportChat.id} sem remote_jid: mensagem automática ignorada`);
+        return;
+      }
+
+      const enviadoEm = new Date();
+      const enviada = await this.whatsappService.sendMessage(
+        supportChat.channel.session_id,
+        destino,
+        mensagem,
+      );
+
+      await runInTransaction(this.dataSource, (manager) =>
+        this.messagesService.saveOutgoing(
+          {
+            messageId: enviada.messageId,
+            channel: supportChat.channel,
+            supportChat,
+            to: destino,
+            content: mensagem,
+            type: MessageTypes.TEXT,
+            sentAt: enviadoEm,
+          },
+          manager,
+        ),
+      );
+
+      this.logger.log(`Mensagem automática enviada na conversa ${supportChat.id}`);
+    } catch (err) {
+      this.logger.warn(`Falha ao enviar mensagem automática: ${err.message}`);
+    }
+  }
+
+  /**
+   * Carrega a conversa e garante que quem escreve é quem a atende.
+   *
+   * Até aqui qualquer autenticado com `support.chat:update` respondia em
+   * qualquer conversa, inclusive numa que outro atendente estivesse conduzindo
+   * - e o cliente recebia duas vozes no mesmo atendimento. O front esconde os
+   * controles; esta é a garantia de quem chama a API direto.
+   *
+   * ⚠️ Não vale para `marcarComoLida` nem para a leitura: acompanhar a conversa
+   * de um colega é legítimo, escrever nela não é.
+   */
+  private async carregaParaEscrita(
+    id: number,
+    user_id: number,
+    relations: string[] = ['channel', 'contact'],
+  ): Promise<SupportChats> {
     const supportChat = await this.supportChatsRepository.findOne({
       where: { id },
-      // `contact` é necessário para marcar as lidas no WhatsApp após a resposta.
-      relations: ['channel', 'contact'],
+      relations,
     });
     if (!supportChat) {
       throw new NotFoundException('Chat de suporte não encontrado');
     }
+
+    if (supportChat.user_id === null) {
+      throw new BadRequestException('Inicie o atendimento antes de responder');
+    }
+
+    if (Number(supportChat.user_id) !== Number(user_id)) {
+      throw new ForbiddenException('Este atendimento está com outro atendente');
+    }
+
+    return supportChat;
+  }
+
+  async sendMessage(id: number, user_id: number, chat_id: string, message: string) {
+    this.logger.log(`Enviando mensagem de para ${chat_id} com mensagem: ${message}`);
+
+    // `contact` vem junto: é necessário para marcar as lidas no WhatsApp.
+    const supportChat = await this.carregaParaEscrita(id, user_id);
 
     const enviadoEm = new Date();
     const sentMessage = await this.whatsappService.sendMessage(
@@ -87,16 +222,16 @@ export class SupportChatsService {
     return { status: 'message sent', message_id: sentMessage.messageId };
   }
 
-  async replyMessage(id: number, chat_id: string, messageId: string, message: string) {
+  async replyMessage(
+    id: number,
+    user_id: number,
+    chat_id: string,
+    messageId: string,
+    message: string,
+  ) {
     this.logger.log(`Enviando mensagem de para ${chat_id} com mensagem: ${message}`);
-    const supportChat = await this.supportChatsRepository.findOne({
-      where: { id },
-      // `contact` é necessário para marcar as lidas no WhatsApp após a resposta.
-      relations: ['channel', 'contact'],
-    });
-    if (!supportChat) {
-      throw new NotFoundException('Chat de suporte não encontrado');
-    }
+    // `contact` vem junto: é necessário para marcar as lidas no WhatsApp.
+    const supportChat = await this.carregaParaEscrita(id, user_id);
 
     const enviadoEm = new Date();
     const sentMessage = await this.whatsappService.replyMessage(
@@ -125,18 +260,12 @@ export class SupportChatsService {
    * segue a URL pública, que o provider usa para baixar. É o que permite enviar
    * vídeos grandes: nada de base64 no corpo nem browser headless no caminho.
    */
-  async sendMedia(id: number, sendMediaDto: SendMediaDto) {
+  async sendMedia(id: number, user_id: number, sendMediaDto: SendMediaDto) {
     const { chat_id, media_key, media_type, mimetype, caption, file_name, quoted_message_id } =
       sendMediaDto;
 
-    const supportChat = await this.supportChatsRepository.findOne({
-      where: { id },
-      // `contact` é necessário para marcar as lidas no WhatsApp após a resposta.
-      relations: ['channel', 'contact'],
-    });
-    if (!supportChat) {
-      throw new NotFoundException('Chat de suporte não encontrado');
-    }
+    // `contact` vem junto: é necessário para marcar as lidas no WhatsApp.
+    const supportChat = await this.carregaParaEscrita(id, user_id);
 
     const mediaUrl = this.storageService.getPublicUrl(media_key);
     this.logger.log(`Enviando ${media_type} para ${chat_id}`);
@@ -206,7 +335,7 @@ export class SupportChatsService {
     }
 
     // Responder é a prova de que o atendente leu: só aí a contagem zera.
-    // Abrir a conversa não basta — ele pode abrir, ler pela metade e sair, e o
+    // Abrir a conversa não basta - ele pode abrir, ler pela metade e sair, e o
     // pendente continua pendente até alguém de fato responder.
     //
     // Fora do try acima de propósito: falhar ao gravar a mensagem não impede
@@ -239,7 +368,16 @@ export class SupportChatsService {
     }
     this.traduzAvatares(supportChatMessages);
 
-    return this.messagesService.getUrlForMessageMedia(supportChatMessages);
+    const comMidia = await this.messagesService.getUrlForMessageMedia(supportChatMessages);
+
+    // Os eventos vêm junto das mensagens porque é com elas que são exibidos -
+    // a transferência aparece intercalada na conversa, na ordem em que
+    // aconteceu. Buscá-los à parte exigiria uma segunda chamada para desenhar
+    // uma tela só.
+    return {
+      ...comMidia,
+      supportChatEvents: await this.supportChatEventsRepository.findPorConversa(id),
+    };
   }
 
   /**
@@ -266,7 +404,7 @@ export class SupportChatsService {
 
     if (!anterior) return null;
 
-    // As colunas guardam a key, não a URL — sem esta conversão o front recebe
+    // As colunas guardam a key, não a URL - sem esta conversão o front recebe
     // `chat/media/xxx.jpeg` como se fosse endereço. Vale para a mídia das
     // mensagens e para os avatares de quem atendeu.
     this.traduzAvatares(anterior);
@@ -274,19 +412,19 @@ export class SupportChatsService {
     return this.messagesService.getUrlForMessageMedia(anterior);
   }
 
-  async sendReactionMessage(id: number, chat_id: string, messageId: string, reaction: string) {
+  async sendReactionMessage(
+    id: number,
+    user_id: number,
+    chat_id: string,
+    messageId: string,
+    reaction: string,
+  ) {
     try {
       this.logger.log(
         `Enviando reação para ${chat_id} na mensagem ${messageId} com reação: ${reaction}`,
       );
-      const supportChat = await this.supportChatsRepository.findOne({
-        where: { id },
-        // `contact` é necessário para marcar as lidas no WhatsApp após a resposta.
-      relations: ['channel', 'contact'],
-      });
-      if (!supportChat) {
-        throw new NotFoundException('Chat de suporte não encontrado');
-      }
+      // `contact` vem junto: é necessário para marcar as lidas no WhatsApp.
+      const supportChat = await this.carregaParaEscrita(id, user_id);
 
       // A Evolution identifica a mensagem reagida pela chave completa, e o
       // `fromMe` faz parte dela: reagir a uma mensagem nossa com `false` é
@@ -314,16 +452,10 @@ export class SupportChatsService {
    * Altera o texto de uma mensagem já enviada.
    *
    * A marcação visual na conversa chega depois, pelo webhook `messages.edited`
-   * — é ele que confirma que o WhatsApp aceitou a alteração.
+   * - é ele que confirma que o WhatsApp aceitou a alteração.
    */
-  async editMessage(id: number, messageId: string, texto: string) {
-    const supportChat = await this.supportChatsRepository.findOne({
-      where: { id },
-      relations: ['channel', 'contact'],
-    });
-    if (!supportChat) {
-      throw new NotFoundException('Chat de suporte não encontrado');
-    }
+  async editMessage(id: number, user_id: number, messageId: string, texto: string) {
+    const supportChat = await this.carregaParaEscrita(id, user_id);
 
     const message = await this.messagesService.findByMessageId(messageId);
     if (!message) {
@@ -350,14 +482,8 @@ export class SupportChatsService {
     return { status: 'message edited' };
   }
 
-  async deleteMessage(id: number, messageId: string) {
-    const supportChat = await this.supportChatsRepository.findOne({
-      where: { id },
-      relations: ['channel', 'contact'],
-    });
-    if (!supportChat) {
-      throw new NotFoundException('Chat de suporte não encontrado');
-    }
+  async deleteMessage(id: number, user_id: number, messageId: string) {
+    const supportChat = await this.carregaParaEscrita(id, user_id);
 
     const message = await this.messagesService.findByMessageId(messageId);
     if (!message) {
@@ -380,17 +506,18 @@ export class SupportChatsService {
    * Oculta mensagens do portal, sem tocar no WhatsApp do contato.
    *
    * É o "apagar para mim": serve quando a janela de revogação (60h) já passou,
-   * ou quando a mensagem é do contato — nos dois casos o WhatsApp não aceita
+   * ou quando a mensagem é do contato - nos dois casos o WhatsApp não aceita
    * revogar, mas o atendente ainda quer limpar a conversa do lado de cá.
    *
    * A linha é preservada com `hidden_at` preenchido: o histórico de um
    * atendimento é registro de trabalho, e some da tela sem sumir do banco.
    */
-  async ocultarMensagens(id: number, messageIds: string[]): Promise<{ ocultadas: number }> {
-    const supportChat = await this.supportChatsRepository.findOne({ where: { id } });
-    if (!supportChat) {
-      throw new NotFoundException('Chat de suporte não encontrado');
-    }
+  async ocultarMensagens(
+    id: number,
+    user_id: number,
+    messageIds: string[],
+  ): Promise<{ ocultadas: number }> {
+    await this.carregaParaEscrita(id, user_id, []);
 
     if (!messageIds?.length) {
       throw new BadRequestException('Informe ao menos uma mensagem');
@@ -423,22 +550,25 @@ export class SupportChatsService {
 
   // ====== Event Listeners Handles ======
   async onMessageCreate(payload: WhatsappWebhookPayload<MessagePayload>) {
-    return runInTransaction(this.dataSource, async (manager) => {
+    const abertura = await runInTransaction(this.dataSource, async (manager) => {
       try {
         const { sessionId, data } = payload;
         const channel = await this.channelsRepository.findBySessionId(sessionId);
         const phoneContact = data.message.id.remote;
 
+        // O `pushName` vem como texto único; o cadastro guarda separado.
+        const { name, last_name } = separaNome(data?.message?._data?.notifyName || 'Cliente');
+
         const contact = await this.contactsService.findOrCreateByRemoteJid(
-          {
-            sessionId,
-            remote_jid: phoneContact,
-            name: data?.message?._data?.notifyName || 'Cliente',
-          },
+          { sessionId, remote_jid: phoneContact, name, last_name },
           manager,
         );
 
-        const supportChat = await this.findOrOpen(contact.id, channel.id, manager);
+        const { supportChat, criada } = await this.supportChatsRepository.findOrOpenComSinal(
+          contact.id,
+          channel.id,
+          manager,
+        );
 
         const savedMessage = await this.messagesService.saveIncoming(
           channel,
@@ -492,11 +622,30 @@ export class SupportChatsService {
 
           this.whatsappService.emitEvent('whatsapp:messages', supoportChatsWhitMessage);
         }
+
+        // A saudação sai fora desta transação - ver abaixo. Só mensagem do
+        // cliente a dispara: a sincronizada do celular do atendente também
+        // passa por aqui e abriria conversa, mas responder a nós mesmos não
+        // faz sentido.
+        return criada && savedMessage && !savedMessage.from_me ? supportChat.id : null;
       } catch (err) {
         this.logger.error(`Erro ao processar mensagem: ${err.message}`);
         throw err;
       }
     });
+
+    // ⚠️ **Depois do commit, de propósito.** Uma chamada HTTP ao provider
+    // dentro da transação prenderia a conexão do banco pelo tempo da rede, e a
+    // fila de mensagens roda com `concurrency: 1` - seria a conversa inteira
+    // esperando. Aqui a mensagem do cliente já está gravada; a saudação é o
+    // extra.
+    if (abertura) {
+      // Releitura para trazer `contact.client` e `channel`, que as variáveis
+      // usam e que o `findOrOpenComSinal` não carrega por completo.
+      const conversa = await this.supportChatsRepository.findParaEstado(abertura);
+      await this.enviaMensagemAutomatica(conversa, conversa?.channel?.mensagem_saudacao);
+      await this.enviaAvisosAtivos(conversa);
+    }
   }
 
   async onMessageAck(payload: WhatsappWebhookPayload<MessagePayload>) {
@@ -654,7 +803,7 @@ export class SupportChatsService {
 
         // A mensagem reagida é localizada pelo `message_id`, que é único, e não
         // pelo JID do contato: a Evolution entrega este evento ora em
-        // `@s.whatsapp.net`, ora em `@lid` — e o segundo não bate com o que
+        // `@s.whatsapp.net`, ora em `@lid` - e o segundo não bate com o que
         // está gravado, fazendo a reação ser descartada em silêncio.
         const mensagemReagida = await this.messagesService.findByMessageId(data.reaction.msgId.id);
 
@@ -690,6 +839,7 @@ export class SupportChatsService {
           };
           this.whatsappService.emitEvent('whatsapp:messages', supoportChatsWhitMessage);
         }
+
       } catch (err) {
         this.logger.error(`Erro ao processar mensagem: ${err.message}`);
         throw err;
@@ -698,14 +848,14 @@ export class SupportChatsService {
   }
 
   /**
-   * Marca a conversa como lida — acionado quando o atendente a abre no painel.
+   * Marca a conversa como lida - acionado quando o atendente a abre no painel.
    *
    * É o único caminho que zera a contagem. O `chats.update` da Evolution não
    * serve: chega identificado por `@lid` (que não é o `remote_jid` gravado) e
    * sem o `unreadCount`, trazendo apenas `remoteJid` e `instanceId`.
    */
   /**
-   * Marca no WhatsApp as mensagens que o contato enviou — o tique azul dele.
+   * Marca no WhatsApp as mensagens que o contato enviou - o tique azul dele.
    *
    * Acontece quando o atendente responde, não quando abre a conversa: abrir e
    * sair sem responder não é atendimento, e o "visto" cria no contato a
@@ -764,7 +914,7 @@ export class SupportChatsService {
         return supportChat;
       }
       throw new ConflictException(
-        `Atendimento já assumido por ${supportChat.user?.name ?? 'outro atendente'}`,
+        `Atendimento já assumido por ${nomeCompleto(supportChat.user) || 'outro atendente'}`,
       );
     }
 
@@ -817,6 +967,20 @@ export class SupportChatsService {
       );
     }
 
+    // ⚠️ **Antes de finalizar, e isto não é preferência.** Enviada depois, a
+    // despedida volta pelo webhook para uma conversa já `is_final`, e o
+    // `findOrOpen` - que filtra por `is_final = false` - não a encontra e abre
+    // **uma conversa nova**, com protocolo novo, em Aguardando. O pior caso
+    // desta ordem é despedida enviada com a finalização falhando logo em
+    // seguida; o da outra é um protocolo fantasma a cada atendimento
+    // encerrado.
+    //
+    // `sem_despedida` pula o envio: há conversa que termina com o cliente já
+    // resolvido e despedido, e repetir o texto padrão soa automático.
+    if (!dto.sem_despedida) {
+      await this.enviaMensagemAutomatica(supportChat, supportChat.channel?.mensagem_despedida);
+    }
+
     const afetadas = await runInTransaction(this.dataSource, (manager) =>
       this.supportChatsRepository.finalizar(
         id,
@@ -831,6 +995,174 @@ export class SupportChatsService {
     }
 
     return this.recarregaEEmiteEstado(id);
+  }
+
+  /**
+   * Encerra uma conversa que não será atendida.
+   *
+   * O caso: mensagem de marketing chegando no número, ou contato que não
+   * receberá atendimento. Encerra direto de **Aguardando**, sem passar por
+   * "iniciar".
+   *
+   * Três diferenças em relação ao `finalizarAtendimento`, e todas são o ponto:
+   * - **não exige cliente associado** - descartar spam não pode dar mais
+   *   trabalho do que atender;
+   * - **não exige dono** - ninguém assumiu, e exigir que assumisse primeiro
+   *   seria burocracia;
+   * - **não envia despedida** - não houve atendimento do qual se despedir, e o
+   *   texto confirmaria ao remetente que o número existe e é lido.
+   *
+   * Grava o status 4 (`FINALIZADO_SEM_RESPOSTA`), distinto do encerramento
+   * normal para os relatórios.
+   */
+  async finalizarSemAtendimento(
+    id: number,
+    user_id: number,
+    dto: FinalizarSemAtendimentoDto,
+  ): Promise<SupportChats> {
+    const supportChat = await this.supportChatsRepository.findParaEstado(id);
+    if (!supportChat) {
+      throw new NotFoundException('Chat de suporte não encontrado');
+    }
+
+    if (supportChat.supportChatStatus?.is_final) {
+      throw new BadRequestException('Este atendimento já foi finalizado');
+    }
+
+    if (supportChat.support_chat_status_id === SupportChatStatusId.EM_ANDAMENTO) {
+      throw new BadRequestException(
+        'Este atendimento já foi iniciado; use a finalização normal',
+      );
+    }
+
+    const afetadas = await runInTransaction(this.dataSource, (manager) =>
+      this.supportChatsRepository.finalizarSemAtendimento(
+        id,
+        new Date(),
+        dto.observation_user?.trim() || null,
+        manager,
+      ),
+    );
+
+    // `affected = 0` aqui significa que outro atendente assumiu a conversa
+    // entre a leitura e o UPDATE - o banco arbitra, como no `iniciar`.
+    if (!afetadas) {
+      throw new ConflictException('O atendimento mudou de estado; recarregue a conversa');
+    }
+
+    this.logger.log(`Conversa ${id} encerrada sem atendimento por user ${user_id}`);
+
+    return this.recarregaEEmiteEstado(id);
+  }
+
+  /**
+   * Devolve a conversa à lista como não lida.
+   *
+   * O inverso do `marcarComoLida`, para o gesto de "vou olhar isto depois": o
+   * badge volta a aparecer na lista lateral.
+   *
+   * ⚠️ Não mexe no WhatsApp. O tique azul já foi enviado quando o atendente
+   * respondeu, e não há como desfazê-lo - isto é sinalização interna.
+   */
+  async marcarComoNaoLida(id: number): Promise<SupportChats> {
+    const supportChat = await this.supportChatsRepository.findParaEstado(id);
+    if (!supportChat) {
+      throw new NotFoundException('Chat de suporte não encontrado');
+    }
+
+    await runInTransaction(this.dataSource, (manager) =>
+      this.supportChatsRepository.marcarComoNaoLida(id, manager),
+    );
+
+    return this.recarregaEEmiteEstado(id);
+  }
+
+  /**
+   * Passa o atendimento para outro atendente, ou devolve para a espera.
+   *
+   * São dois caminhos da mesma ação: com `user_destino_id` a conversa troca de
+   * dono e segue em andamento; sem ele, perde o dono e volta para "Aguardando",
+   * de onde qualquer um a assume.
+   *
+   * Só o dono transfere - mesma regra de `finalizarAtendimento`, e pelo mesmo
+   * motivo: a conversa é responsabilidade de quem a assumiu, e tirá-la dele sem
+   * que ele saiba é o tipo de coisa que se descobre tarde demais.
+   *
+   * ⚠️ Transferir passa junto o **direito de finalizar**: `finalizarAtendimento`
+   * valida o dono, e depois daqui ele é outro.
+   */
+  async transferirAtendimento(
+    id: number,
+    user_id: number,
+    dto: TransferirAtendimentoDto,
+  ): Promise<SupportChats> {
+    const supportChat = await this.supportChatsRepository.findParaEstado(id);
+    if (!supportChat) {
+      throw new NotFoundException('Chat de suporte não encontrado');
+    }
+
+    if (supportChat.supportChatStatus?.is_final) {
+      throw new BadRequestException('Este atendimento já foi finalizado');
+    }
+
+    if (supportChat.support_chat_status_id !== SupportChatStatusId.EM_ANDAMENTO) {
+      throw new BadRequestException('Inicie o atendimento antes de transferi-lo');
+    }
+
+    if (Number(supportChat.user_id) !== Number(user_id)) {
+      throw new ForbiddenException('Somente quem assumiu o atendimento pode transferi-lo');
+    }
+
+    const destinoId = dto.user_destino_id ?? null;
+
+    if (destinoId !== null) {
+      if (Number(destinoId) === Number(user_id)) {
+        throw new BadRequestException('O atendimento já é seu');
+      }
+      // Lança `BadRequestException` se não existir ou estiver inativo - não
+      // dá para entregar uma conversa a quem não pode atendê-la.
+      await this.userRepository.findById(destinoId);
+    }
+
+    const motivo = dto.motivo?.trim() || null;
+
+    const afetadas = await runInTransaction(this.dataSource, async (manager) => {
+      const linhas = await this.supportChatsRepository.transferir(
+        id,
+        user_id,
+        destinoId,
+        manager,
+      );
+
+      // Só registra o evento se a troca de dono valeu: senão a conversa teria
+      // no histórico uma transferência que não chegou a acontecer.
+      if (linhas) {
+        await this.supportChatEventsRepository.registraTransferencia(
+          id,
+          user_id,
+          destinoId,
+          motivo,
+          manager,
+        );
+      }
+
+      return linhas;
+    });
+
+    if (!afetadas) {
+      throw new ConflictException('O atendimento mudou de estado durante a transferência');
+    }
+
+    this.logger.log(
+      `Atendimento ${id} transferido por ${user_id} para ${destinoId ?? 'a fila de espera'}`,
+    );
+
+    return this.recarregaEEmiteEstado(id);
+  }
+
+  /** Eventos do atendimento, para a conversa mostrar o que aconteceu nela. */
+  async listaEventos(id: number): Promise<SupportChatEvents[]> {
+    return this.supportChatEventsRepository.findPorConversa(id);
   }
 
   /**
@@ -906,7 +1238,7 @@ export class SupportChatsService {
       last_message_id: supportChat.last_message_id,
       unread_count: supportChat.unread_count ?? completo?.unread_count ?? 0,
       // O `updated_at` do banco ainda é o anterior ao commit desta transação, e
-      // é por ele que a lista se ordena — sem isto a conversa com mensagem nova
+      // é por ele que a lista se ordena - sem isto a conversa com mensagem nova
       // não sobe para o topo.
       updated_at: new Date(),
     });

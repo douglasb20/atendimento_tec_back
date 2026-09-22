@@ -20,8 +20,16 @@ export class Contacts {
   @Column({ type: 'int', nullable: true })
   client_id: number;
 
+  /** Primeiro nome. Vindo do webhook, é a primeira palavra do `pushName`. */
   @Column({ type: 'varchar', length: 90, nullable: false })
   name: string;
+
+  /**
+   * Sobrenome. Nulo é válido e comum: contato que é empresa ou apelido, e
+   * `pushName` de uma palavra só.
+   */
+  @Column({ type: 'varchar', length: 90, nullable: true, default: null })
+  last_name: string | null;
 
   @Column({ type: 'text', nullable: false })
   avatar_url: string;

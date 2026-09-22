@@ -43,7 +43,7 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
    * Extrai o access token do handshake.
    *
    * O caminho normal é o cookie: como ele é httpOnly, o cliente não consegue
-   * lê-lo para montar `auth.token` — mas o navegador o envia no handshake, e é
+   * lê-lo para montar `auth.token` - mas o navegador o envia no handshake, e é
    * de lá que ele sai. O `auth.token` continua aceito para clientes que ainda o
    * enviem (e para testes que não passam por navegador).
    */

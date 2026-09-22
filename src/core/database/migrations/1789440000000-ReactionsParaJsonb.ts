@@ -3,13 +3,13 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 /**
  * Converte `reaction` de `varchar(20)` para `jsonb`, um emoji por pessoa.
  *
- * A coluna guardava uma reação só, e cada evento novo sobrescrevia a anterior —
+ * A coluna guardava uma reação só, e cada evento novo sobrescrevia a anterior -
  * o WhatsApp aceita várias, uma por participante. O formato passa a ser um mapa
  * `{ "<jid de quem reagiu>": "<emoji>" }`, que é o que permite trocar e remover
  * a reação de alguém sem mexer nas outras: trocar reatribui a chave, remover a
  * apaga.
  *
- * As reações já gravadas não têm autor registrado — o `senderId` chegava no
+ * As reações já gravadas não têm autor registrado - o `senderId` chegava no
  * payload e era descartado. Elas são preservadas sob a chave `desconhecido`,
  * para não sumirem da conversa.
  */

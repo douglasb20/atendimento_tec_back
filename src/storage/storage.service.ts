@@ -1,5 +1,6 @@
 // upload.service.ts
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
@@ -73,7 +74,7 @@ export class StorageService {
 
     // Idempotente de propósito: os caminhos de mídia já substituem a key pela
     // URL antes de o handler emitir pelo socket, e uma segunda conversão
-    // produzia `https://.../https%3A//...` — que o storage responde como
+    // produzia `https://.../https%3A//...` - que o storage responde como
     // `NoSuchKey`. Receber uma URL aqui significa que nada há a fazer.
     if (/^https?:\/\//i.test(key)) return key;
 
@@ -122,6 +123,32 @@ export class StorageService {
   async uploadFileBase64(base64Data: string, key: string, fileType: string) {
     const buffer = Buffer.from(base64Data, 'base64');
     return await this.uploadBuffer(buffer, key, fileType);
+  }
+
+  /**
+   * Duplica um objeto dentro do bucket, sem baixar os bytes.
+   *
+   * O `CopyObject` roda inteiramente no servidor de storage: nada trafega por
+   * aqui, e o custo é o mesmo para 10 KB ou 100 MB.
+   *
+   * Existe para o anexo das respostas rápidas. O arquivo do cadastro é
+   * permanente, mas a mídia enviada numa conversa é varrida pelo cron de
+   * retenção depois de alguns meses - e ele apaga pela key gravada na
+   * mensagem, sem olhar prefixo. Sem a cópia, o primeiro envio condenaria o
+   * arquivo do cadastro e todas as respostas que o usam quebrariam juntas.
+   */
+  async copyObject(origem: string, destino: string) {
+    const bucket = process.env.STORAGE_BUCKET!;
+
+    return this.s3.send(
+      new CopyObjectCommand({
+        Bucket: bucket,
+        // O `CopySource` inclui o bucket e precisa vir codificado: uma key com
+        // espaço ou acento quebra a requisição sem isto.
+        CopySource: encodeURI(`${bucket}/${origem}`),
+        Key: destino,
+      }),
+    );
   }
 
   async uploadBuffer(buffer: Buffer, key: string, mimetype: string) {

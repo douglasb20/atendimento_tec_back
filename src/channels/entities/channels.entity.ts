@@ -43,6 +43,20 @@ export class Channels {
   @Column({ type: 'text', nullable: true })
   qr_code: string | null;
 
+  /**
+   * Enviada sozinha quando um contato abre uma conversa nova.
+   *
+   * ⚠️ Nulo ou vazio = não envia. Aceita as variáveis `{{nome}}`,
+   * `{{telefone}}`, `{{protocolo}}`, `{{cliente}}`, `{{canal}}` e
+   * `{{saudacao}}`, trocadas no ato do envio.
+   */
+  @Column({ type: 'text', nullable: true })
+  mensagem_saudacao: string | null;
+
+  /** Enviada ao finalizar o atendimento. Mesmas regras da saudação. */
+  @Column({ type: 'text', nullable: true })
+  mensagem_despedida: string | null;
+
   @Column({ type: 'timestamptz', nullable: true })
   connected_at: Date | null;
 

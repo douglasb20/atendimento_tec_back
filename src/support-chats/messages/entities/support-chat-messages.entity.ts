@@ -127,7 +127,7 @@ export class SupportChatMessages {
    * Reações da mensagem, um emoji por pessoa: `{ "<jid>": "<emoji>" }`.
    *
    * O mapa por autor é o que permite trocar e remover a reação de alguém sem
-   * mexer nas outras — o WhatsApp dá a cada participante uma reação, que ele
+   * mexer nas outras - o WhatsApp dá a cada participante uma reação, que ele
    * pode alterar ou tirar.
    */
   @Column({ name: 'reaction', type: 'jsonb', default: () => "'{}'::jsonb" })

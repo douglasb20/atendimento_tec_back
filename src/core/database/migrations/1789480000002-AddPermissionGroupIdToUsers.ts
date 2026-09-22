@@ -5,7 +5,7 @@ import { MigrationInterface, QueryRunner, TableColumn, TableForeignKey } from 't
  *
  * Nulo é estado válido: usuário sem grupo não tem permissão alguma, e é assim
  * que um cadastro recém-criado nasce até alguém decidir o que ele pode fazer.
- * `ON DELETE SET NULL` mantém isso coerente — excluir um grupo não apaga quem o
+ * `ON DELETE SET NULL` mantém isso coerente - excluir um grupo não apaga quem o
  * usava, só o deixa sem acesso.
  *
  * A coluna `users.role` (varchar, `'USER'` por padrão) fica onde está: nenhum

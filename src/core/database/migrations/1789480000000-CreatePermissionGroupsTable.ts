@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
 /**
- * Grupos de permissão — "Atendente", "Supervisor", "Administrador".
+ * Grupos de permissão - "Atendente", "Supervisor", "Administrador".
  *
  * Substitui o vínculo direto entre usuário e permissão como caminho principal.
  * Com a lista por usuário, contratar cinco atendentes significava marcar as

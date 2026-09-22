@@ -24,7 +24,7 @@ export class CreatePermissionGroupDto {
    *
    * Lista completa, não incremento: o que vier aqui passa a ser exatamente o
    * que o grupo tem. Enviar vazio deixa o grupo sem permissão alguma, que é
-   * escolha legítima — um grupo em construção.
+   * escolha legítima - um grupo em construção.
    */
   @IsArray()
   @ArrayUnique()

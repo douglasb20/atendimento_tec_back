@@ -71,7 +71,7 @@ export class TagsService {
 
     // Remover uma etiqueta em uso apagaria a classificação de vários clientes
     // de uma vez, em silêncio. A contagem na mensagem diz o tamanho do estrago
-    // que seria — e o atendente decide se vale desvincular antes.
+    // que seria - e o atendente decide se vale desvincular antes.
     const vinculados = await this.tagsRepository.contarClientesVinculados(id);
 
     if (vinculados > 0) {

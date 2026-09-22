@@ -8,7 +8,7 @@ export class CreateTagDto {
 
   /**
    * Cor em `#RRGGBB`. O ColorPicker do front devolve o hex sem o `#`, e a
-   * normalização acontece lá — aqui o formato completo é obrigatório, para o
+   * normalização acontece lá - aqui o formato completo é obrigatório, para o
    * banco não misturar as duas grafias.
    */
   @IsString()

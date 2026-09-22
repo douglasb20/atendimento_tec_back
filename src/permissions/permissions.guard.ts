@@ -31,7 +31,7 @@ export class PermissionGuard implements CanActivate {
       throw new UnauthorizedException('Usuário não autenticado');
     }
 
-    // Reservado ao usuário master — checado antes de tudo, inclusive do desvio
+    // Reservado ao usuário master - checado antes de tudo, inclusive do desvio
     // de superusuário abaixo, porque aqui ele é a única via de acesso.
     if (this.reflector.get<boolean>(APENAS_SUPERUSUARIO, handler)) {
       if (!user.is_superuser) {
@@ -62,7 +62,7 @@ export class PermissionGuard implements CanActivate {
 
     if (!requeridas?.length) {
       // Negar é o padrão. Esquecer de anotar um endpoint passa a dar 403, não
-      // acesso livre — e o log diz qual, para o conserto ser rápido.
+      // acesso livre - e o log diz qual, para o conserto ser rápido.
       this.logger.warn(
         `Endpoint sem @Permissions nem @SemPermissao: ${context.getClass().name}.${handler.name}`,
       );

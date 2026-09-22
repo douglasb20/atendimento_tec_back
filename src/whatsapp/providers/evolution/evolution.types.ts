@@ -69,7 +69,7 @@ export type EvolutionWebhookBody<T = unknown> = {
 };
 
 /**
- * Payload de `send.message.update` — a edição partida da nossa instância.
+ * Payload de `send.message.update` - a edição partida da nossa instância.
  * Formato próprio: o texto novo vem em `editedMessage`, e o instante em
  * milissegundos, ao contrário do `messageTimestamp` em segundos do upsert.
  */
@@ -119,6 +119,9 @@ export type EvolutionMessageContent = {
   reactionMessage?: { key?: EvolutionMessageKey; text?: string };
   protocolMessage?: { key?: EvolutionMessageKey; type?: string };
   editedMessage?: unknown;
+  templateMessage?: EvolutionTemplateMessage;
+  buttonsMessage?: EvolutionButtonsMessage;
+  listMessage?: EvolutionListMessage;
   /** Adicionado pela Evolution quando o webhook está com base64 habilitado. */
   base64?: string;
   /** Adicionado quando a Evolution tem storage S3/MinIO configurado. */
@@ -136,6 +139,44 @@ export type EvolutionMediaContent = {
   height?: number;
   width?: number;
   contextInfo?: EvolutionContextInfo;
+};
+
+/**
+ * Mensagens com opções clicáveis - usadas por campanhas e bots.
+ *
+ * As três guardam o texto fora de `conversation`, e cada uma num lugar
+ * diferente: é o que fazia elas chegarem com `content` vazio.
+ *
+ * Aqui elas são só histórico - o atendente não tem como clicar nas opções -,
+ * então o mapper achata tudo em texto. Só os campos que o mapper lê estão
+ * declarados; o resto do payload é ignorado de propósito.
+ */
+export type EvolutionTemplateMessage = {
+  /** O Baileys entrega o template já preenchido neste nó. */
+  hydratedTemplate?: {
+    hydratedTitleText?: string;
+    hydratedContentText?: string;
+    hydratedFooterText?: string;
+    hydratedButtons?: {
+      quickReplyButton?: { displayText?: string };
+      urlButton?: { displayText?: string; url?: string };
+      callButton?: { displayText?: string; phoneNumber?: string };
+    }[];
+  };
+};
+
+export type EvolutionButtonsMessage = {
+  contentText?: string;
+  footerText?: string;
+  buttons?: { buttonText?: { displayText?: string } }[];
+};
+
+export type EvolutionListMessage = {
+  title?: string;
+  description?: string;
+  footerText?: string;
+  /** As opções vêm agrupadas em seções, cada uma com o seu título. */
+  sections?: { title?: string; rows?: { title?: string; description?: string }[] }[];
 };
 
 /** Payload de `messages.upsert` e `send.message` - key aninhado. */

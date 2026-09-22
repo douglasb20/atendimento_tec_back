@@ -18,7 +18,7 @@ const CACHE_MS = 60_000;
 /** O que a tela recebe: a definição do catálogo mais o valor em vigor. */
 export type AjusteParaTela = DefinicaoAjuste & {
   chave: string;
-  /** Ausente nas chaves de senha — estas nunca saem da API. */
+  /** Ausente nas chaves de senha - estas nunca saem da API. */
   valor?: string | number;
   /** Só para senhas: diz se há algo gravado, sem revelar o quê. */
   definido?: boolean;
@@ -31,7 +31,7 @@ export class SystemSettingsService {
   /**
    * Valores em memória.
    *
-   * Lidos a cada pedido de senha, a cada login e a cada envio de e-mail — ir ao
+   * Lidos a cada pedido de senha, a cada login e a cada envio de e-mail - ir ao
    * banco toda vez seria consulta por nada. Um minuto é curto o bastante para
    * uma mudança aparecer rápido, e o `PATCH` invalida na hora de qualquer forma.
    */
@@ -61,7 +61,7 @@ export class SystemSettingsService {
   /**
    * O valor cru da chave: banco → variável de ambiente → padrão do catálogo.
    *
-   * Senhas voltam já descriptografadas — a cifra só existe no banco.
+   * Senhas voltam já descriptografadas - a cifra só existe no banco.
    */
   private async bruto(chave: ChaveAjuste): Promise<string> {
     const def = DEFINICOES[chave];
@@ -89,7 +89,7 @@ export class SystemSettingsService {
    * Inteiro dentro da faixa declarada.
    *
    * Valor corrompido no banco cai no padrão em vez de virar `NaN` no meio de um
-   * cálculo de data — é o tipo de erro que só apareceria muito depois.
+   * cálculo de data - é o tipo de erro que só apareceria muito depois.
    */
   async getInteiro(chave: ChaveAjuste): Promise<number> {
     const def = DEFINICOES[chave];

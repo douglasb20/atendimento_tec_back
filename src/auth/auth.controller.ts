@@ -22,7 +22,7 @@ export class AuthController {
    *
    * Os tokens não voltam mais no corpo: o objetivo de gravá-los como httpOnly é
    * justamente que nenhum JavaScript os alcance, e devolvê-los no JSON anularia
-   * isso — o front poderia guardá-los onde quisesse. Quem os envia a partir daí
+   * isso - o front poderia guardá-los onde quisesse. Quem os envia a partir daí
    * é o navegador, em toda requisição.
    */
   @Post('/signin')
@@ -36,7 +36,7 @@ export class AuthController {
     this.aplicaCookies(response, sessao);
 
     // O `expires_at` também vai no corpo para o cliente decidir quando renovar
-    // sem precisar ler cookie — é só um timestamp.
+    // sem precisar ler cookie - é só um timestamp.
     return { expires_at: this.expDoAccess(sessao.access_token) };
   }
 

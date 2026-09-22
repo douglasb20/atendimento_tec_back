@@ -4,7 +4,7 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  * Cor do texto da etiqueta: claro ou escuro.
  *
  * O cálculo automático por luminância acerta na maioria dos casos, mas as cores
- * médias caem perto do limiar e a decisão vira arbitrária — e às vezes a
+ * médias caem perto do limiar e a decisão vira arbitrária - e às vezes a
  * preferência é estética, não de contraste. O campo passa a ser escolha de quem
  * cadastra, com o automático servindo de sugestão inicial no formulário.
  */

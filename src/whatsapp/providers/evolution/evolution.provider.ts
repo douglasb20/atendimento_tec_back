@@ -92,7 +92,7 @@ export class EvolutionProvider implements WhatsappProvider {
         // A Evolution autentica por um header `apikey` simples (não Bearer).
         // Este é o padrão: a chave **global**, necessária para criar, listar e
         // remover instâncias. As operações sobre uma instância específica o
-        // sobrescrevem com o token dela — ver `comToken`.
+        // sobrescrevem com o token dela - ver `comToken`.
         apikey: integration.credentials?.apiKey ?? '',
       },
       timeout: 30_000,
@@ -104,14 +104,14 @@ export class EvolutionProvider implements WhatsappProvider {
    * tem um.
    *
    * A Evolution emite um token por instância no `/instance/create` e o aceita
-   * no lugar da chave global nas operações daquela instância — recusando-o
+   * no lugar da chave global nas operações daquela instância - recusando-o
    * (401) para qualquer outra. Usá-lo limita o estrago de um vazamento a um
    * canal, em vez de entregar a chave que apaga todas as instâncias do
    * servidor. Num backend multi-tenant, é a diferença entre um cliente poder
    * derrubar só o próprio número ou o de todo mundo.
    *
    * O fallback para a global cobre dois casos reais: canais criados antes de
-   * o token passar a ser gravado, e as rotas que **exigem** a global —
+   * o token passar a ser gravado, e as rotas que **exigem** a global -
    * `/instance/create` e `/instance/fetchInstances` a recusam.
    */
   private comToken(session: ProviderSessionRef) {
@@ -155,10 +155,32 @@ export class EvolutionProvider implements WhatsappProvider {
   }
 
   /**
+   * Reinicia a sessão na Evolution.
+   *
+   * ⚠️ É **POST**, não PUT: a v2.3.7 declara `.post(this.routerPath('restart'))`
+   * em `instance.router.ts`, embora boa parte da documentação diga PUT.
+   *
+   * A Evolution recusa com 400 quando a instância está `close` ("is not
+   * connected") - a tela só oferece a ação em canal conectado, e aqui a
+   * mensagem é traduzida para quem chamar a API direto.
+   */
+  async restartConnection(session: ProviderSessionRef): Promise<void> {
+    try {
+      await this.http.post(`/instance/restart/${session.sessionId}`, {}, this.comToken(session));
+      this.logger.log(`Sessão reiniciada: ${session.sessionId}`);
+    } catch (error) {
+      if (this.statusOf(error) === 404) {
+        this.fail('A sessão não existe no provider. Conecte o canal antes de reiniciá-lo.', error);
+      }
+      this.fail('Falha ao reiniciar a sessão do WhatsApp', error);
+    }
+  }
+
+  /**
    * Confere endereço e apikey sem tocar em sessão nenhuma.
    *
-   * `/instance/fetchInstances` serve porque exige a apikey **global** — a mesma
-   * que criar instância exige — e responde 401 quando ela não confere. O
+   * `/instance/fetchInstances` serve porque exige a apikey **global** - a mesma
+   * que criar instância exige - e responde 401 quando ela não confere. O
    * `catch` traduz cada falha para uma frase que diz o que corrigir: sem isso,
    * a tela mostraria `ECONNREFUSED` ou `Request failed with status code 401`.
    */
@@ -249,7 +271,7 @@ export class EvolutionProvider implements WhatsappProvider {
       const url = data?.profilePictureUrl ?? '';
 
       // Resposta 200 sem URL é indistinguível, no log, de um contato que
-      // simplesmente não tem foto — e as duas coisas levam ao avatar genérico
+      // simplesmente não tem foto - e as duas coisas levam ao avatar genérico
       // na tela. Sem esta linha a única pista era o campo vazio no banco,
       // descoberto horas depois.
       if (!url) {
@@ -393,7 +415,7 @@ export class EvolutionProvider implements WhatsappProvider {
   ): Promise<void> {
     try {
       // sendReaction não usa `number`: o destino sai do próprio key.remoteJid.
-      // O `fromMe` compõe a chave que identifica a mensagem reagida — fixá-lo
+      // O `fromMe` compõe a chave que identifica a mensagem reagida - fixá-lo
       // em `false` fazia a Evolution não achar as nossas próprias mensagens, e
       // a reação era aceita sem nunca aparecer no WhatsApp.
       await this.http.post(

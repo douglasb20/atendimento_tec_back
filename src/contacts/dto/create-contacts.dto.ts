@@ -20,6 +20,11 @@ export class CreateContactsDto {
   @IsNotEmpty({ message: 'Este campo é obrigatório' })
   name: string;
 
+  /** Opcional: contato pode ser empresa ou ter só um apelido. */
+  @IsOptional()
+  @IsString()
+  last_name?: string | null;
+
   @IsOptional()
   @IsString()
   phone?: string;

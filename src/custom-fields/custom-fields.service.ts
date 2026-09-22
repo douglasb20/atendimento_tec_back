@@ -286,7 +286,7 @@ export class CustomFieldsService {
    * As opções pertencem ao tipo `lista` e a mais nenhum.
    *
    * Sem esta checagem um campo de texto poderia guardar opções que nada lê, e
-   * um campo de lista nasceria sem nada para escolher — inutilizável, e o erro
+   * um campo de lista nasceria sem nada para escolher - inutilizável, e o erro
    * só apareceria na tela de quem tenta preencher.
    */
   private validaOpcoes(tipo: string, opcoes?: string[] | null): string[] | null {

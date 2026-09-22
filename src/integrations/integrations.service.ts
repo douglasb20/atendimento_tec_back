@@ -26,7 +26,7 @@ export class IntegrationsService {
     private readonly integrationsRepository: IntegrationsRepository,
     private readonly dataSource: DataSource,
     // `forwardRef` porque a factory depende deste service para resolver as
-    // credenciais — o ciclo é real e intencional.
+    // credenciais - o ciclo é real e intencional.
     @Inject(forwardRef(() => ProviderFactory))
     private readonly providerFactory: ProviderFactory,
   ) {}
@@ -41,7 +41,7 @@ export class IntegrationsService {
    *
    * É o **único** caminho em que elas saem da API: a coluna é `select: false` e
    * nem a listagem nem o `findOne` as trazem. Existe porque o formulário de
-   * edição precisa mostrar o que está configurado — um campo vazio não
+   * edição precisa mostrar o que está configurado - um campo vazio não
    * distingue "tem chave gravada" de "nunca foi preenchida".
    *
    * Protegido por `integration:update`, não por `view`: quem pode substituir a
@@ -61,7 +61,7 @@ export class IntegrationsService {
    * Verifica se a integração conversa com o provider.
    *
    * Aceita credencial avulsa (`dto.credentials`) para o teste rodar **antes** de
-   * salvar — é o ponto de existir: descobrir a apikey errada no formulário, e
+   * salvar - é o ponto de existir: descobrir a apikey errada no formulário, e
    * não quando o primeiro canal falhar ao conectar. Sem credencial no corpo,
    * usa a que está gravada, o que cobre o "testar de novo" na listagem.
    */
@@ -71,7 +71,7 @@ export class IntegrationsService {
     let credentials = dto.credentials;
 
     // Integração existente: completa o que o formulário não mandou. O caso
-    // típico é editar sem trocar a apikey — o campo vem vazio de propósito.
+    // típico é editar sem trocar a apikey - o campo vem vazio de propósito.
     if (dto.integration_id) {
       const gravada = await this.resolveForProvider(dto.integration_id);
       slug ??= gravada.integrationProvider?.slug;
@@ -94,7 +94,7 @@ export class IntegrationsService {
 
       return await provider.testarConexao();
     } catch (err) {
-      // Provider sem implementação, URL malformada: vira resposta, não 500 —
+      // Provider sem implementação, URL malformada: vira resposta, não 500 -
       // a tela precisa mostrar o motivo no lugar de um erro genérico.
       return { ok: false, mensagem: err?.message ?? 'Não foi possível validar a integração.' };
     }

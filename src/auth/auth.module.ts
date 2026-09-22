@@ -20,7 +20,7 @@ import { UserRefreshTokens } from 'users/entities/user-refresh-tokens.entity';
       useFactory: (config: ConfigService) => ({
         secret: config.getOrThrow('ACCESS_JWT_SECRET'),
         // Curto de propósito: o access viaja em toda requisição, fica em cookie
-        // legível por JavaScript e **não é revogável** — vale até expirar. A
+        // legível por JavaScript e **não é revogável** - vale até expirar. A
         // renovação é automática pelo refresh, então o atendente não percebe.
         signOptions: { expiresIn: config.get('ACCESS_JWT_EXPIRATION') || '30min' },
       }),

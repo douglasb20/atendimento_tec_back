@@ -3,7 +3,7 @@ import { Response } from 'express';
 /** Nomes dos cookies de sessão, usados na gravação e na leitura pelo JWT. */
 export const COOKIE_ACCESS = 'token';
 export const COOKIE_REFRESH = 'refresh_token';
-/** Lido pelo front para saber quando renovar — este **não** é httpOnly. */
+/** Lido pelo front para saber quando renovar - este **não** é httpOnly. */
 export const COOKIE_EXPIRES = 'expires_at';
 
 /**
@@ -11,7 +11,7 @@ export const COOKIE_EXPIRES = 'expires_at';
  *
  * Os dois tokens saem como **httpOnly**: o JavaScript da página não os alcança,
  * então um XSS não consegue roubá-los. O navegador continua enviando os dois em
- * toda requisição — `httpOnly` impede a leitura por script, não o envio.
+ * toda requisição - `httpOnly` impede a leitura por script, não o envio.
  *
  * O `expires_at` é legível de propósito: o middleware e o `ApiClient` precisam
  * saber *quando* o access expira para disparar a renovação antes de a
@@ -20,7 +20,7 @@ export const COOKIE_EXPIRES = 'expires_at';
  * `sameSite: 'lax'` protege contra CSRF sem quebrar a navegação normal. Em
  * produção front e API ficam em subdomínios distintos
  * (`suporte.` e `api.automatecsistemasweb.com.br`), então o cookie é gravado no
- * domínio-pai via `COOKIE_DOMAIN` — sem isso ele ficaria preso ao host da API e
+ * domínio-pai via `COOKIE_DOMAIN` - sem isso ele ficaria preso ao host da API e
  * o front nunca o receberia de volta.
  */
 export function gravaCookiesDeSessao(
@@ -47,7 +47,7 @@ export function gravaCookiesDeSessao(
   res.cookie(COOKIE_EXPIRES, String(tokens.access_exp), { ...base, httpOnly: false });
 }
 
-/** Remove os três no logout — mesmas opções, senão o navegador não os casa. */
+/** Remove os três no logout - mesmas opções, senão o navegador não os casa. */
 export function limpaCookiesDeSessao(res: Response) {
   const base = {
     path: '/',

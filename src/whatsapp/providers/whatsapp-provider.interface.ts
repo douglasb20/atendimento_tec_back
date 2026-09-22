@@ -14,7 +14,7 @@ export interface WhatsappProvider {
 
   /**
    * Verifica se a integração está utilizável: endereço alcançável e credencial
-   * aceita. Não envolve sessão nenhuma — serve à tela de cadastro, para o erro
+   * aceita. Não envolve sessão nenhuma - serve à tela de cadastro, para o erro
    * aparecer ali e não horas depois, quando um canal falha ao conectar.
    */
   testarConexao(): Promise<ProviderTesteConexao>;
@@ -32,13 +32,25 @@ export interface WhatsappProvider {
   requestDisconnection(session: ProviderSessionRef): Promise<void>;
 
   /**
+   * Derruba e reconecta a sessão, sem perder o pareamento.
+   *
+   * É a saída para a sessão que o provider dá como conectada mas que parou de
+   * entregar mensagens - reconectar por dentro evita o caminho longo de
+   * desconectar e ler o QR de novo.
+   *
+   * ⚠️ Só vale para sessão ativa: reiniciar o que está desconectado não tem o
+   * que reconectar, e o provider recusa.
+   */
+  restartConnection(session: ProviderSessionRef): Promise<void>;
+
+  /**
    * Estado da sessão **no provider**, consultado na hora.
    *
    * Existe porque o nosso banco guarda o último estado que um evento nos
    * contou, e eventos se perdem: sem uma consulta direta não há como saber se
    * o canal marcado como conectado ainda está.
    *
-   * `null` quando a sessão não existe no provider — distinto de desconectada.
+   * `null` quando a sessão não existe no provider - distinto de desconectada.
    */
   fetchConnectionStatus(session: ProviderSessionRef): Promise<ProviderConnectionStatus | null>;
 
@@ -85,7 +97,7 @@ export interface WhatsappProvider {
   /**
    * @param fromMe se a mensagem **reagida** é nossa. A Evolution localiza a
    * mensagem pela chave completa, e errar este campo faz a reação não ser
-   * aplicada — sem erro, porque a requisição em si é aceita.
+   * aplicada - sem erro, porque a requisição em si é aceita.
    */
   sendReaction(
     session: ProviderSessionRef,
@@ -120,7 +132,7 @@ export interface WhatsappProvider {
   ): Promise<void>;
 
   /**
-   * Marca mensagens recebidas como lidas no WhatsApp do contato — o que produz
+   * Marca mensagens recebidas como lidas no WhatsApp do contato - o que produz
    * o tique azul do lado dele.
    */
   markAsRead(session: ProviderSessionRef, mensagens: ProviderMessageRef[]): Promise<void>;
@@ -210,7 +222,7 @@ export const WHATSAPP_PROVIDER = 'WHATSAPP_PROVIDER';
 /** Resultado do teste de conexão de uma integração. */
 export type ProviderTesteConexao = {
   ok: boolean;
-  /** Mensagem pronta para a tela — já traduzida do erro do provider. */
+  /** Mensagem pronta para a tela - já traduzida do erro do provider. */
   mensagem: string;
   /** Quantas sessões o provider já conhece; ajuda a confirmar que é o servidor certo. */
   instancias?: number;

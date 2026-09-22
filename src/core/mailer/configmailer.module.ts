@@ -31,7 +31,7 @@ import * as path from 'node:path';
             // Caminho derivado do próprio arquivo, não do `cwd`: quem
             // dispara o processo decide o diretório de trabalho, e no deploy
             // isso muda sem aviso. Com `process.cwd()` o envio falhava em
-            // produção, onde a pasta nem chegava a existir — o `nest-cli.json`
+            // produção, onde a pasta nem chegava a existir - o `nest-cli.json`
             // agora a copia para dentro do `dist`, que é o que o Docker leva.
             dir: path.join(__dirname, '..', '..', 'templates', 'mail'),
             adapter: new HandlebarsAdapter(),

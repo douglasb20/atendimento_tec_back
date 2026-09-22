@@ -1,0 +1,93 @@
+@url = http://localhost:3001/api
+@endpoint = /quick-replies
+@authToken = COLE_AQUI
+
+###############################################################################
+# Respostas rápidas
+#
+# Mensagens prontas que o atendente insere digitando `/atalho` na conversa.
+# Compartilhadas: não há dono, o objetivo é padronizar o que a empresa responde.
+###############################################################################
+
+#### Listar
+# `quick.reply:view` OU `support.chat:view`: quem atende precisa da lista para
+# usar os atalhos, mesmo sem poder cadastrar.
+GET {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+
+#### Criar (só texto)
+POST {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "atalho": "bemvindo",
+  "mensagem": "{{saudacao}}, {{nome}}! Em que podemos ajudar?"
+}
+
+#### Criar com anexo
+# Os quatro campos do anexo vão juntos: sem a key não há o que enviar, e sem
+# nome/mimetype/tipo o provider não sabe tratar o arquivo.
+POST {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "atalho": "tabela",
+  "mensagem": "Segue nossa tabela de preços.",
+  "anexo_key": "quick-replies/uuid-do-arquivo.pdf",
+  "anexo_nome": "tabela-precos-2026.pdf",
+  "anexo_mimetype": "application/pdf",
+  "anexo_tipo": "document"
+}
+
+#### Atalho duplicado -> 409 (a comparação ignora maiúsculas)
+POST {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "atalho": "BemVindo",
+  "mensagem": "Deve ser recusado"
+}
+
+#### Atualizar
+PATCH {{url}}{{endpoint}}/1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "mensagem": "Texto novo"
+}
+
+#### Remover (soft delete - o atalho volta a ficar livre)
+DELETE {{url}}{{endpoint}}/1
+Authorization: Bearer {{authToken}}
+
+###############################################################################
+# Anexo
+###############################################################################
+
+#### Assinar o upload
+# ⚠️ O prefixo (`quick-replies/`) é fixo no servidor, diferente do
+# `sign-media-post` do chat, que aceita o caminho vindo do corpo. A extensão sai
+# do nome original, não do mimetype.
+POST {{url}}{{endpoint}}/assinar-anexo
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "fileType": "application/pdf",
+  "fileName": "tabela-precos-2026.pdf"
+}
+
+#### Preparar o anexo para envio
+# Copia o arquivo do cadastro para `chat/media/` e devolve a key da cópia, que
+# o front usa no `SendMedia` normal.
+#
+# ⚠️ É isto que protege o cadastro: a mensagem enviada guarda a key da mídia, e
+# o cron de retenção apaga por ela depois de alguns meses, sem olhar prefixo. Se
+# a mensagem apontasse para o arquivo do cadastro, o primeiro envio o
+# condenaria - e todas as respostas que o usam quebrariam juntas.
+POST {{url}}{{endpoint}}/1/preparar-anexo
+Authorization: Bearer {{authToken}}

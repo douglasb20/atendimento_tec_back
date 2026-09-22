@@ -8,7 +8,7 @@ import { AuthService } from '../auth.service';
 import { SigninDto } from 'users/dto/signin.dto';
 import { JwtPayload } from '@types';
 
-/** Lê o access token do cookie httpOnly — o caminho normal desde a migração. */
+/** Lê o access token do cookie httpOnly - o caminho normal desde a migração. */
 const doCookie = (req: Request): string | null => req?.cookies?.[COOKIE_ACCESS] ?? null;
 
 @Injectable()

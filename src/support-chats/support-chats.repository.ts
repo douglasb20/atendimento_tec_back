@@ -55,6 +55,11 @@ export class SupportChatsRepository extends Repository<SupportChats> {
         'contact',
         'contact.client',
         'contact.client.tags',
+        // Os campos personalizados aparecem no painel de detalhes do chat. A
+        // definição de cada um (nome, tipo) vem junto: a relação com
+        // `CustomFields` é eager.
+        'contact.camposPersonalizados',
+        'contact.client.camposPersonalizados',
         'channel',
         'supportChatMessages',
         'user',
@@ -89,7 +94,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     if (!atual) return { total: 0, proximo: null };
 
     // `id <` e não data: os ids são sequenciais e é por eles que a ordem de
-    // criação se define sem ambiguidade — duas conversas abertas no mesmo
+    // criação se define sem ambiguidade - duas conversas abertas no mesmo
     // segundo teriam a mesma data.
     const limite = antes_de ?? support_chat_id;
 
@@ -141,13 +146,43 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     });
   }
 
+  /**
+   * Como o `findOrOpen`, mas dizendo se a conversa nasceu agora.
+   *
+   * O `findOrOpen` devolve o mesmo tipo nos dois casos, e quem chama não tem
+   * como distinguir - o que basta para gravar a mensagem, mas não para a
+   * saudação automática, que só pode sair na abertura.
+   *
+   * Método à parte em vez de mudar a assinatura do outro: são três chamadores,
+   * e só um precisa do sinal.
+   */
+  async findOrOpenComSinal(
+    contact_id: number,
+    channel_id: number,
+    manager: EntityManager,
+    user_id?: number,
+  ): Promise<{ supportChat: SupportChats; criada: boolean }> {
+    const existente = await this.buscaAberta(contact_id, channel_id);
+    if (existente) return { supportChat: existente, criada: false };
+
+    return { supportChat: await this.abre(contact_id, channel_id, manager, user_id), criada: true };
+  }
+
   async findOrOpen(
     contact_id: number,
     channel_id: number,
     manager: EntityManager,
     user_id?: number,
   ): Promise<SupportChats> {
-    let supportChat = await this.createQueryBuilder('sc')
+    return (
+      (await this.buscaAberta(contact_id, channel_id)) ??
+      (await this.abre(contact_id, channel_id, manager, user_id))
+    );
+  }
+
+  /** A conversa ainda não finalizada deste contato neste canal, se houver. */
+  private async buscaAberta(contact_id: number, channel_id: number): Promise<SupportChats | null> {
+    return this.createQueryBuilder('sc')
       .innerJoin('support_chat_status', 'scs', 'scs.id = sc.support_chat_status_id')
       .leftJoinAndSelect('sc.contact', 'c')
       .leftJoinAndSelect('sc.channel', 'ch')
@@ -156,20 +191,26 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       .andWhere('sc.channel_id = :channel_id', { channel_id })
       .andWhere('scs.is_final = false')
       .getOne();
+  }
 
-    if (!supportChat) {
-      const protocol = await this.protocolCountersRepository.generateProtocol(manager);
-      const supportChatToSave = manager.create(SupportChats, {
+  private async abre(
+    contact_id: number,
+    channel_id: number,
+    manager: EntityManager,
+    user_id?: number,
+  ): Promise<SupportChats> {
+    const protocol = await this.protocolCountersRepository.generateProtocol(manager);
+
+    return manager.save(
+      SupportChats,
+      manager.create(SupportChats, {
         user_id: user_id || null,
         channel_id,
         contact_id,
         support_chat_status_id: SupportChatStatusId.AGUARDANDO,
         protocol,
-      });
-
-      supportChat = await manager.save(SupportChats, supportChatToSave);
-    }
-    return supportChat;
+      }),
+    );
   }
 
   /**
@@ -181,7 +222,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
    */
   async findParaEstado(id: number, manager?: EntityManager): Promise<SupportChats> {
     // O `manager` da transação em curso, quando há uma. Sem ele a leitura usa
-    // uma conexão própria, que não enxerga o que ainda não foi commitado — na
+    // uma conexão própria, que não enxerga o que ainda não foi commitado - na
     // primeira mensagem de um contato novo isso devolvia `null`, e a conversa
     // seguia pelo socket sem a relação `contact`: a lista lateral aparecia sem
     // nome e sem foto até o atendente recarregar a página.
@@ -193,6 +234,11 @@ export class SupportChatsRepository extends Repository<SupportChats> {
         'contact',
         'contact.client',
         'contact.client.tags',
+        // Os campos personalizados aparecem no painel de detalhes do chat. A
+        // definição de cada um (nome, tipo) vem junto: a relação com
+        // `CustomFields` é eager.
+        'contact.camposPersonalizados',
+        'contact.client.camposPersonalizados',
         'channel',
         'supportChatStatus',
         'user',
@@ -218,10 +264,16 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       .update(SupportChats)
       .set({
         user_id,
-        answered_at,
+        // ⚠️ COALESCE, e não o valor direto: uma conversa devolvida para a
+        // espera passa por aqui de novo quando alguém a reassume, e sobrescrever
+        // reiniciaria o cronômetro. O tempo conta desde o primeiro atendimento,
+        // porque mede a espera do cliente pela resolução - não o turno de quem
+        // está com ela agora.
+        answered_at: () => 'COALESCE("answered_at", :answered_at)',
         is_waiting: false,
         support_chat_status_id: SupportChatStatusId.EM_ANDAMENTO,
       })
+      .setParameter('answered_at', answered_at)
       .where('id = :id AND support_chat_status_id IN (:...naoAssumidos)', {
         id,
         naoAssumidos: [SupportChatStatusId.AGUARDANDO, SupportChatStatusId.EM_FILA],
@@ -231,7 +283,102 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     return resultado.affected ?? 0;
   }
 
+  /**
+   * Passa a conversa para outro atendente, ou de volta para a espera.
+   *
+   * `user_destino_id` nulo é o segundo caminho: a conversa perde o dono e volta
+   * para "Aguardando", de onde qualquer um pode assumi-la.
+   *
+   * O WHERE exige o status **e** o dono atual: entre a validação no service e
+   * este update, o outro atendente pode ter finalizado a conversa ou ela pode
+   * já ter sido transferida. Nos dois casos o update não acha a linha, e o
+   * service transforma o zero em conflito.
+   *
+   * ⚠️ `answered_at` fica intocado mesmo na volta para a espera - ver o
+   * `assumir` acima.
+   */
+  async transferir(
+    id: number,
+    user_origem_id: number,
+    user_destino_id: number | null,
+    manager: EntityManager,
+  ): Promise<number> {
+    const resultado = await manager
+      .createQueryBuilder()
+      .update(SupportChats)
+      .set({
+        user_id: user_destino_id,
+        is_waiting: user_destino_id === null,
+        support_chat_status_id: user_destino_id
+          ? SupportChatStatusId.EM_ANDAMENTO
+          : SupportChatStatusId.AGUARDANDO,
+      })
+      .where('id = :id AND support_chat_status_id = :emAndamento AND user_id = :user_origem_id', {
+        id,
+        emAndamento: SupportChatStatusId.EM_ANDAMENTO,
+        user_origem_id,
+      })
+      .execute();
+
+    return resultado.affected ?? 0;
+  }
+
   /** Encerra a conversa. Só sai de "Em andamento", pelo mesmo motivo do `assumir`. */
+  /**
+   * Encerra sem que tenha havido atendimento.
+   *
+   * Grava o status **4** (`FINALIZADO_SEM_RESPOSTA`), que existia no seed e
+   * nenhum código atribuía: é o caso do spam de marketing e do contato que não
+   * será atendido. Distinto do 5 nos relatórios - contar um descarte como
+   * atendimento encerrado inflaria o volume.
+   *
+   * O UPDATE condicional aceita **Aguardando e Em fila**, não `EM_ANDAMENTO`:
+   * quem já assumiu a conversa usa `finalizar`. `affected = 0` significa que
+   * alguém assumiu no meio do caminho, e quem chama arbitra a corrida.
+   */
+  async finalizarSemAtendimento(
+    id: number,
+    finished_at: Date,
+    observation_user: string | null,
+    manager: EntityManager,
+  ): Promise<number> {
+    const resultado = await manager
+      .createQueryBuilder()
+      .update(SupportChats)
+      .set({
+        finished_at,
+        observation_user,
+        is_waiting: false,
+        unread_count: 0,
+        support_chat_status_id: SupportChatStatusId.FINALIZADO_SEM_RESPOSTA,
+      })
+      .where('id = :id AND support_chat_status_id IN (:...abertos)', {
+        id,
+        abertos: [SupportChatStatusId.AGUARDANDO, SupportChatStatusId.EM_FILA],
+      })
+      .execute();
+
+    return resultado.affected ?? 0;
+  }
+
+  /**
+   * Devolve a conversa ao estado de não lida, com o contador em 1.
+   *
+   * O valor real não importa: a lista mostra um badge, não a contagem exata, e
+   * o gesto é "marcar para ver depois". Mais importante é que qualquer mensagem
+   * nova soma a partir daqui, em vez de recomeçar do zero.
+   */
+  async marcarComoNaoLida(id: number, manager: EntityManager): Promise<number> {
+    const resultado = await manager
+      .createQueryBuilder()
+      .update(SupportChats)
+      .set({ unread_count: 1 })
+      .where('id = :id', { id })
+      .execute();
+
+    return resultado.affected ?? 0;
+  }
+
   async finalizar(
     id: number,
     finished_at: Date,
@@ -262,7 +409,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
    *
    * A contagem é nossa, não a do WhatsApp: o `chats.update` da Evolution chega
    * sem `unreadCount` (só `remoteJid` e `instanceId`), e o "lido" do protocolo
-   * reflete qualquer aparelho conectado à conta — se alguém abre no celular, a
+   * reflete qualquer aparelho conectado à conta - se alguém abre no celular, a
    * mensagem fica lida sem nenhum atendente ter visto. Aqui, não lida significa
    * que ninguém abriu a conversa no painel.
    */
@@ -279,7 +426,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     );
 
     // Num UPDATE ... RETURNING, o driver devolve `[linhas, quantidade]`, e não
-    // as linhas direto — acessar `resultado[0].unread_count` pega o array e
+    // as linhas direto - acessar `resultado[0].unread_count` pega o array e
     // resulta em undefined. As duas formas são aceitas aqui porque o retorno
     // varia entre versões do driver.
     const linhas = Array.isArray(resultado?.[0]) ? resultado[0] : resultado;

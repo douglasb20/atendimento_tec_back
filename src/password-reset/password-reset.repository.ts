@@ -12,7 +12,7 @@ export class PasswordResetRepository extends Repository<PasswordResets> {
   /**
    * O pedido correspondente ao token, com o usuário carregado.
    *
-   * Busca pelo hash — o token em claro não existe no banco. Traz mesmo os
+   * Busca pelo hash - o token em claro não existe no banco. Traz mesmo os
    * expirados e os já usados, porque quem chama precisa distinguir os casos
    * para dizer ao usuário o que aconteceu.
    */

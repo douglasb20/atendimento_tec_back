@@ -50,7 +50,7 @@ describe('EvolutionMapper', () => {
     });
 
     // O payload real de `chats.update` traz apenas `{ remoteJid, instanceId }`
-    // — sem `unreadCount`. Roteá-lo como UNREAD_COUNT zerava o contador a cada
+    // - sem `unreadCount`. Roteá-lo como UNREAD_COUNT zerava o contador a cada
     // evento; a contagem passou a ser mantida por nós, em SupportChatsService.
     it('não roteia chats.update, que chega sem a contagem', () => {
       expect(EvolutionMapper.mapEventType('chats.update')).toBeNull();
@@ -234,6 +234,69 @@ describe('EvolutionMapper', () => {
       expect(unico.vCards).toEqual(['BEGIN:VCARD...']);
       expect(multiplo.type).toBe(MessageTypes.CONTACT_CARD_MULTI);
       expect(multiplo.vCards).toHaveLength(2);
+    });
+
+    // Estas três chegavam com `body` vazio - a bolha aparecia em branco na
+    // conversa -, porque o texto delas não vem em `conversation`.
+    it('extrai texto e botões de templateMessage', () => {
+      const result = EvolutionMapper.mapUpsert({
+        ...upsertTexto,
+        message: {
+          templateMessage: {
+            hydratedTemplate: {
+              hydratedContentText: 'Olá, Douglas!\nAqui é o Jean da *Wati*.',
+              hydratedButtons: [
+                { quickReplyButton: { displayText: 'Sim, me ligue' } },
+                { quickReplyButton: { displayText: 'Só mensagens de WhatsApp' } },
+              ],
+            },
+          },
+        },
+        messageType: 'templateMessage',
+      });
+
+      expect(result.type).toBe(MessageTypes.TEMPLATE_BUTTON_REPLY);
+      expect(result.body).toContain('Olá, Douglas!');
+      expect(result.body).toContain('▸ Sim, me ligue');
+      expect(result.body).toContain('▸ Só mensagens de WhatsApp');
+    });
+
+    it('extrai texto e botões de buttonsMessage', () => {
+      const result = EvolutionMapper.mapUpsert({
+        ...upsertTexto,
+        message: {
+          buttonsMessage: {
+            contentText: 'Podemos agendar?',
+            buttons: [{ buttonText: { displayText: 'Pode sim' } }],
+          },
+        },
+        messageType: 'buttonsMessage',
+      });
+
+      expect(result.type).toBe(MessageTypes.TEMPLATE_BUTTON_REPLY);
+      expect(result.body).toContain('Podemos agendar?');
+      expect(result.body).toContain('▸ Pode sim');
+    });
+
+    it('extrai as linhas de todas as seções de listMessage', () => {
+      const result = EvolutionMapper.mapUpsert({
+        ...upsertTexto,
+        message: {
+          listMessage: {
+            title: 'Escolha um horário',
+            sections: [
+              { title: 'Manhã', rows: [{ title: '09:00', description: 'Com o Jean' }] },
+              { title: 'Tarde', rows: [{ title: '14:00' }] },
+            ],
+          },
+        },
+        messageType: 'listMessage',
+      });
+
+      expect(result.type).toBe(MessageTypes.LIST);
+      expect(result.body).toContain('Escolha um horário');
+      expect(result.body).toContain('▸ 09:00 - Com o Jean');
+      expect(result.body).toContain('▸ 14:00');
     });
 
     it('marca mensagem de status do broadcast', () => {

@@ -50,6 +50,12 @@ const MESSAGE_TYPE_MAP: Record<string, MessageTypes> = {
   pollCreationMessage: MessageTypes.POLL_CREATION,
   pollUpdateMessage: MessageTypes.POLL_CREATION,
   templateMessage: MessageTypes.TEMPLATE_BUTTON_REPLY,
+  // A mensagem *com* os botões, distinta da resposta do contato logo abaixo.
+  // Sem entrada própria no enum, cai no mesmo tipo do template - o que
+  // importa é o `content` chegar preenchido, já que o front escolhe a bolha
+  // por `is_media`, não pelo tipo.
+  buttonsMessage: MessageTypes.TEMPLATE_BUTTON_REPLY,
+  listMessage: MessageTypes.LIST,
   buttonsResponseMessage: MessageTypes.BUTTONS_RESPONSE,
   listResponseMessage: MessageTypes.LIST_RESPONSE,
   editedMessage: MessageTypes.TEXT,
@@ -86,7 +92,7 @@ export class EvolutionMapper {
       case EvolutionEvent.MESSAGES_EDITED:
       // A Evolution separa a edição por origem: `messages.edited` quando parte
       // do contato, `send.message.update` quando parte da nossa instância. Para
-      // nós é a mesma coisa — o texto da mensagem mudou.
+      // nós é a mesma coisa - o texto da mensagem mudou.
       case EvolutionEvent.SEND_MESSAGE_UPDATE:
         return DataTypeWhatsapp.MESSAGE_EDIT;
       case EvolutionEvent.MESSAGES_DELETE:
@@ -137,7 +143,7 @@ export class EvolutionMapper {
         return (data as EvolutionUpdateData).remoteJid ?? null;
       case EvolutionEvent.SEND_MESSAGE_UPDATE:
         // Apesar do nome parecido com `messages.update`, este traz a chave
-        // aninhada, como o upsert — e não o `remoteJid` no topo.
+        // aninhada, como o upsert - e não o `remoteJid` no topo.
         return (
           (data as EvolutionEditedData).key?.remoteJid ??
           (data as EvolutionUpdateData).remoteJid ??
@@ -272,9 +278,7 @@ export class EvolutionMapper {
    */
   static mapEdited(data: EvolutionUpsertData & EvolutionEditedData): MessageData {
     const textoEditado =
-      data.editedMessage?.extendedTextMessage?.text ??
-      data.editedMessage?.conversation ??
-      null;
+      data.editedMessage?.extendedTextMessage?.text ?? data.editedMessage?.conversation ?? null;
 
     // Sem `editedMessage` é o formato de upsert, que o mapa padrão resolve.
     if (!textoEditado) {
@@ -388,7 +392,7 @@ export class EvolutionMapper {
       },
       // Quem reagiu. Em grupo vem em `participant`; numa conversa individual
       // esse campo não existe, e cair no `remoteJid` daria o número do contato
-      // mesmo quando fomos nós que reagimos — as duas reações disputariam a
+      // mesmo quando fomos nós que reagimos - as duas reações disputariam a
       // mesma chave no mapa. O `fromMe` é o que separa os dois lados.
       senderId: data.key?.fromMe
         ? 'nos'
@@ -482,6 +486,8 @@ export class EvolutionMapper {
     if (!message) return '';
 
     if (message.conversation) return message.conversation;
+    const comOpcoes = this.extractOpcoes(message);
+    if (comOpcoes !== null) return comOpcoes;
     if (type === MessageTypes.CONTACT_CARD || type === MessageTypes.CONTACT_CARD_MULTI) {
       return JSON.stringify(this.extractVCards(message));
     }
@@ -492,6 +498,75 @@ export class EvolutionMapper {
     if (message.speechToText) return message.speechToText;
 
     return mediaContent?.caption ?? '';
+  }
+
+  /**
+   * Achata em texto as mensagens com opções clicáveis (template, botões e
+   * lista), usadas por campanhas e bots.
+   *
+   * Elas chegavam com `content` vazio - a bolha aparecia em branco na conversa
+   * - porque o texto não vem em `conversation`: cada uma o guarda no seu
+   * próprio nó, e o `extractBody` não os conhecia.
+   *
+   * As opções viram uma lista com marcador porque aqui elas são só histórico:
+   * o atendente não tem como clicar. Perdê-las deixaria a conversa
+   * incompreensível quando o cliente respondesse - dá para ver a escolha, mas
+   * não o que foi oferecido.
+   *
+   * Devolve `null` (e não string vazia) quando não é nenhum dos três, para o
+   * `extractBody` seguir para os ramos seguintes.
+   */
+  private static extractOpcoes(message: EvolutionMessageContent): string | null {
+    const partes: string[] = [];
+    const opcoes: string[] = [];
+
+    const template = message.templateMessage?.hydratedTemplate;
+    const botoes = message.buttonsMessage;
+    const lista = message.listMessage;
+
+    if (template) {
+      partes.push(
+        template.hydratedTitleText,
+        template.hydratedContentText,
+        template.hydratedFooterText,
+      );
+      for (const botao of template.hydratedButtons ?? []) {
+        // A ordem segue o Baileys: cada botão traz um dos três nós, nunca dois.
+        const url = botao.urlButton;
+        const ligar = botao.callButton;
+        if (botao.quickReplyButton?.displayText) opcoes.push(botao.quickReplyButton.displayText);
+        else if (url?.displayText)
+          opcoes.push(url.url ? `${url.displayText} (${url.url})` : url.displayText);
+        else if (ligar?.displayText)
+          opcoes.push(
+            ligar.phoneNumber ? `${ligar.displayText} (${ligar.phoneNumber})` : ligar.displayText,
+          );
+      }
+    } else if (botoes) {
+      partes.push(botoes.contentText, botoes.footerText);
+      for (const botao of botoes.buttons ?? []) {
+        if (botao.buttonText?.displayText) opcoes.push(botao.buttonText.displayText);
+      }
+    } else if (lista) {
+      partes.push(lista.title, lista.description, lista.footerText);
+      for (const secao of lista.sections ?? []) {
+        for (const linha of secao.rows ?? []) {
+          if (linha.title)
+            opcoes.push(linha.description ? `${linha.title} - ${linha.description}` : linha.title);
+        }
+      }
+    } else {
+      return null;
+    }
+
+    const texto = partes.filter((parte) => parte?.trim()).join('\n\n');
+    if (!opcoes.length) return texto;
+
+    // O separador é o que distingue, na bolha, o que o remetente escreveu das
+    // opções que ele ofereceu.
+    return [texto, '───────────────', ...opcoes.map((opcao) => `▸ ${opcao}`)]
+      .filter((linha) => linha)
+      .join('\n');
   }
 
   private static extractQuotedBody(quoted: EvolutionMessageContent): string {

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import { DataSource } from 'typeorm';
+import { nomeCompleto } from '@/Utils';
 
 import { ConfigMailerService } from 'core/mailer/configmailer.service';
 import { UserRefreshTokens } from '@/users/entities/user-refresh-tokens.entity';
@@ -11,7 +12,7 @@ import { SystemSettingsService } from '@/system-settings/system-settings.service
 import { PasswordResets } from './entities/password-resets.entity';
 import { PasswordResetRepository } from './password-reset.repository';
 
-/** Por que um pedido não vale — o front usa isto para explicar ao usuário. */
+/** Por que um pedido não vale - o front usa isto para explicar ao usuário. */
 export type MotivoInvalido = 'invalido' | 'expirado' | 'usado';
 
 export type ResultadoValidacao = { valido: boolean; motivo?: MotivoInvalido };
@@ -37,7 +38,7 @@ export class PasswordResetService {
    * O que é gravado no banco.
    *
    * SHA-256 basta aqui, e bcrypt seria errado: o token já tem 256 bits de
-   * entropia, então não há o que proteger contra força bruta — o custo do
+   * entropia, então não há o que proteger contra força bruta - o custo do
    * bcrypt existe para senhas humanas, que são curtas e previsíveis.
    */
   private hashDoToken(token: string): string {
@@ -81,7 +82,12 @@ export class PasswordResetService {
 
     // Fora da transação: o e-mail sai depois do commit, senão um envio bem
     // sucedido poderia acompanhar um pedido que acabou revertido.
-    await this.mailerService.SendForgottenPassword(user.name, user.email, token, minutos);
+    await this.mailerService.SendForgottenPassword(
+      nomeCompleto(user),
+      user.email,
+      token,
+      minutos,
+    );
 
     this.logger.log(`Pedido de redefinição criado para o usuário ${user.id}`);
   }
@@ -90,7 +96,7 @@ export class PasswordResetService {
    * O link ainda serve?
    *
    * Existe para a tela não pedir a senha nova e só então descobrir que o prazo
-   * passou — o usuário digitaria duas vezes para nada.
+   * passou - o usuário digitaria duas vezes para nada.
    */
   async validar(token: string): Promise<ResultadoValidacao> {
     const pedido = await this.passwordResetRepository.findByTokenHash(this.hashDoToken(token));

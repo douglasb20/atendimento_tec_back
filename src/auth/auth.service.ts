@@ -37,6 +37,7 @@ export class AuthService {
       sub: user.id,
       id: user.id,
       name: user.name,
+      last_name: user.last_name ?? null,
       email: user.email,
       lastlogin_at: user.lastlogin_at,
     };
@@ -53,10 +54,10 @@ export class AuthService {
         secret: process.env.REFRESH_JWT_SECRET,
         // Longo porque é barato aqui: o refresh só trafega em `/auth/refresh`,
         // fica persistido em `user_refresh_tokens` e **é revogável pelo banco**
-        // — nada disso vale para o access. Ele também rotaciona a cada uso, de
+        // - nada disso vale para o access. Ele também rotaciona a cada uso, de
         // modo que o anterior deixa de servir.
         //
-        // Vem do portal, em dias — a variável de ambiente segue valendo como
+        // Vem do portal, em dias - a variável de ambiente segue valendo como
         // padrão, pelo catálogo. `JWT_EXPIRATION` é o nome antigo, mantido
         // como último recurso: produção ainda o define, e o nome não dizia
         // qual dos dois tokens configurava.
@@ -186,7 +187,10 @@ export class AuthService {
   private async findByEmail(email: string): Promise<Users> {
     const user = await this.usersRepository.findOne({
       where: { email, status: 1 },
-      select: ['id', 'name', 'email', 'password', 'lastlogin_at'],
+      // ⚠️ `last_name` precisa estar aqui: sem ele o payload do token sai com
+      // sobrenome `undefined` e nada acusa - o `select` explícito não erra, só
+      // omite.
+      select: ['id', 'name', 'last_name', 'email', 'password', 'lastlogin_at'],
     });
 
     if (!user) {

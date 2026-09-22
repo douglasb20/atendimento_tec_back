@@ -47,7 +47,7 @@ export class PermissionGroupsRepository extends Repository<PermissionGroups> {
     return query.getExists();
   }
 
-  /** Quantos usuários usam este grupo — verificado antes de remover. */
+  /** Quantos usuários usam este grupo - verificado antes de remover. */
   async contarUsuariosVinculados(id: number): Promise<number> {
     return this.manager.count(Users, { where: { permission_group_id: id } });
   }
@@ -67,7 +67,7 @@ export class PermissionGroupsRepository extends Repository<PermissionGroups> {
     return repo.find({ where: { id: In(ids) } });
   }
 
-  /** Ids dos usuários com este grupo — usados para invalidar o cache. */
+  /** Ids dos usuários com este grupo - usados para invalidar o cache. */
   async idsDosUsuarios(permission_group_id: number): Promise<number[]> {
     const usuarios = await this.manager.find(Users, {
       where: { permission_group_id },

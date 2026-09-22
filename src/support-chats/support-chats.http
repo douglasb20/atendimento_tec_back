@@ -68,3 +68,31 @@ Content-Type: application/json
   "mimetype": "application/pdf",
   "file_name": "orcamento.pdf"
 }
+
+###############################################################################
+# Transferência de atendimento
+#
+# Só o dono transfere, e só um atendimento em andamento. Exige a permissão
+# `support.chat:transfer` (id 50), que é própria - não basta `support.chat:update`.
+###############################################################################
+
+#### 7) Transferir para outro atendente
+POST {{url}}{{endpoint}}/18/transferir
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "user_destino_id": 14,
+  "motivo": "Cliente pediu para falar com o financeiro"
+}
+
+#### 8) Devolver para a espera (sem destinatário)
+# Omitir `user_destino_id` não é erro: é o segundo caminho da mesma ação. A
+# conversa perde o dono e volta para "Aguardando".
+POST {{url}}{{endpoint}}/18/transferir
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "motivo": "Saindo do turno"
+}

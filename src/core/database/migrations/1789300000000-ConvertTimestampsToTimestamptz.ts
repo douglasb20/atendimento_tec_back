@@ -7,7 +7,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * backend roda em `America/Sao_Paulo` e gravava o horário local (`20:18`), mas
  * o banco está em UTC e o driver devolvia esse mesmo valor marcado como UTC
  * (`20:18Z`). O navegador então somava as três horas de diferença e mostrava
- * `23:18` — uma mensagem enviada agora aparecia no futuro.
+ * `23:18` - uma mensagem enviada agora aparecia no futuro.
  *
  * O `USING ... AT TIME ZONE 'America/Sao_Paulo'` reinterpreta o que já está
  * gravado como horário de São Paulo, que foi como o backend o escreveu; sem a

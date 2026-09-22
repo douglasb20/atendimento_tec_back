@@ -28,6 +28,8 @@ import { StorageModule } from '@/storage/storage.module';
 import { RedisCacheModule } from '@/redis-cache/redis-cache.module';
 import { IntegrationsModule } from '@/integrations/integrations.module';
 import { CustomFieldsModule } from '@/custom-fields/custom-fields.module';
+import { QuickRepliesModule } from '@/quick-replies/quick-replies.module';
+import { ServiceAlertsModule } from '@/service-alerts/service-alerts.module';
 import { TagsModule } from '@/tags/tags.module';
 import { PermissionGroupsModule } from '@/permission-groups/permission-groups.module';
 import { PasswordResetModule } from '@/password-reset/password-reset.module';
@@ -48,7 +50,7 @@ import { HealthModule } from '@/health/health.module';
       },
       // Isola as filas por ambiente quando o Redis é compartilhado. Sem isto,
       // prod e homologação escrevem nas mesmas chaves (`whatsapp-messages-queue`)
-      // e o BullMQ entrega o job a qualquer worker que esteja escutando — uma
+      // e o BullMQ entrega o job a qualquer worker que esteja escutando - uma
       // mensagem de cliente real podia ser processada pelo backend de teste.
       ...(process.env.REDIS_PREFIX && { prefix: process.env.REDIS_PREFIX }),
       defaultJobOptions: {
@@ -95,6 +97,8 @@ import { HealthModule } from '@/health/health.module';
     RedisCacheModule,
     IntegrationsModule,
     TagsModule,
+    QuickRepliesModule,
+    ServiceAlertsModule,
     CustomFieldsModule,
     PermissionGroupsModule,
     PasswordResetModule,

@@ -1,4 +1,4 @@
-import { runInTransaction } from '@/Utils';
+import { nomeCompleto, runInTransaction } from '@/Utils';
 import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
 import { Clients } from 'clients/entities/clients.entity';
 import { DataSource, EntityManager } from 'typeorm';
@@ -51,7 +51,7 @@ export class ContactsService {
     return this.contactRepository.find({
       where: { status: 1 },
       relations: ['camposPersonalizados'],
-      order: { name: 'ASC' },
+      order: { name: 'ASC', last_name: 'ASC' },
     });
   }
 
@@ -95,7 +95,7 @@ export class ContactsService {
         const existente = await manager.findOneBy(Contacts, { remote_jid: jid });
         if (existente) {
           throw new ConflictException(
-            `Este número já está cadastrado no contato "${existente.name}"`,
+            `Este número já está cadastrado no contato "${nomeCompleto(existente)}"`,
           );
         }
       }
@@ -206,7 +206,7 @@ export class ContactsService {
     return this.contactRepository.find({
       where: { client_id, status: 1 },
       relations: ['camposPersonalizados'],
-      order: { name: 'ASC' },
+      order: { name: 'ASC', last_name: 'ASC' },
     });
   }
 
@@ -215,17 +215,19 @@ export class ContactsService {
       sessionId,
       remote_jid,
       name,
+      last_name,
     }: {
       sessionId: string;
       remote_jid: string;
       name?: string;
+      last_name?: string | null;
     },
     manager: EntityManager,
   ): Promise<Contacts> {
     let contact = await manager.findOneBy(Contacts, { remote_jid });
 
     // Diagnóstico do avatar genérico: sem isto não dá para distinguir "contato
-    // novo", "já tinha foto" e "tem o campo vazio e vai reconsultar" — os três
+    // novo", "já tinha foto" e "tem o campo vazio e vai reconsultar" - os três
     // caminhos são silenciosos e levam ao mesmo resultado na tela.
     this.logger.debug(
       `findOrCreateByRemoteJid ${remote_jid}: ` +
@@ -240,6 +242,7 @@ export class ContactsService {
       contact = manager.create(Contacts, {
         remote_jid,
         name,
+        last_name,
         phone,
         avatar_url: profilePicUrl,
         is_avatar_external: true,
@@ -253,7 +256,7 @@ export class ContactsService {
     // Contato já existente sem foto: tenta de novo.
     //
     // A busca acontecia só na criação, então um contato criado enquanto a
-    // instância ainda subia — ou antes de o dono publicar uma foto — ficava com
+    // instância ainda subia - ou antes de o dono publicar uma foto - ficava com
     // o avatar genérico para sempre, por mais conversas que tivesse depois.
     //
     // Só quando está vazia: refazer a chamada em toda mensagem somaria uma ida

@@ -3,8 +3,8 @@ import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 /**
  * Pedidos de redefinição de senha.
  *
- * Guarda o **hash** do token, nunca o token: quem ler esta tabela — backup,
- * consulta de manutenção, vazamento — não consegue redefinir a senha de
+ * Guarda o **hash** do token, nunca o token: quem ler esta tabela - backup,
+ * consulta de manutenção, vazamento - não consegue redefinir a senha de
  * ninguém. O valor em claro só existe no e-mail e na URL que o usuário recebe.
  *
  * A tabela também é o que permite o uso único: `used_at` marca o consumo, e um

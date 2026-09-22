@@ -3,7 +3,7 @@
  *
  * É a fonte única: o backend valida a escrita contra este catálogo, converte a
  * leitura com ele, e o front monta a tela a partir dele. Acrescentar um ajuste
- * é acrescentar uma entrada aqui — sem migration, sem mexer na tela.
+ * é acrescentar uma entrada aqui - sem migration, sem mexer na tela.
  *
  * Com chave-valor o banco não garante mais o tipo, que era o argumento a favor
  * de uma coluna por ajuste. Esta declaração é o que ocupa esse lugar: sem ela a
@@ -16,7 +16,7 @@ export type TipoAjuste = 'inteiro' | 'texto' | 'senha' | 'booleano';
 export type DefinicaoAjuste = {
   /** Como o campo aparece na tela. */
   rotulo: string;
-  /** Uma linha explicando o efeito — a tela mostra abaixo do campo. */
+  /** Uma linha explicando o efeito - a tela mostra abaixo do campo. */
   descricao: string;
   tipo: TipoAjuste;
   /** Agrupa os campos na tela. */
@@ -63,7 +63,7 @@ export const CATALOGO = {
   refresh_expiracao_dias: {
     rotulo: 'Duração da sessão',
     descricao:
-      'Por quanto tempo o atendente continua conectado sem precisar entrar de novo. Não encurta as sessões já abertas — elas carregam o prazo do momento do login.',
+      'Por quanto tempo o atendente continua conectado sem precisar entrar de novo. Não encurta as sessões já abertas - elas carregam o prazo do momento do login.',
     tipo: 'inteiro',
     grupo: 'comportamento',
     unidade: 'dias',
@@ -75,7 +75,7 @@ export const CATALOGO = {
   upload_max_mb: {
     rotulo: 'Tamanho máximo de arquivo',
     descricao:
-      'Limite por arquivo enviado no chat. O teto de 512 MB é do protocolo do WhatsApp — dá para reduzir, nunca aumentar.',
+      'Limite por arquivo enviado no chat. O teto de 512 MB é do protocolo do WhatsApp - dá para reduzir, nunca aumentar.',
     tipo: 'inteiro',
     grupo: 'comportamento',
     unidade: 'MB',
@@ -144,7 +144,7 @@ export type ChaveAjuste = keyof typeof CATALOGO;
  * O catálogo visto como `DefinicaoAjuste`.
  *
  * O `as const` acima preserva os literais, o que é bom para autocompletar as
- * chaves — mas faz o TypeScript perder os campos opcionais (`min`, `max`,
+ * chaves - mas faz o TypeScript perder os campos opcionais (`min`, `max`,
  * `env`) na união de entradas heterogêneas. Quem lê uma definição usa esta
  * visão; quem precisa da chave exata usa `CATALOGO`.
  */

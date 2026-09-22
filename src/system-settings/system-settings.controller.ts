@@ -11,7 +11,7 @@ import { TestarEmailDto } from './dto/testar-email.dto';
 import { AjusteParaTela, SystemSettingsService } from './system-settings.service';
 
 /**
- * Ajustes do sistema — restrito ao usuário master.
+ * Ajustes do sistema - restrito ao usuário master.
  *
  * `@ApenasSuperusuario` e não `@Permissions`: estes valores mudam o
  * comportamento para todos os usuários, e poder concedê-los por grupo seria

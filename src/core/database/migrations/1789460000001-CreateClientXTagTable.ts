@@ -7,7 +7,7 @@ import { MigrationInterface, QueryRunner, Table } from 'typeorm';
  * `@JoinTable` da entidade `Clients` apenas aponta para ela pelo nome.
  *
  * `ON DELETE CASCADE` nos dois lados é rede de segurança para a linha apagada
- * por fora da aplicação — restauração de backup, manutenção direta no banco. No
+ * por fora da aplicação - restauração de backup, manutenção direta no banco. No
  * caminho normal o service recusa remover etiqueta ainda vinculada.
  */
 export class CreateClientXTagTable1789460000001 implements MigrationInterface {
@@ -42,7 +42,7 @@ export class CreateClientXTagTable1789460000001 implements MigrationInterface {
     );
 
     // A PK composta já cobre a busca por cliente; este índice atende o sentido
-    // inverso — "quais clientes têm esta etiqueta" —, usado ao checar se a tag
+    // inverso - "quais clientes têm esta etiqueta" -, usado ao checar se a tag
     // pode ser removida.
     await queryRunner.query(`CREATE INDEX "idx_client_x_tag_tag_id" ON "client_x_tag" ("tag_id")`);
   }

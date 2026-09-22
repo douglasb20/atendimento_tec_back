@@ -5,7 +5,7 @@ import { MigrationInterface, QueryRunner, Table } from 'typeorm';
  *
  * Uma linha por valor, e não um `jsonb` na própria tabela: pesquisar contato
  * por campo personalizado é o motivo de existir o catálogo, e é aí que o jsonb
- * cobraria mais caro — exigiria índice GIN e sintaxe que o projeto não usa em
+ * cobraria mais caro - exigiria índice GIN e sintaxe que o projeto não usa em
  * lugar nenhum.
  *
  * ⚠️ A PK composta é o que impede o mesmo campo duas vezes no mesmo registro.

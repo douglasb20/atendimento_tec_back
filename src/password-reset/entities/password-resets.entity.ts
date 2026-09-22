@@ -30,7 +30,7 @@ export class PasswordResets {
   @Column({ type: 'timestamptz' })
   expires_at: Date;
 
-  /** Preenchido ao consumir o pedido — é o que impede o reuso do link. */
+  /** Preenchido ao consumir o pedido - é o que impede o reuso do link. */
   @Column({ type: 'timestamptz', nullable: true, default: null })
   used_at: Date | null;
 

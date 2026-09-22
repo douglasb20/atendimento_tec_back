@@ -32,3 +32,13 @@ Content-Type: application/json
 {
   "name": "Suporte"
 }
+#### Reiniciar a conexão
+# Derruba e reconecta a sessão sem perder o pareamento - a saída para o canal
+# que consta conectado mas parou de entregar mensagens.
+#
+# Exige `channel:update` (e não `channel:view` como o terminate): a ação
+# interrompe o atendimento por alguns segundos.
+#
+# ⚠️ Só em canal CONECTADO. A Evolution recusa reiniciar instância `close`.
+POST {{url}}{{endpoint}}/1/reiniciar
+Authorization: Bearer {{authToken}}

@@ -6,6 +6,11 @@ export class CreateUserDto {
   @IsNotEmpty({ message: (opt) => `Campo ${opt.property} é obrigatório` })
   name: string;
 
+  /** Opcional, como no contato. */
+  @IsOptional()
+  @IsString({ message: (opt) => `Campo ${opt.property} aceita somente formato string` })
+  last_name?: string | null;
+
   @IsString()
   @IsEmail({}, { message: (opt) => `Formato do campo ${opt.property} inválido` })
   email: string;
@@ -19,7 +24,7 @@ export class CreateUserDto {
   avatar_url?: string;
 
   /**
-   * Custo/hora do atendente. **Obsoleto** — o formulário deixou de enviá-lo.
+   * Custo/hora do atendente. **Obsoleto** - o formulário deixou de enviá-lo.
    *
    * Continua aceito para não quebrar chamadas antigas (os `.http` ainda o
    * mandam). Alimentava um cálculo em `supports`, módulo parado, cuja consulta
@@ -35,7 +40,7 @@ export class CreateUserDto {
   role?: string;
 
   /**
-   * O grupo de permissão do usuário — é ele que define o acesso.
+   * O grupo de permissão do usuário - é ele que define o acesso.
    *
    * Nulo é válido e significa sem permissão alguma, que é como um cadastro
    * nasce até alguém decidir o que ele pode fazer. Não confundir com `role`

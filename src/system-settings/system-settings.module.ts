@@ -9,7 +9,7 @@ import { SystemSettingsService } from './system-settings.service';
 
 /**
  * `@Global` porque a validade do link de senha, a retenção de mídia e a
- * duração da sessão são lidas em módulos distintos — importar este em cada um
+ * duração da sessão são lidas em módulos distintos - importar este em cada um
  * seria ruído sem ganho.
  *
  * O `forwardRef` com o mailer é um ciclo real: o mailer lê a configuração

@@ -4,7 +4,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * E-mail único entre os usuários.
  *
  * Não havia índice nenhum além da chave primária, e nada no código verificava:
- * dava para cadastrar dois usuários com o mesmo e-mail — inclusive um com o do
+ * dava para cadastrar dois usuários com o mesmo e-mail - inclusive um com o do
  * usuário master. Isso quebra o login, que busca **pelo e-mail** e usa o
  * primeiro registro que encontrar: quem entra passa a depender da ordem física
  * da tabela, e a senha correta de um dos dois é recusada.
@@ -20,7 +20,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 export class EmailUnicoEmUsers1789480000005 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Duplicatas existentes impediriam a criação do índice. Em vez de falhar o
-    // deploy, os registros repetidos são desativados — o mais antigo fica, que
+    // deploy, os registros repetidos são desativados - o mais antigo fica, que
     // é o original, e os demais recebem um sufixo para liberar o endereço.
     await queryRunner.query(`
       WITH duplicados AS (

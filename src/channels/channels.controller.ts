@@ -37,20 +37,46 @@ export class ChannelsController {
     return this.channelsService.findChannel(channelId);
   }
 
+  /**
+   * Abre a sessão e devolve o QR code para parear.
+   *
+   * ⚠️ `channel:config`, não `channel:view`: até a migration `1789550000000`
+   * esta rota exigia só `view`, e quem podia enxergar a lista de canais
+   * conseguia mexer na conexão de todos.
+   */
   @Get('/:channelId/start')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('channel:view')
+  @Permissions('channel:config')
   @HttpCode(HttpStatus.OK)
   async startSession(@Param('channelId') channelId: number) {
     return this.channelsService.startSession(channelId);
   }
 
+  /**
+   * Derruba a sessão. **Para o atendimento de todo mundo naquele canal** - é a
+   * ação mais destrutiva do módulo, e por isso exige `channel:config`.
+   */
   @Get('/:channelId/terminate')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('channel:view')
+  @Permissions('channel:config')
   @HttpCode(HttpStatus.OK)
   async closeSession(@Param('channelId') channelId: number) {
     return this.channelsService.closeSession(channelId);
+  }
+
+  /**
+   * Derruba e reconecta a sessão, sem perder o pareamento.
+   *
+   * `channel:config` como o `start` e o `terminate`: é a mesma natureza das
+   * três - mexer na sessão -, e separá-las faria derrubar e subir a conexão
+   * depender de duas permissões diferentes.
+   */
+  @Post('/:channelId/reiniciar')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('channel:config')
+  @HttpCode(HttpStatus.OK)
+  async restartSession(@Param('channelId') channelId: number) {
+    return this.channelsService.restartSession(channelId);
   }
 
   /**
@@ -58,7 +84,7 @@ export class ChannelsController {
    *
    * `channel:view` e não `:update` de propósito: quem enxerga o canal precisa
    * poder confirmar se ele está de pé, e a rota não muda nada por conta
-   * própria — só alinha o banco ao que o provider já diz.
+   * própria - só alinha o banco ao que o provider já diz.
    */
   @Get('/:channelId/sincronizar-status')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)

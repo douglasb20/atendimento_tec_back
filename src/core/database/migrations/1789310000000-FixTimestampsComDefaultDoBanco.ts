@@ -6,7 +6,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * A migration `ConvertTimestampsToTimestamptz` tratou todas as colunas de data
  * do mesmo jeito, e elas não eram iguais: umas são preenchidas pelo **backend**
  * (que roda em `America/Sao_Paulo` e gravava horário local), outras pelo
- * **Postgres** via `CURRENT_TIMESTAMP` — e o banco está em UTC.
+ * **Postgres** via `CURRENT_TIMESTAMP` - e o banco está em UTC.
  *
  * Nas do backend a reinterpretação como horário de São Paulo estava certa. Nas
  * do banco, os valores já eram UTC, então converter de novo os empurrou três

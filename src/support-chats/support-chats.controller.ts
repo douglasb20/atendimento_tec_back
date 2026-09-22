@@ -23,6 +23,8 @@ import { ReplyMessageDto } from './dto/reply-message.dto';
 import { SendMediaDto } from './dto/send-media.dto';
 import { SignMediaPostDto } from './dto/sign-media-post.dto';
 import { FinalizarAtendimentoDto } from './dto/finalizar-atendimento.dto';
+import { FinalizarSemAtendimentoDto } from './dto/finalizar-sem-atendimento.dto';
+import { TransferirAtendimentoDto } from './dto/transferir-atendimento.dto';
 
 @Controller('support-chats')
 export class SupportChatsController {
@@ -39,6 +41,7 @@ export class SupportChatsController {
   ) {
     return this.supportChatsService.sendMessage(
       id,
+      req.user['id'],
       sendMessageDto.chat_id,
       `*${req.user['name']}:*\n${sendMessageDto.message}`,
     );
@@ -63,6 +66,7 @@ export class SupportChatsController {
   ) {
     return this.supportChatsService.replyMessage(
       id,
+      req.user['id'],
       replyMessageDto.chat_id,
       replyMessageDto.message_id,
       `*${req.user['name']}:*\n${replyMessageDto.message}`,
@@ -89,7 +93,7 @@ export class SupportChatsController {
    * Quantos atendimentos anteriores este contato tem.
    *
    * Mesma permissão de abrir a conversa: quem vê o atendimento atual pode ver
-   * os anteriores **do mesmo contato** — é o histórico dele, não de outro.
+   * os anteriores **do mesmo contato** - é o histórico dele, não de outro.
    */
   @Get('/:id/anteriores')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
@@ -129,7 +133,7 @@ export class SupportChatsController {
     // A legenda leva o mesmo prefixo do texto: numa conversa atendida por mais
     // de uma pessoa, é o que identifica quem falou no WhatsApp do cliente -
     // lá só chega texto, não há como marcar o autor de outro jeito.
-    return this.supportChatsService.sendMedia(id, {
+    return this.supportChatsService.sendMedia(id, req.user['id'], {
       ...sendMediaDto,
       caption: sendMediaDto.caption
         ? `*${req.user['name']}:*\n${sendMediaDto.caption}`
@@ -144,11 +148,12 @@ export class SupportChatsController {
   async deleteMessage(
     @Param('id', ParseIntPipe) id: number,
     @Body() { message_id }: { message_id: string },
+    @Req() req: Request,
   ) {
     if (!message_id) {
       throw new BadRequestException('O campo message_id é obrigatório');
     }
-    return this.supportChatsService.deleteMessage(id, message_id);
+    return this.supportChatsService.deleteMessage(id, req.user['id'], message_id);
   }
 
   /**
@@ -164,11 +169,12 @@ export class SupportChatsController {
   async ocultarMensagens(
     @Param('id', ParseIntPipe) id: number,
     @Body() { message_ids }: { message_ids: string[] },
+    @Req() req: Request,
   ) {
     if (!Array.isArray(message_ids) || message_ids.length === 0) {
       throw new BadRequestException('O campo message_ids é obrigatório');
     }
-    return this.supportChatsService.ocultarMensagens(id, message_ids);
+    return this.supportChatsService.ocultarMensagens(id, req.user['id'], message_ids);
   }
 
   @Post('/:id/marcar-lida')
@@ -177,6 +183,20 @@ export class SupportChatsController {
   @HttpCode(HttpStatus.OK)
   async marcarComoLida(@Param('id', ParseIntPipe) id: number) {
     return this.supportChatsService.marcarComoLida(id);
+  }
+
+  /**
+   * O inverso do `marcar-lida`: devolve a conversa à lista como não lida.
+   *
+   * `support.chat:view` como a irmã: é sinalização de leitura, não alteração
+   * do atendimento.
+   */
+  @Post('/:id/marcar-nao-lida')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:view')
+  @HttpCode(HttpStatus.OK)
+  async marcarComoNaoLida(@Param('id', ParseIntPipe) id: number) {
+    return this.supportChatsService.marcarComoNaoLida(id);
   }
 
   @Post('/:id/iniciar')
@@ -203,6 +223,48 @@ export class SupportChatsController {
     );
   }
 
+  /**
+   * Encerra sem que tenha havido atendimento - spam, engano, contato que não
+   * será atendido.
+   *
+   * Rota própria e não um sinalizador no `finalizar`: as regras são opostas.
+   * Aquele exige dono, cliente associado e estado `EM_ANDAMENTO`; este recusa
+   * justamente o `EM_ANDAMENTO` e dispensa as outras duas.
+   */
+  @Post('/:id/finalizar-sem-atendimento')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:update')
+  @HttpCode(HttpStatus.OK)
+  async finalizarSemAtendimento(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: FinalizarSemAtendimentoDto,
+    @Req() req: Request,
+  ) {
+    return this.supportChatsService.finalizarSemAtendimento(id, req.user['id'], dto);
+  }
+
+  /**
+   * Permissão própria, e não o `support.chat:update` das demais ações:
+   * transferir é a única que tira a conversa das mãos de alguém.
+   */
+  @Post('/:id/transferir')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:transfer')
+  @HttpCode(HttpStatus.OK)
+  async transferirAtendimento(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() transferirAtendimentoDto: TransferirAtendimentoDto,
+    @Req() req: Request,
+  ) {
+    // O ator vem do token, nunca do corpo: senão daria para transferir em nome
+    // de outro atendente.
+    return this.supportChatsService.transferirAtendimento(
+      id,
+      req.user['id'],
+      transferirAtendimentoDto,
+    );
+  }
+
   @Post('/:id/edit-message')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('message:update')
@@ -220,6 +282,7 @@ export class SupportChatsController {
     // perderia a identificação do atendente ao ser alterada.
     return this.supportChatsService.editMessage(
       id,
+      req.user['id'],
       message_id,
       `*${req.user['name']}:*\n${message.trim()}`,
     );
@@ -233,7 +296,14 @@ export class SupportChatsController {
     @Param('id', ParseIntPipe) id: number,
     @Body()
     { chat_id, message_id, reaction }: { chat_id: string; message_id: string; reaction: string },
+    @Req() req: Request,
   ) {
-    return await this.supportChatsService.sendReactionMessage(id, chat_id, message_id, reaction);
+    return await this.supportChatsService.sendReactionMessage(
+      id,
+      req.user['id'],
+      chat_id,
+      message_id,
+      reaction,
+    );
   }
 }

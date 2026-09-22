@@ -7,7 +7,7 @@ export const SEM_PERMISSAO = 'sem_permissao';
  *
  * Existe porque o `PermissionGuard` passou a **negar** quando não há
  * `@Permissions`: antes o padrão era liberar, e esquecer o decorator não
- * produzia erro nenhum — produzia acesso livre, em silêncio. Onze dos treze
+ * produzia erro nenhum - produzia acesso livre, em silêncio. Onze dos treze
  * endpoints de conversas estavam assim.
  *
  * Com a inversão, "liberado de propósito" precisa estar escrito. É o que este

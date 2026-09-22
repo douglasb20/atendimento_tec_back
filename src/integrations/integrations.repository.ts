@@ -9,7 +9,7 @@ export class IntegrationsRepository extends Repository<Integrations> {
     super(Integrations, dataSource.manager);
   }
 
-  /** Providers disponíveis para o formulário — só os habilitados. */
+  /** Providers disponíveis para o formulário - só os habilitados. */
   async findProvidersAtivos(): Promise<IntegrationProviders[]> {
     return this.manager.find(IntegrationProviders, {
       where: { is_active: true },
@@ -17,7 +17,7 @@ export class IntegrationsRepository extends Repository<Integrations> {
     });
   }
 
-  /** Quantos canais apontam para esta integração — usado antes de remover. */
+  /** Quantos canais apontam para esta integração - usado antes de remover. */
   async contarCanaisVinculados(id: number): Promise<number> {
     return this.manager.count('Channels', { where: { integration_id: id } } as never);
   }

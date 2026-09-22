@@ -66,7 +66,7 @@ export class PermissionGroupsService {
       if (dto.description !== undefined) grupo.description = dto.description;
 
       // Só toca nas permissões quando o campo vem no corpo. Omitido, os
-      // vínculos ficam como estão — permite renomear sem reenviar a lista.
+      // vínculos ficam como estão - permite renomear sem reenviar a lista.
       if (dto.permission_ids !== undefined) {
         grupo.permissions = await this.permissionGroupsRepository.permissoesPorIds(
           dto.permission_ids,

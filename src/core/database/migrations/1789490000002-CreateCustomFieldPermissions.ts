@@ -7,7 +7,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * até 12 e `permissions` até 45.
  *
  * Só o catálogo tem permissão própria. Preencher os valores num contato usa
- * `contact:update`, e num cliente `client:update` — é edição do cadastro, não
+ * `contact:update`, e num cliente `client:update` - é edição do cadastro, não
  * uma ação à parte; exigir permissão separada faria alguém poder editar o
  * contato mas não um dos campos dele.
  */

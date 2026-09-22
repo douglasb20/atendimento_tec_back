@@ -29,7 +29,7 @@ async function bootstrap() {
   app.enableCors({
     origin: origensPermitidas(),
     // Sem isto o navegador não envia os cookies de sessão em requisição
-    // cross-origin — e em produção front e API estão em subdomínios distintos.
+    // cross-origin - e em produção front e API estão em subdomínios distintos.
     // Note que `credentials: true` é incompatível com `origin: '*'`: a origem
     // precisa ser explícita, e é o que `origensPermitidas()` devolve.
     credentials: true,
@@ -50,7 +50,7 @@ async function bootstrap() {
     .then(() => console.log('Redis conectado ao Bull ✔'))
     .catch((err) => console.error('Erro ao conectar no Redis Bull:', err));
 
-  // `APP_ENV` guarda a porta, não o ambiente — o nome engana, mas é o que os
+  // `APP_ENV` guarda a porta, não o ambiente - o nome engana, mas é o que os
   // ambientes existentes já usam. `PORT` é o nome convencional e tem
   // precedência; sem nenhuma das duas, 3001.
   await app.listen(process.env.PORT || process.env.APP_ENV || 3001);

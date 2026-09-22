@@ -163,7 +163,7 @@ export class MessagesService {
   /**
    * Registra a reação de uma pessoa, preservando as das demais.
    *
-   * Cada participante tem **uma** reação, que pode trocar ou remover — por isso
+   * Cada participante tem **uma** reação, que pode trocar ou remover - por isso
    * o mapa é indexado por quem reagiu. Emoji vazio no payload significa que a
    * pessoa desfez a reação, e a chave dela sai do mapa.
    */
@@ -295,7 +295,7 @@ export class MessagesService {
         media_type: mimeType,
         media_size: mediaSize,
         // Sem isto o documento recebido chega sem nome, e a bolha mostra
-        // "Documento" — o download também sairia com o uuid da key.
+        // "Documento" - o download também sairia com o uuid da key.
         file_name: fileName,
       });
 

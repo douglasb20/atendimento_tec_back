@@ -209,7 +209,7 @@ export class WhatsappService {
 
   async requestConnection(sessionId: string): Promise<ProviderConnectionResult> {
     // Com o token: reconectar uma instância que já existe deve usar o token
-    // dela, e `findBySessionId` não traz a coluna (`select: false`) — o canal
+    // dela, e `findBySessionId` não traz a coluna (`select: false`) - o canal
     // chegaria sem ele e a chamada cairia na chave global.
     const channel = await this.channelsRepository.findBySessionIdWithToken(sessionId);
     const { provider, session } = await this.providerFactory.forChannel(channel);
@@ -234,6 +234,12 @@ export class WhatsappService {
   async requestDisconnection(sessionId: string): Promise<void> {
     const { provider, session } = await this.resolve(sessionId);
     return provider.requestDisconnection(session);
+  }
+
+  async restartConnection(sessionId: string): Promise<void> {
+    const { provider, session } = await this.resolve(sessionId);
+    this.logger.log(`Reiniciando a sessão ${sessionId}`);
+    return provider.restartConnection(session);
   }
 
   /** Estado da sessão no provider, consultado na hora. */

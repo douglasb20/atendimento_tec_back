@@ -130,6 +130,37 @@ export class ChannelsService {
     await this.whatsappService.requestDisconnection(channel.session_id);
   }
 
+  /**
+   * Derruba e reconecta a sessão sem perder o pareamento.
+   *
+   * Serve à sessão que consta conectada mas parou de entregar mensagens: é o
+   * caminho curto, que dispensa desconectar e ler o QR de novo.
+   *
+   * ⚠️ Só em canal conectado. A Evolution recusa reiniciar instância `close`
+   * ("is not connected"), e desconectado é caso de conectar, não de reiniciar.
+   */
+  async restartSession(channelId: number) {
+    const channel = await this.findChannel(channelId);
+    if (!channel) {
+      throw new NotFoundException('Canal não localizado com este id');
+    }
+
+    if (!channel.session_id) {
+      throw new BadRequestException('Este canal ainda não tem uma sessão para reiniciar');
+    }
+
+    if (channel.channel_status_id !== ChannelStatus.CONNECTED) {
+      throw new BadRequestException('Só é possível reiniciar um canal conectado');
+    }
+
+    await this.whatsappService.restartConnection(channel.session_id);
+
+    // O estado real vem pelo `connection.update` do webhook, que a Evolution
+    // dispara ao derrubar e ao subir de novo - não forçamos status aqui para
+    // não brigar com o que o provider vai contar em seguida.
+    return { status: 'restarting' };
+  }
+
   // ====== Events Listener Methods ======
 
   handleChannelStatus(channel_id: number): void {
@@ -226,7 +257,7 @@ export class ChannelsService {
    * Consulta o estado da sessão no provider e alinha o nosso banco a ele.
    *
    * O status que guardamos é o último que um evento `connection.update` nos
-   * contou — e evento se perde. Quando isso acontece o portal mostra
+   * contou - e evento se perde. Quando isso acontece o portal mostra
    * "Conectado" para um canal que caiu, e a falha só aparece quando alguém
    * tenta enviar. Este método é a fonte da verdade sob demanda.
    */

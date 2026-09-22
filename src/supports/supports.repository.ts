@@ -164,9 +164,10 @@ export class SupportRepository extends Repository<Supports> {
         'timediff(at.hora_fim, at.hora_inicio) as duration',
         'cli.nome as cli_nome',
         'cli.cnpj as cli_cnpj',
-        'u.name as user_nome',
+        // Concatenado: as colunas são separadas desde a migration 1789530000000.
+        "trim(u.name || ' ' || coalesce(u.last_name, '')) as user_nome",
         'u.email as user_email',
-        'cont.name as contact_nome',
+        "trim(cont.name || ' ' || coalesce(cont.last_name, '')) as contact_nome",
         'cont.phone as contact_phone',
         'as.descricao as status_descricao',
       ])

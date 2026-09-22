@@ -100,3 +100,40 @@ export async function runInTransaction<T>(
     await qr.release();
   }
 }
+
+/**
+ * O nome completo a partir das duas colunas.
+ *
+ * Existe para a concatenação viver num lugar só: `name` e `last_name` são
+ * separados no banco desde a migration `1789530000000`, e montar
+ * `` `${name} ${last_name}` `` na mão espalharia o tratamento do sobrenome
+ * nulo - que é o caso comum, não a exceção (contato de empresa, `pushName` de
+ * uma palavra).
+ */
+export const nomeCompleto = (
+  pessoa?: { name?: string | null; last_name?: string | null } | null,
+): string => [pessoa?.name, pessoa?.last_name].filter(Boolean).join(' ').trim();
+
+/**
+ * Divide um nome livre em primeiro nome + sobrenome, na primeira palavra.
+ *
+ * ⚠️ É **heurística**, e o principal consumidor é o `pushName` do WhatsApp -
+ * texto que o contato escolhe, não nome civil. "Douglas A. Silva" sai certo;
+ * "Automatec Sistemas" ganha o sobrenome "Sistemas". Foi decisão de projeto
+ * dividir mesmo assim, para o cadastro já nascer separado.
+ *
+ * Nome de uma palavra devolve `last_name: null`, nunca uma cópia do nome.
+ */
+export const separaNome = (
+  completo?: string | null,
+): { name: string; last_name: string | null } => {
+  const limpo = (completo ?? '').trim().replace(/\s+/g, ' ');
+
+  if (!limpo) return { name: '', last_name: null };
+
+  const espaco = limpo.indexOf(' ');
+
+  return espaco === -1
+    ? { name: limpo, last_name: null }
+    : { name: limpo.slice(0, espaco), last_name: limpo.slice(espaco + 1) };
+};

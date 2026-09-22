@@ -77,7 +77,7 @@ export class ProviderFactory {
    * Serve ao botão "Testar conexão" da tela de cadastro: o usuário precisa
    * saber se a credencial funciona *antes* de salvar, e não horas depois,
    * quando um canal falha ao conectar. Sem isto, testar exigiria gravar
-   * primeiro — e uma integração com credencial errada já fica no ar.
+   * primeiro - e uma integração com credencial errada já fica no ar.
    */
   provisorio(dados: {
     slug: string;

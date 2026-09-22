@@ -59,7 +59,7 @@ export class TagsRepository extends Repository<Tags> {
   /**
    * Nome já usado por outra etiqueta ativa.
    *
-   * A comparação é `lower()` nos dois lados, igual ao índice único do banco —
+   * A comparação é `lower()` nos dois lados, igual ao índice único do banco -
    * checar com sensibilidade a maiúsculas deixaria "Premium" passar pela
    * validação e estourar no INSERT.
    */

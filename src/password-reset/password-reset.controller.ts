@@ -8,7 +8,7 @@ import { PasswordResetService, ResultadoValidacao } from './password-reset.servi
  * Recuperação de senha.
  *
  * Os três endpoints são **públicos**, sem guard nenhum: quem esqueceu a senha
- * não tem sessão. A proteção é o token — 256 bits de aleatoriedade, válido uma
+ * não tem sessão. A proteção é o token - 256 bits de aleatoriedade, válido uma
  * vez só e por prazo curto.
  */
 @Controller('auth')

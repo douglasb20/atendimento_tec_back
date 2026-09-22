@@ -46,7 +46,7 @@ export class ClientController {
    * Só as etiquetas, sem reenviar o cadastro.
    *
    * É o que o painel do chat usa para classificar o cliente durante o
-   * atendimento — lá o nome e o CNPJ não estão em mãos, e mandá-los vazios no
+   * atendimento - lá o nome e o CNPJ não estão em mãos, e mandá-los vazios no
    * PATCH comum apagaria o que está gravado.
    */
   @Patch(':client_id/tags')

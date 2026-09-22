@@ -46,3 +46,42 @@ Authorization: Bearer {{authToken}}
 #### 5) Get user info
 GET {{url}}{{endpoint}}/info
 Authorization: Bearer {{authToken}}
+###############################################################################
+# Preferência de tema
+#
+# Auto-serviço: `@SemPermissao`, e o id vem do token — ninguém altera a
+# preferência de outro.
+#
+# Os dois campos são independentes: omitir preserva o que está gravado, para o
+# toggle de modo não precisar reenviar a cor.
+#
+# Valores em `src/users/temas.ts`, que precisa casar com
+# `front/scripts/temas.config.mjs`.
+###############################################################################
+
+#### Trocar a cor
+PATCH {{url}}{{endpoint}}/preferencias-tema
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "tema": "verde"
+}
+
+#### Trocar só o modo (o toggle claro/escuro)
+PATCH {{url}}{{endpoint}}/preferencias-tema
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "modo_tema": "escuro"
+}
+
+#### Valor inválido -> 400 com a lista de aceitos
+PATCH {{url}}{{endpoint}}/preferencias-tema
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "tema": "fucsia"
+}

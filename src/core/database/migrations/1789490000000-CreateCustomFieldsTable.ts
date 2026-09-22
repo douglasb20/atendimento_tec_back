@@ -4,7 +4,7 @@ import { MigrationInterface, QueryRunner, Table } from 'typeorm';
  * Catálogo de campos personalizados de contatos e clientes.
  *
  * O cadastro existe para que "CPF", "cpf" e "C.P.F." não virem três campos
- * distintos — sem ele, quem preenche inventa o nome na hora e a busca por
+ * distintos - sem ele, quem preenche inventa o nome na hora e a busca por
  * campo nunca funciona.
  *
  * ⚠️ **Estar no catálogo não põe o campo em nenhum contato.** Esta tabela é a
@@ -27,7 +27,7 @@ export class CreateCustomFieldsTable1789490000000 implements MigrationInterface 
           { name: 'nome', type: 'varchar', length: '60', isNullable: false },
           // `texto` | `numero` | `data` | `booleano` | `lista`. O valor é
           // sempre gravado como texto; é esta coluna que diz como interpretá-lo,
-          // e é o código que garante — o banco não tem como.
+          // e é o código que garante - o banco não tem como.
           { name: 'tipo', type: 'varchar', length: '12', isNullable: false },
           // `contato` | `cliente` | `ambos`. Um "CNPJ" só faz sentido em
           // cliente; um "cargo", só em contato.
@@ -35,7 +35,7 @@ export class CreateCustomFieldsTable1789490000000 implements MigrationInterface 
           // Só para `tipo = lista`: `["Indicação", "Google", "Feira"]`.
           //
           // jsonb aqui é legítimo porque é lido inteiro para montar o seletor e
-          // nunca consultado por dentro — mesmo uso de `integrations.credentials`.
+          // nunca consultado por dentro - mesmo uso de `integrations.credentials`.
           { name: 'opcoes', type: 'jsonb', isNullable: true, default: null },
           { name: 'created_at', type: 'timestamptz', default: 'CURRENT_TIMESTAMP' },
           {

@@ -3,7 +3,7 @@ import { IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'clas
 /**
  * Credenciais avulsas para testar antes de salvar.
  *
- * Campos omitidos usam o que já está configurado — é o que permite conferir uma
+ * Campos omitidos usam o que já está configurado - é o que permite conferir uma
  * senha nova sem reenviar host e porta, e testar o que está gravado sem enviar
  * nada.
  */

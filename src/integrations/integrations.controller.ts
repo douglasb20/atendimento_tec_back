@@ -24,7 +24,7 @@ import { IntegrationsService } from './integrations.service';
 export class IntegrationsController {
   constructor(private readonly integrationsService: IntegrationsService) {}
 
-  /** Providers disponíveis — alimenta a seleção do formulário. */
+  /** Providers disponíveis - alimenta a seleção do formulário. */
   @Get('/providers')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('integration:view')

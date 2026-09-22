@@ -1,36 +1,30 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { Injectable } from '@nestjs/common';
 
-import { runInTransaction } from 'Utils';
 import { PermissionsRepository } from './permissions.repository';
-import { CreatePermissionDto } from './dto/create-permission.dto';
-import { UpdatePermissionDto } from './dto/update-permission.dto';
 
 /** Quanto tempo as permissões de um usuário ficam em memória. */
 const CACHE_MS = 30_000;
 
 @Injectable()
 export class PermissionService {
-  private readonly logger = new Logger(PermissionService.name);
 
   /**
    * Cache das permissões por usuário.
    *
    * O guard roda em toda requisição protegida, e com papéis a consulta virou
    * uma junção de três tabelas. Trinta segundos é curto o bastante para uma
-   * permissão revogada sumir rápido — e o `invalida` cobre o caso em que a
+   * permissão revogada sumir rápido - e o `invalida` cobre o caso em que a
    * mudança precisa valer na hora.
    *
    * Em memória de propósito: o dado é pequeno, reconstrói-se sozinho, e pô-lo
    * no Redis traria invalidação distribuída para um problema que não a exige.
-   * Com mais de uma instância da API, cada uma tem o seu — o desencontro dura
+   * Com mais de uma instância da API, cada uma tem o seu - o desencontro dura
    * os mesmos trinta segundos.
    */
   private readonly cache = new Map<number, { permissoes: Set<string>; expiraEm: number }>();
 
   constructor(
     private readonly permissionRepository: PermissionsRepository,
-    private readonly dataSource: DataSource,
   ) {}
 
   /** Descarta o cache de um usuário, ou de todos. Chamar ao mexer em papéis. */
@@ -75,25 +69,6 @@ export class PermissionService {
     return this.permissionRepository.permissionByUser(user_id);
   }
 
-  async createPermission(createPermissionDto: CreatePermissionDto[]) {
-    await runInTransaction(this.dataSource, async (manager) => {
-      await this.permissionRepository.createPermission(createPermissionDto, manager);
-    });
-
-    // Permissão nova pode entrar num papel em seguida; o cache inteiro sai.
-    this.invalida();
-    this.logger.log(`${createPermissionDto.length} permissão(ões) criada(s)`);
-  }
-
-  async updatePermission(id: number, updatePermissionDto: UpdatePermissionDto) {
-    await runInTransaction(this.dataSource, async (manager) => {
-      await this.permissionRepository.updatePermission(id, updatePermissionDto, manager);
-    });
-
-    // Renomear uma permissão muda o que o guard compara: o cache precisa cair.
-    this.invalida();
-    this.logger.log(`Permissão ${id} atualizada`);
-  }
 
   // =============== Modules =============
 

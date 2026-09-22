@@ -102,7 +102,7 @@ export class ClientService {
   /**
    * Substitui as etiquetas do cliente pelas informadas.
    *
-   * Ids que já não existem são descartados em silêncio — a tela pode ter sido
+   * Ids que já não existem são descartados em silêncio - a tela pode ter sido
    * carregada antes de alguém remover a etiqueta, e derrubar o salvamento
    * inteiro por isso seria pior do que ignorar.
    */
@@ -110,7 +110,7 @@ export class ClientService {
    * Substitui as etiquetas do cliente e devolve o cliente atualizado.
    *
    * Existe separado do `updateClient` para o painel do chat poder classificar o
-   * cliente sem reenviar nome e CNPJ — que ele nem tem em mãos.
+   * cliente sem reenviar nome e CNPJ - que ele nem tem em mãos.
    */
   async atualizarEtiquetas(client_id: number, tagIds: number[]): Promise<Clients> {
     return runInTransaction(this.dataSource, async (manager) => {
@@ -168,7 +168,7 @@ export class ClientService {
       throw new BadRequestException(`Cliente com id "${client_id}" não existe.`);
     }
     // Filtra pelo id, não pelo objeto: passar a entidade inteira faz o TypeORM
-    // montar a condição a partir de todos os campos carregados — e desde que o
+    // montar a condição a partir de todos os campos carregados - e desde que o
     // cliente passou a vir com as etiquetas, a comparação nunca casava.
     const contacts = await this.contactRepository.findBy({ client_id: client.id, status: 1 });
     client.contacts = contacts;

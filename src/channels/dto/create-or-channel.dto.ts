@@ -1,4 +1,13 @@
-import { IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
+
+/**
+ * Teto das mensagens automáticas.
+ *
+ * O WhatsApp aceita bem mais, mas saudação é recado curto: o limite existe
+ * para a tela poder mostrar o contador e para o texto caber na bolha sem
+ * virar parede.
+ */
+const LIMITE_MENSAGEM = 1000;
 
 export class CreateOrChannelDto {
   @IsString({ message: (opt) => `Campo ${opt.property} aceita somente formato string` })
@@ -7,11 +16,35 @@ export class CreateOrChannelDto {
 
   /**
    * Integração que atende este canal. Opcional: sem ela, o canal cai na
-   * integração marcada como padrão — o que basta enquanto houver um servidor
+   * integração marcada como padrão - o que basta enquanto houver um servidor
    * de provider só. Informar passa a importar quando coexistem vários
    * (produção e homologação, ou um cliente com Evolution própria).
    */
-  @IsOptional()
+  // `ValidateIf` em vez de `IsOptional`: o front manda `null` explicitamente
+  // para dizer "usar a integração padrão", e o `IsOptional` sozinho deixaria
+  // passar, mas o `IsInt` recusaria o nulo vindo no corpo.
+  @ValidateIf((_, valor) => valor !== null && valor !== undefined)
   @IsInt({ message: 'Selecione uma integração válida' })
-  integration_id?: number;
+  integration_id?: number | null;
+
+  /**
+   * Enviada sozinha quando um contato abre uma conversa nova.
+   *
+   * Vazio desliga o envio - é assim que se desfaz o cadastro sem precisar de
+   * uma opção "ativar/desativar" à parte.
+   */
+  @IsOptional()
+  @IsString({ message: 'A mensagem de saudação precisa ser um texto' })
+  @MaxLength(LIMITE_MENSAGEM, {
+    message: `A mensagem de saudação deve ter no máximo ${LIMITE_MENSAGEM} caracteres`,
+  })
+  mensagem_saudacao?: string | null;
+
+  /** Enviada ao finalizar o atendimento. Mesmas regras da saudação. */
+  @IsOptional()
+  @IsString({ message: 'A mensagem de despedida precisa ser um texto' })
+  @MaxLength(LIMITE_MENSAGEM, {
+    message: `A mensagem de despedida deve ter no máximo ${LIMITE_MENSAGEM} caracteres`,
+  })
+  mensagem_despedida?: string | null;
 }

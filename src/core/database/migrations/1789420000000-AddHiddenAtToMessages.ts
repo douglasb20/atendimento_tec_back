@@ -8,7 +8,7 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  * ela continua. Serve para o caso em que a janela de revogação (60h) já passou
  * e o atendente ainda quer limpar a conversa do próprio lado.
  *
- * A linha é preservada — o histórico de um atendimento é registro de trabalho,
+ * A linha é preservada - o histórico de um atendimento é registro de trabalho,
  * e a coluna guarda *quando* foi oculta, permitindo auditar e reverter.
  */
 export class AddHiddenAtToMessages1789420000000 implements MigrationInterface {

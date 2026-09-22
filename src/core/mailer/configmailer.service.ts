@@ -18,7 +18,7 @@ export type ResultadoTeste = { ok: boolean; erro?: string };
 export class ConfigMailerService {
   private readonly logger = new Logger(ConfigMailerService.name);
 
-  /** Nome do transporte registrado por último — usado para descartá-lo. */
+  /** Nome do transporte registrado por último - usado para descartá-lo. */
   private transporteAtual: string | null = null;
 
   constructor(
@@ -42,7 +42,7 @@ export class ConfigMailerService {
    * nome dele.
    *
    * O `MailerModule.forRootAsync` monta o transporte uma vez, na subida do
-   * processo — mudar o servidor pela tela não teria efeito. `addTransporter`
+   * processo - mudar o servidor pela tela não teria efeito. `addTransporter`
    * registra em tempo de execução, e é o que permite a troca sem reiniciar.
    *
    * O nome deriva da própria configuração: mudar host, porta ou usuário produz
@@ -90,7 +90,7 @@ export class ConfigMailerService {
     token: string,
     validadeMinutos: number,
   ): Promise<void> {
-    // Sem barra no fim, venha a variável com ou sem — concatenar direto
+    // Sem barra no fim, venha a variável com ou sem - concatenar direto
     // produziria `//auth/...`, que alguns servidores tratam como outra rota.
     const base = (process.env.URL_FRONTEND ?? 'http://localhost:3000').replace(/\/+$/, '');
     const url = `${base}/auth/redefinir-senha/${token}`;
@@ -114,7 +114,7 @@ export class ConfigMailerService {
    *
    * Existe para a configuração ser conferida **antes** de valer: uma senha
    * errada salva em silêncio só apareceria quando alguém tentasse recuperar a
-   * própria senha — e aí a recuperação estaria quebrada.
+   * própria senha - e aí a recuperação estaria quebrada.
    */
   async testarConexao(
     destinatario: string,
@@ -145,7 +145,7 @@ export class ConfigMailerService {
         to: destinatario,
         subject: 'Teste de configuração de e-mail',
         // Template, não `text`: o adaptador Handlebars é aplicado a todo
-        // transporte registrado e falha quando não encontra um — o erro que
+        // transporte registrado e falha quando não encontra um - o erro que
         // aparecia era do adaptador, mascarando a causa real da recusa.
         template: 'teste_configuracao',
         context: { host: config.host, port: config.port, user: config.user },
