@@ -48,9 +48,9 @@ export const CATALOGO = {
   },
 
   midia_retencao_meses: {
-    rotulo: 'Retenção de mídia',
+    rotulo: 'Retenção de mídia do atendimento',
     descricao:
-      'Depois deste prazo, fotos, áudios e vídeos das conversas são apagados do storage. As mensagens continuam, sem o arquivo.',
+      'Depois deste prazo, fotos, áudios e vídeos das conversas com clientes são apagados do storage. As mensagens continuam, sem o arquivo.',
     tipo: 'inteiro',
     grupo: 'comportamento',
     unidade: 'meses',
@@ -58,6 +58,22 @@ export const CATALOGO = {
     max: 120,
     padrao: 3,
     env: 'MEDIA_RETENTION_MONTHS',
+  },
+
+  chat_interno_retencao_meses: {
+    rotulo: 'Retenção de mídia do chat interno',
+    descricao:
+      'Depois deste prazo, os arquivos trocados entre a equipe no chat interno são apagados do storage. As mensagens continuam, sem o arquivo.',
+    tipo: 'inteiro',
+    grupo: 'comportamento',
+    unidade: 'meses',
+    min: 1,
+    max: 120,
+    // Prazo próprio, e mais curto que o do atendimento: conversa entre colegas
+    // é operacional e perde o valor rápido, enquanto a do cliente é registro do
+    // que foi combinado com ele.
+    padrao: 1,
+    env: 'INTERNAL_CHAT_RETENTION_MONTHS',
   },
 
   refresh_expiracao_dias: {

@@ -19,6 +19,7 @@ import { PreferenciasTemaDto } from './dto/preferencias-tema.dto';
 import { Users } from './entities/users.entity';
 import { UserRepository } from './users.repository';
 import { RedisCacheRepository } from '@/redis-cache/redis-cache.repository';
+import { UserConfigService } from '@/user-config/user-config.service';
 
 @Injectable({ scope: Scope.REQUEST })
 export class UsersService {
@@ -30,6 +31,7 @@ export class UsersService {
     private readonly permissionsRepository: PermissionsRepository,
     private readonly permissionService: PermissionService,
     private readonly storageService: StorageService,
+    private readonly userConfigService: UserConfigService,
     private dataSource: DataSource,
   ) {
     this.query = this.dataSource.createQueryRunner();
@@ -284,7 +286,13 @@ export class UsersService {
       (p) => p.name,
     );
 
-    return { ...userWithAvatar, permissions };
+    // As preferências vêm junto: o cookie `userInfo` é o que reabastece o
+    // cookie `tema` em máquina nova, e o front lê as de notificação daqui sem
+    // uma segunda chamada. Cabem folgado nos 4 KB - são duas strings curtas e
+    // quatro booleanos.
+    const preferencias = await this.userConfigService.paraUsuario(user_id);
+
+    return { ...userWithAvatar, permissions, ...preferencias };
   }
 
   /**
@@ -303,20 +311,27 @@ export class UsersService {
     user_id: number,
     dto: PreferenciasTemaDto,
   ): Promise<{ tema: string | null; modo_tema: string | null }> {
-    const user = await this.usersRepository.findById(user_id);
-
     // Omitir preserva: o toggle de modo manda só `modo_tema`, e os cards só a
-    // cor. Sobrescrever com `undefined` apagaria a outra metade da escolha.
-    const tema = dto.tema ?? user.tema;
-    const modo_tema = dto.modo_tema ?? user.modo_tema;
+    // cor. Mandar as duas sempre sobrescreveria a outra metade da escolha.
+    const aGravar: Record<string, string> = {};
 
-    // `update` herdado do `Repository<Users>`: são duas colunas escalares, sem
-    // relação nem efeito colateral, e o `updateUser` daqui exige um DTO de
-    // cadastro inteiro mais o manager de uma transação.
-    await this.usersRepository.update({ id: user_id }, { tema, modo_tema });
-    this.logger.log(`Tema do usuário ${user_id}: ${tema ?? 'padrão'}/${modo_tema ?? 'padrão'}`);
+    if (dto.tema) aGravar.tema = dto.tema;
+    if (dto.modo_tema) aGravar.modo_tema = dto.modo_tema;
 
-    return { tema, modo_tema };
+    // A rota continua existindo, mas o armazenamento mudou: tema deixou de ser
+    // coluna de `users` e virou preferência em `user_config` (ver a migration
+    // `1789600000001`). Mantê-la evita mexer no `useTema` do front junto com a
+    // troca de formato.
+    const preferencias = Object.keys(aGravar).length
+      ? await this.userConfigService.atualizar(user_id, aGravar)
+      : await this.userConfigService.paraUsuario(user_id);
+
+    this.logger.log(`Tema do usuário ${user_id}: ${preferencias.tema}/${preferencias.modo_tema}`);
+
+    return {
+      tema: String(preferencias.tema),
+      modo_tema: String(preferencias.modo_tema),
+    };
   }
 
   /**

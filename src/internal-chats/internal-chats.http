@@ -1,0 +1,114 @@
+@url = http://localhost:3001/api
+@endpoint = /internal-chats
+@authToken = COLE_AQUI
+
+###############################################################################
+# Chat interno
+#
+# Conversa direta entre usuários do portal - combinar a passagem de um
+# atendimento, avisar que um serviço caiu, pedir ajuda com um cliente.
+#
+# Duas regras que não estão nas permissões:
+#
+# 1. O **usuário master** (`is_superuser`) não participa: é a conta de
+#    instalação, não um atendente. Todas as rotas respondem 403 para ele, e
+#    ninguém consegue mandar mensagem a ele.
+#
+# 2. `internal.chat:view` autoriza *usar* o chat interno, não ler a conversa
+#    dos outros. Quem participa de cada conversa é verificado comparando o
+#    usuário logado com as duas pontas - um terceiro recebe 403.
+###############################################################################
+
+#### Colegas disponíveis, com quem está online
+# Rota própria em vez de `GET /users`: aquela exige `user:view`, que é
+# administrativa, e o atendente comum ficaria sem lista.
+GET {{url}}{{endpoint}}/colegas
+Authorization: Bearer {{authToken}}
+
+###
+
+#### Minhas conversas, com a última mensagem e as não lidas
+GET {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+
+###
+
+#### Total de não lidas - alimenta o badge geral
+GET {{url}}{{endpoint}}/nao-lidas
+Authorization: Bearer {{authToken}}
+
+###
+
+#### Histórico de uma conversa
+# `limite` (1-100, padrão 50) e `antes_de` (cursor: o `created_at` da mais
+# antiga já carregada). Cursor em vez de offset porque mensagem nova chegando
+# durante a rolagem faria o offset repetir ou pular linhas.
+GET {{url}}{{endpoint}}/1/messages?limite=50
+Authorization: Bearer {{authToken}}
+
+###
+
+#### Enviar texto
+# O parâmetro é o id do **destinatário**, não o da conversa: quem escreve pela
+# primeira vez ainda não tem conversa, e ela nasce aqui.
+POST {{url}}{{endpoint}}/14/messages
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "text",
+  "content": "Consegue assumir o atendimento do protocolo 202609-0042?"
+}
+
+###
+
+#### 1/2 - Assinar o upload de um arquivo
+# Devolve `{ url, key, method: "PUT" }`. O arquivo sobe direto para o storage
+# pela `url`; o backend não vê o binário.
+POST {{url}}{{endpoint}}/sign-media
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "fileType": "image/png"
+}
+
+###
+
+#### 2/2 - Enviar a mídia, com a `key` devolvida acima
+# `media_key` é a key, não a URL. Tipos: image | video | document | audio |
+# voice. `content` vira legenda.
+POST {{url}}{{endpoint}}/14/messages
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "image",
+  "media_key": "chat-interno/COLE_A_KEY_AQUI.png",
+  "mimetype": "image/png",
+  "file_name": "print.png",
+  "media_size": 20480,
+  "content": "olha o erro que apareceu"
+}
+
+###
+
+#### Áudio gravado na hora
+# `voice` é o que o WhatsApp chama de `ptt`; `audio` é arquivo anexado.
+POST {{url}}{{endpoint}}/14/messages
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "voice",
+  "media_key": "chat-interno/COLE_A_KEY_AQUI.ogg",
+  "mimetype": "audio/ogg",
+  "file_name": "audio.ogg"
+}
+
+###
+
+#### Marcar como lidas as mensagens que o outro mandou
+# Idempotente: chamar de novo devolve `{ "lidas": 0 }`.
+PATCH {{url}}{{endpoint}}/1/read
+Authorization: Bearer {{authToken}}

@@ -64,18 +64,12 @@ export class Users {
   @Column({ default: 1, nullable: true })
   status: number;
 
-  /**
-   * Cor escolhida para a interface (`automatec`, `verde`, `roxo`…).
-   *
-   * ⚠️ Nulo = nunca escolheu; o front usa o padrão. Os valores válidos vivem
-   * em `front/scripts/temas.config.mjs` e são conferidos no DTO.
-   */
-  @Column({ type: 'varchar', length: 20, nullable: true, default: null })
-  tema: string | null;
-
-  /** `claro`, `escuro` ou `dim`. Nulo = nunca escolheu. */
-  @Column({ type: 'varchar', length: 10, nullable: true, default: null })
-  modo_tema: string | null;
+  // ⚠️ `tema` e `modo_tema` **saíram daqui** na migration `1789600000001`:
+  // viraram chaves em `user_config`, junto das demais preferências. Quem
+  // precisa delas chama `UserConfigService.paraUsuario()`; `GET /users/info`
+  // já as devolve junto, para o cookie `userInfo` continuar completo.
+  //
+  // Esta entidade guarda quem a pessoa **é**, não o que ela prefere.
 
   // ======= Relationships =======
   @OneToMany(() => Supports, (supports) => supports.user)

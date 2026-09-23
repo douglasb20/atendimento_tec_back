@@ -161,7 +161,10 @@ export class SupportRepository extends Repository<Supports> {
       .innerJoinAndSelect('support_status', 'as', 'as.id = at.support_status_id')
       .select([
         'at.*',
-        'timediff(at.hora_fim, at.hora_inicio) as duration',
+        // ⚠️ Era `timediff(...)`, do MySQL. No Postgres a subtração de dois
+        // `time` já devolve um `interval`, e a função não existe - a tela
+        // inteira voltava 500.
+        '(at.hora_fim - at.hora_inicio) as duration',
         'cli.nome as cli_nome',
         'cli.cnpj as cli_cnpj',
         // Concatenado: as colunas são separadas desde a migration 1789530000000.
@@ -174,8 +177,16 @@ export class SupportRepository extends Repository<Supports> {
       .addSelect(
         `
           CASE
-            WHEN at.tipo_entrada = "T" THEN (TIME_TO_SEC(TIMEDIFF(at.hora_fim, at.hora_inicio)) / 3600) * u.valor_hora
-            ELSE (SELECT SUM(ss.service_fee) FROM support_services as ss WHERE ss.support_id=at.id)
+            -- Aspas simples, nao duplas: no Postgres as duplas fazem do T um
+            -- nome de coluna e a consulta e recusada. T = cobranca por tempo,
+            -- S = por servico (ver supports.entity.ts).
+            --
+            -- EXTRACT(EPOCH FROM ...) no lugar de TIME_TO_SEC(TIMEDIFF()):
+            -- as duas funcoes sao do MySQL. O intervalo vira segundos e depois
+            -- horas, como no original.
+            WHEN at.tipo_entrada = 'T'
+              THEN (EXTRACT(EPOCH FROM (at.hora_fim - at.hora_inicio)) / 3600) * u.valor_hora
+            ELSE (SELECT SUM(ss.service_fee) FROM support_services as ss WHERE ss.support_id = at.id)
           END AS total_amount
         `,
       )

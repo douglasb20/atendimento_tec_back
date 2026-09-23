@@ -34,6 +34,9 @@ import { TagsModule } from '@/tags/tags.module';
 import { PermissionGroupsModule } from '@/permission-groups/permission-groups.module';
 import { PasswordResetModule } from '@/password-reset/password-reset.module';
 import { SystemSettingsModule } from '@/system-settings/system-settings.module';
+import { PresencaModule } from '@/presenca/presenca.module';
+import { InternalChatsModule } from '@/internal-chats/internal-chats.module';
+import { UserConfigModule } from '@/user-config/user-config.module';
 import { HealthModule } from '@/health/health.module';
 
 // const destPath = path.resolve(__dirname, '..', '..', 'files', 'tmp');
@@ -103,6 +106,9 @@ import { HealthModule } from '@/health/health.module';
     PermissionGroupsModule,
     PasswordResetModule,
     SystemSettingsModule,
+    PresencaModule,
+    InternalChatsModule,
+    UserConfigModule,
     HealthModule,
   ],
   exports: [ QueryStorageService],
