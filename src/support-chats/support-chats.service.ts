@@ -2,6 +2,8 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -9,7 +11,8 @@ import {
 import { DataSource, EntityManager } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 
-import { ContactsService } from '@/contacts/contacts.service';
+import { comDdiBrasil, ContactsService } from '@/contacts/contacts.service';
+import { ContactsRepository } from '@/contacts/contacts.repository';
 import { WhatsappService } from '@/whatsapp/whatsapp.service';
 import {
   MessageEditPayload,
@@ -32,14 +35,25 @@ import { SendMediaDto, SendMediaType } from './dto/send-media.dto';
 import { FinalizarAtendimentoDto } from './dto/finalizar-atendimento.dto';
 import { FinalizarSemAtendimentoDto } from './dto/finalizar-sem-atendimento.dto';
 import { TransferirAtendimentoDto } from './dto/transferir-atendimento.dto';
+import { CreateSupportChatDto } from './dto/create-support-chat.dto';
 import { SupportChatEvents } from './entities/support-chat-events.entity';
 import { SupportChatEventsRepository } from './support-chat-events.repository';
 import { montaMensagemAutomatica } from './mensagens-automaticas';
 import { UserRepository } from '@/users/users.repository';
 import { ServiceAlertsService } from '@/service-alerts/service-alerts.service';
+import { ChatbotsRepository } from '@/chatbots/chatbots.repository';
+import { ChatbotFlowExecutionsService } from '@/chatbot-engine/chatbot-flow-executions.service';
+import { ChatbotFlowExecutionsRepository } from '@/chatbot-engine/chatbot-flow-executions.repository';
+import { Channels } from '@/channels/entities/channels.entity';
+import { DepartmentsRepository } from '@/departments/departments.repository';
+import { Departments } from '@/departments/entities/departments.entity';
 
-/** Tipo de mídia do envio → tipo interno persistido, o mesmo que o webhook grava. */
-const TIPO_INTERNO_POR_MIDIA: Record<SendMediaType, MessageTypes> = {
+/**
+ * Tipo de mídia do envio → tipo interno persistido, o mesmo que o webhook
+ * grava. Exportado: o `ExecutionEngine` do chatbot reaproveita este mapa em
+ * vez de duplicá-lo.
+ */
+export const TIPO_INTERNO_POR_MIDIA: Record<SendMediaType, MessageTypes> = {
   [SendMediaType.IMAGE]: MessageTypes.IMAGE,
   [SendMediaType.VIDEO]: MessageTypes.VIDEO,
   [SendMediaType.AUDIO]: MessageTypes.AUDIO,
@@ -63,6 +77,12 @@ export class SupportChatsService {
     private readonly storageService: StorageService,
     private readonly serviceAlertsService: ServiceAlertsService,
     private readonly dataSource: DataSource,
+    private readonly chatbotsRepository: ChatbotsRepository,
+    @Inject(forwardRef(() => ChatbotFlowExecutionsService))
+    private readonly chatbotFlowExecutionsService: ChatbotFlowExecutionsService,
+    private readonly chatbotFlowExecutionsRepository: ChatbotFlowExecutionsRepository,
+    private readonly departmentsRepository: DepartmentsRepository,
+    private readonly contactsRepository: ContactsRepository,
   ) {}
 
   /**
@@ -117,6 +137,56 @@ export class SupportChatsService {
     } catch (err) {
       this.logger.warn(`Falha ao enviar avisos da conversa ${supportChat.id}: ${err.message}`);
     }
+  }
+
+  /**
+   * Decide o texto de abertura da conversa quando não há chatbot ativo no
+   * canal: a saudação normal, ou a mensagem de ausência de algum setor
+   * vinculado, se todos estiverem fora do horário.
+   *
+   * Regra de **união**: canal considerado disponível se **qualquer** setor
+   * vinculado estiver dentro do horário agora (mesmo padrão de Zendesk/
+   * Intercom/WhatsApp Business - evita o falso "estamos fechados" quando só
+   * uma das áreas está de folga). Setor sem nenhum intervalo cadastrado conta
+   * como sempre disponível. Canal sem setor vinculado nenhum não muda em
+   * nada - comportamento de hoje, sempre a saudação.
+   *
+   * Quando todos os setores estão fora do horário, a mensagem usada é a do
+   * **primeiro setor vinculado** (menor `id`) - decisão do usuário, evita
+   * concatenar textos de vários setores fechados ao mesmo tempo.
+   */
+  private async decideMensagemDeAbertura(channel: Channels): Promise<string | null | undefined> {
+    const setores = await this.dataSource
+      .createQueryBuilder()
+      .relation(Channels, 'departments')
+      .of(channel.id)
+      .loadMany<Departments>();
+
+    if (!setores.length) return channel.mensagem_saudacao;
+
+    setores.sort((a, b) => a.id - b.id);
+
+    const agora = new Date();
+    const diaAtual = agora.getDay();
+    const horaAtual = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}:00`;
+
+    let primeiroFechado: Departments | null = null;
+
+    for (const setor of setores) {
+      const intervalos = await this.departmentsRepository.findSchedule(setor.id);
+
+      const disponivel =
+        intervalos.length === 0 ||
+        intervalos.some(
+          (i) => i.weekday === diaAtual && i.start_time <= horaAtual && horaAtual < i.end_time,
+        );
+
+      if (disponivel) return channel.mensagem_saudacao;
+
+      if (!primeiroFechado) primeiroFechado = setor;
+    }
+
+    return primeiroFechado?.absence_message ?? channel.mensagem_saudacao;
   }
 
   private async enviaMensagemAutomatica(
@@ -361,6 +431,16 @@ export class SupportChatsService {
     return conversas;
   }
 
+  /**
+   * A conversa pronta para o motor de chatbot enviar uma mensagem - mesma
+   * releitura que a saudação automática usa (`contact`, `channel` completos).
+   * Exposto aqui porque o repository não sai deste módulo; o motor de fluxo
+   * (`chatbot-engine`) não deve depender de `SupportChatsRepository` direto.
+   */
+  async findParaEnvioBot(id: number): Promise<SupportChats | null> {
+    return this.supportChatsRepository.findParaEstado(id);
+  }
+
   async findSupportChatsById(id: number) {
     const supportChatMessages = await this.supportChatsRepository.findSupportChatsById(id);
     if (!supportChatMessages) {
@@ -550,6 +630,9 @@ export class SupportChatsService {
 
   // ====== Event Listeners Handles ======
   async onMessageCreate(payload: WhatsappWebhookPayload<MessagePayload>) {
+    let chatbotParaEnfileirar: { executionId: number; trigger: 'start' | 'resume'; resumeText?: string } | null =
+      null;
+
     const abertura = await runInTransaction(this.dataSource, async (manager) => {
       try {
         const { sessionId, data } = payload;
@@ -576,6 +659,21 @@ export class SupportChatsService {
           data.message,
           manager,
         );
+
+        // O bot só atua sobre mensagem real do cliente, e só enquanto a
+        // conversa não foi assumida por um atendente - uma vez com dono
+        // (`EM_ANDAMENTO`), o motor nunca é acionado, a não ser que o
+        // atendente transfira de volta explicitamente (fora deste gancho).
+        if (savedMessage && !savedMessage.from_me) {
+          chatbotParaEnfileirar = await this.decideAcaoDoChatbot(
+            contact.id,
+            supportChat,
+            channel,
+            criada,
+            savedMessage.content,
+            manager,
+          );
+        }
 
         if (savedMessage) {
           // Só o que vem do cliente conta como não lido; o que nós enviamos já
@@ -643,9 +741,75 @@ export class SupportChatsService {
       // Releitura para trazer `contact.client` e `channel`, que as variáveis
       // usam e que o `findOrOpenComSinal` não carrega por completo.
       const conversa = await this.supportChatsRepository.findParaEstado(abertura);
-      await this.enviaMensagemAutomatica(conversa, conversa?.channel?.mensagem_saudacao);
+
+      // O chatbot de entrada substitui a saudação do canal - decisão do
+      // usuário, para não disparar as duas mensagens de abertura. Sem
+      // chatbot, o texto ainda pode ser trocado pela mensagem de ausência de
+      // um setor fora do horário (ver `decideMensagemDeAbertura`).
+      if (!chatbotParaEnfileirar) {
+        const texto = await this.decideMensagemDeAbertura(conversa.channel);
+        await this.enviaMensagemAutomatica(conversa, texto);
+      }
+
       await this.enviaAvisosAtivos(conversa);
     }
+
+    if (chatbotParaEnfileirar) {
+      await this.chatbotFlowExecutionsService.enfileirar(
+        chatbotParaEnfileirar.executionId,
+        chatbotParaEnfileirar.trigger === 'resume'
+          ? { kind: 'resume', resumePayload: { text: chatbotParaEnfileirar.resumeText } }
+          : { kind: 'start' },
+      );
+    }
+  }
+
+  /**
+   * Decide, dentro da transação de `onMessageCreate`, se um chatbot deve
+   * agir sobre esta mensagem - e já cria/atualiza o estado necessário. O
+   * enfileiramento do job em si fica para depois do commit (ver acima).
+   */
+  private async decideAcaoDoChatbot(
+    contactId: number,
+    supportChat: SupportChats,
+    channel: Channels,
+    conversaCriada: boolean,
+    textoRecebido: string,
+    manager: EntityManager,
+  ): Promise<{ executionId: number; trigger: 'start' | 'resume'; resumeText?: string } | null> {
+    const execucaoSuspensa = await this.chatbotFlowExecutionsRepository.findSuspendedAwaitingReply(
+      contactId,
+      manager,
+    );
+
+    if (execucaoSuspensa) {
+      return { executionId: execucaoSuspensa.id, trigger: 'resume', resumeText: textoRecebido };
+    }
+
+    // Só conversa nova entra por um chatbot de entrada - uma conversa já
+    // aberta e sem execução pendente segue o caminho normal (atendimento
+    // humano), mesmo que ainda esteja `AGUARDANDO`.
+    if (!conversaCriada) return null;
+
+    const chatbotEntrada = await this.chatbotsRepository.findEntradaAtivoDoCanal(channel.id, manager);
+    if (!chatbotEntrada?.current_published_version_id) return null;
+
+    const execucao = await this.chatbotFlowExecutionsService.iniciar(
+      contactId,
+      supportChat.id,
+      chatbotEntrada,
+      manager,
+    );
+
+    // A "fila do bot": a conversa some de Aguardando/Em fila humana enquanto
+    // o motor está processando, e volta a aparecer se ele redirecionar.
+    await this.supportChatsRepository.atualizaStatus(
+      supportChat.id,
+      SupportChatStatusId.EM_FILA,
+      manager,
+    );
+
+    return { executionId: execucao.id, trigger: 'start' };
   }
 
   async onMessageAck(payload: WhatsappWebhookPayload<MessagePayload>) {
@@ -890,6 +1054,112 @@ export class SupportChatsService {
     user_id?: number,
   ) {
     return await this.supportChatsRepository.findOrOpen(contact_id, channel_id, manager, user_id);
+  }
+
+  /**
+   * Cria uma conversa do zero, sem esperar uma mensagem chegar pelo webhook -
+   * o atendente escolhe quem vai atender (contato existente ou número novo)
+   * e por qual canal, e já nasce dono dela (`EM_ANDAMENTO`), pronta para
+   * escrever a primeira mensagem manualmente.
+   *
+   * Diferente do cadastro manual de contato (`ContactsService.createContact`):
+   * aqui um número sem WhatsApp confirmado **bloqueia** a criação, em vez de
+   * salvar com `remote_jid` nulo e um aviso - uma conversa sem JID válido
+   * nunca conseguiria enviar mensagem de verdade.
+   */
+  async criarNova(dto: CreateSupportChatDto, user_id: number): Promise<SupportChats> {
+    if (Boolean(dto.contact_id) === Boolean(dto.phone)) {
+      throw new BadRequestException('Informe um contato existente ou um número novo, não os dois');
+    }
+
+    const channel = await this.channelsRepository.findByIdConectado(dto.channel_id);
+
+    const { supportChat, criada } = await runInTransaction(this.dataSource, async (manager) => {
+      const contactId = dto.contact_id
+        ? await this.resolveContatoExistente(dto.contact_id)
+        : await this.resolveContatoNovo(dto.phone, dto.name, manager);
+
+      const resultado = await this.supportChatsRepository.findOrOpenComSinal(
+        contactId,
+        channel.id,
+        manager,
+        user_id,
+      );
+
+      // Só promove a dono quem de fato criou agora - uma conversa que já
+      // existia (idempotência do `findOrOpenComSinal`) mantém o dono atual,
+      // mesma regra de conflito que `iniciarAtendimento` já aplica.
+      if (resultado.criada) {
+        await this.supportChatsRepository.assumir(resultado.supportChat.id, user_id, new Date(), manager);
+      }
+
+      return resultado;
+    });
+
+    this.logger.log(
+      `Conversa ${criada ? 'criada' : 'reaberta'}: id ${supportChat.id}, canal ${channel.id}`,
+    );
+
+    return this.recarregaEEmiteEstado(supportChat.id);
+  }
+
+  /** Contato já cadastrado - precisa ter JID confirmado, senão a conversa não teria como enviar mensagem. */
+  private async resolveContatoExistente(contactId: number): Promise<number> {
+    const contact = await this.contactsRepository.findById(contactId);
+
+    if (!contact.remote_jid) {
+      throw new BadRequestException('Este contato não tem número de WhatsApp confirmado');
+    }
+
+    return contact.id;
+  }
+
+  /**
+   * Número novo - mesmo caminho de verificação que `ContactsService.createContact`
+   * usa (`comDdiBrasil` + `whatsappService.verificaNumero`), mas bloqueando
+   * em vez de salvar com aviso quando o número não é confirmado.
+   */
+  private async resolveContatoNovo(
+    phone: string,
+    name: string | undefined,
+    manager: EntityManager,
+  ): Promise<number> {
+    if (!name?.trim()) {
+      throw new BadRequestException('Informe o nome do contato');
+    }
+
+    const numero = comDdiBrasil(phone);
+    if (!numero) {
+      throw new BadRequestException('Informe um número de telefone válido');
+    }
+
+    const verificado = await this.whatsappService.verificaNumero(numero);
+
+    if (!verificado) {
+      throw new BadRequestException('Não foi possível verificar o número agora. Tente novamente.');
+    }
+    if (!verificado.existe || !verificado.remoteJid) {
+      throw new BadRequestException('Este número não tem WhatsApp');
+    }
+
+    const existente = await manager.findOneBy(Contacts, { remote_jid: verificado.remoteJid });
+    if (existente) {
+      throw new ConflictException(
+        `Este número já está cadastrado no contato "${nomeCompleto(existente)}"`,
+      );
+    }
+
+    const novoContato = await manager.save(
+      Contacts,
+      manager.create(Contacts, {
+        name: name.trim(),
+        phone: verificado.remoteJid.split('@')[0],
+        remote_jid: verificado.remoteJid,
+        status: 1,
+      }),
+    );
+
+    return novoContato.id;
   }
 
   /**

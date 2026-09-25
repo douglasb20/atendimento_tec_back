@@ -6,7 +6,7 @@ import {
   Scope,
   UnauthorizedException,
 } from '@nestjs/common';
-import { DataSource, QueryRunner } from 'typeorm';
+import { DataSource, EntityManager, QueryRunner } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 
 import { PermissionsRepository } from 'permissions/permissions.repository';
@@ -20,6 +20,7 @@ import { Users } from './entities/users.entity';
 import { UserRepository } from './users.repository';
 import { RedisCacheRepository } from '@/redis-cache/redis-cache.repository';
 import { UserConfigService } from '@/user-config/user-config.service';
+import { DepartmentsRepository } from '@/departments/departments.repository';
 
 @Injectable({ scope: Scope.REQUEST })
 export class UsersService {
@@ -32,6 +33,7 @@ export class UsersService {
     private readonly permissionService: PermissionService,
     private readonly storageService: StorageService,
     private readonly userConfigService: UserConfigService,
+    private readonly departmentsRepository: DepartmentsRepository,
     private dataSource: DataSource,
   ) {
     this.query = this.dataSource.createQueryRunner();
@@ -44,6 +46,14 @@ export class UsersService {
 
   async findOne(id: number): Promise<Users> {
     const user = await this.usersRepository.findById(id);
+
+    // À parte, e não em `findById`: aquele valida o token a cada requisição, e
+    // o join dos setores custaria em toda chamada da API.
+    user.departments = await this.dataSource
+      .createQueryBuilder()
+      .relation(Users, 'departments')
+      .of(id)
+      .loadMany();
 
     const userWithAvatar = await this.getUserWithURLAvatar(user);
 
@@ -86,7 +96,17 @@ export class UsersService {
     try {
       await this.query.startTransaction();
 
-      const newUser = await this.usersRepository.createUser(createUserDto, this.query.manager);
+      const { department_ids, ...dadosDoUsuario } = createUserDto;
+
+      const newUser = await this.usersRepository.createUser(
+        dadosDoUsuario as CreateUserDto,
+        this.query.manager,
+      );
+
+      if (department_ids !== undefined) {
+        await this.gravaSetores(newUser.id, department_ids, this.query.manager);
+      }
+
       delete newUser.password;
       await this.query.commitTransaction();
 
@@ -121,7 +141,12 @@ export class UsersService {
       // SDK ("No value provided for input HTTP label: Key") e derruba a
       // atualização inteira com 500 - um usuário sem avatar não podia ser
       // editado.
-      if (!updateUserDto.avatar_url && user.avatar_url) {
+      //
+      // ⚠️ `=== null`, e não "falsy": remover é pedir `avatar_url: null`. Com
+      // o campo **ausente** o repository mantém a key, e apagar o arquivo aqui
+      // deixava a key apontando para o nada - o perfil, que só envia o avatar
+      // quando ele muda, sumia com a foto a cada salvamento do nome.
+      if (updateUserDto.avatar_url === null && user.avatar_url) {
         await this.storageService.deleteObject(user.avatar_url);
         await this.redisCacheRepository.del(`presigned:user:${user.id}:avatar`);
       }
@@ -130,11 +155,20 @@ export class UsersService {
         await this.redisCacheRepository.del(`presigned:user:${user.id}:avatar`);
       }
 
+      const { department_ids, ...dadosDoUsuario } = updateUserDto;
+
       const updatedUser = await this.usersRepository.updateUser(
         user_id,
-        updateUserDto,
+        dadosDoUsuario as UpdateUserDto,
         this.query.manager,
       );
+
+      // Só com o campo presente: o perfil não o envia, e salvar o próprio nome
+      // não pode tirar a pessoa dos setores dela.
+      if (department_ids !== undefined) {
+        await this.gravaSetores(user_id, department_ids, this.query.manager);
+      }
+
       delete updatedUser.password;
       await this.query.commitTransaction();
 
@@ -148,6 +182,30 @@ export class UsersService {
     } catch (err) {
       await this.query.rollbackTransaction();
       throw err;
+    }
+  }
+
+  /**
+   * Substitui os setores do usuário pelos informados.
+   *
+   * Apaga e regrava em vez de calcular a diferença: são poucas linhas por
+   * usuário, e o resultado é o mesmo. Ids de setor removido são ignorados - a
+   * tela pode ter carregado a lista antes de alguém remover um deles.
+   */
+  private async gravaSetores(
+    user_id: number,
+    department_ids: number[],
+    manager: EntityManager,
+  ): Promise<void> {
+    const setores = await this.departmentsRepository.findByIds(department_ids, manager);
+
+    await manager.query('DELETE FROM user_x_department WHERE user_id = $1', [user_id]);
+
+    for (const setor of setores) {
+      await manager.query(
+        'INSERT INTO user_x_department (user_id, department_id) VALUES ($1, $2)',
+        [user_id, setor.id],
+      );
     }
   }
 
@@ -303,7 +361,7 @@ export class UsersService {
    * preferência de outro.
    *
    * Rota própria, separada do `update` de usuário, porque as validações são
-   * outras — lá um campo inválido do cadastro impediria salvar o tema, que foi
+   * outras - lá um campo inválido do cadastro impediria salvar o tema, que foi
    * exatamente o que aconteceu no sistema de referência (um CNPJ errado
    * bloqueava a troca de cor).
    */

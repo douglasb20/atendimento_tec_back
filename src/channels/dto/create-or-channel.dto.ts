@@ -1,4 +1,12 @@
-import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
+import {
+  IsArray,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+  ValidateIf,
+} from 'class-validator';
 
 /**
  * Teto das mensagens automáticas.
@@ -47,4 +55,16 @@ export class CreateOrChannelDto {
     message: `A mensagem de despedida deve ter no máximo ${LIMITE_MENSAGEM} caracteres`,
   })
   mensagem_despedida?: string | null;
+
+  /**
+   * Os setores atendidos por este canal. Pode ser mais de um, como no
+   * Whaticket - hoje é só a associação; quem escolhe entre eles para cada
+   * conversa nova é o chatbot por fluxo, ainda não construído.
+   *
+   * Ausente, os vínculos ficam como estão; `[]` tira o canal de todos.
+   */
+  @IsOptional()
+  @IsArray({ message: 'Informe os setores como lista' })
+  @IsInt({ each: true, message: 'Setor inválido' })
+  department_ids?: number[];
 }

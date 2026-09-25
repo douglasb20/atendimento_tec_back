@@ -27,7 +27,8 @@ export class UserRepository extends Repository<Users> {
    * assina o que faz. `findById` não filtra, senão o próprio login quebraria.
    */
   async findActives() {
-    // `permissionGroup` carregada para a listagem mostrar o grupo de cada um.
+    // `permissionGroup` e `departments` carregadas para a listagem mostrar o
+    // grupo e os setores de cada um.
     return this.find({
       where: [
         { status: 1, is_superuser: 0 },
@@ -35,7 +36,7 @@ export class UserRepository extends Repository<Users> {
         // `NULL` em vez de 0, e `is_superuser: 0` sozinho o excluiria da lista.
         { status: 1, is_superuser: IsNull() },
       ],
-      relations: ['permissionGroup'],
+      relations: ['permissionGroup', 'departments'],
     });
   }
 

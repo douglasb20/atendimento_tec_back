@@ -405,6 +405,19 @@ export class SupportChatsRepository extends Repository<SupportChats> {
   }
 
   /**
+   * Grava o status direto, sem as regras de `finalizar`/`iniciarAtendimento` -
+   * usado pelo motor de chatbot para marcar a "fila do bot" (`EM_FILA`) ao
+   * assumir uma conversa nova, e para devolvê-la quando o bot redireciona.
+   */
+  async atualizaStatus(
+    id: number,
+    statusId: SupportChatStatusId,
+    manager: EntityManager,
+  ): Promise<void> {
+    await manager.update(SupportChats, id, { support_chat_status_id: statusId });
+  }
+
+  /**
    * Soma uma mensagem não lida à conversa.
    *
    * A contagem é nossa, não a do WhatsApp: o `chats.update` da Evolution chega

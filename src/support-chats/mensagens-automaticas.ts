@@ -60,7 +60,7 @@ const formataCnpj = (cnpj?: string | null): string => {
 /**
  * Valores disponíveis para a conversa.
  *
- * Exige `contact`, `contact.client` e `channel` carregados — sem eles as
+ * Exige `contact`, `contact.client` e `channel` carregados - sem eles as
  * variáveis correspondentes saem vazias, o que é o comportamento tolerante,
  * mas não é o pretendido. Quem chama precisa trazer as relações.
  */
@@ -88,7 +88,7 @@ const valoresDaConversa = (supportChat: SupportChats): Record<string, string> =>
 });
 
 /**
- * Aplica as variáveis ao texto. Devolve `null` quando não há o que enviar —
+ * Aplica as variáveis ao texto. Devolve `null` quando não há o que enviar -
  * assim quem chama decide com um `if` só.
  */
 export const montaMensagemAutomatica = (

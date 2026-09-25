@@ -1,0 +1,108 @@
+# @name login
+POST {{url}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "douglasdev.cn@gmail.com",
+  "password": 1234
+}
+###
+
+@authToken = {{login.response.body.$.access_token}}
+
+@endpoint = /chatbots
+
+#### 1) Listar chatbots (exclui complementares)
+GET {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+
+###
+
+#### 2) Listar fluxos complementares
+GET {{url}}{{endpoint}}?type=complementar
+Authorization: Bearer {{authToken}}
+
+###
+
+#### 3) Buscar chatbot por id
+GET {{url}}{{endpoint}}/1
+Authorization: Bearer {{authToken}}
+
+###
+
+#### 4) Criar chatbot de entrada (troque channel_id por um canal existente)
+POST {{url}}{{endpoint}}
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Atendimento inicial",
+  "type": "entrada",
+  "channel_id": 1
+}
+
+###
+
+#### 5) Criar fluxo complementar (sem canal)
+POST {{url}}{{endpoint}}
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Verificar horário comercial",
+  "type": "complementar"
+}
+
+###
+
+#### 6) Tentar criar 2º chatbot de entrada no mesmo canal -> deve recusar
+POST {{url}}{{endpoint}}
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Outro fluxo de entrada",
+  "type": "entrada",
+  "channel_id": 1
+}
+
+###
+
+#### 7) Atualizar chatbot (nome, ativo, settings)
+PATCH {{url}}{{endpoint}}/1
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Atendimento inicial (editado)",
+  "settings": { "alerta_inatividade": { "ativo": true, "tempo_minutos": 10 } }
+}
+
+###
+
+#### 8) Ver o rascunho do fluxo (nasce só com o nó Início)
+GET {{url}}{{endpoint}}/1/flow
+Authorization: Bearer {{authToken}}
+
+###
+
+#### 9) Salvar o grafo do rascunho
+PUT {{url}}{{endpoint}}/1/flow
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "nodes": [
+    { "id": "start", "type": "start", "position": { "x": 0, "y": 0 }, "data": {} },
+    { "id": "n1", "type": "message", "position": { "x": 200, "y": 0 }, "data": { "value": "Olá!" } }
+  ],
+  "edges": [
+    { "id": "e1", "source": "start", "sourceHandle": null, "target": "n1", "targetHandle": null }
+  ]
+}
+
+###
+
+#### 10) Remover chatbot (soft delete)
+DELETE {{url}}{{endpoint}}/1
+Authorization: Bearer {{authToken}}

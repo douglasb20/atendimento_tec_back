@@ -22,6 +22,9 @@ import { SupportChatsService } from './support-chats.service';
 import { StorageModule } from '@/storage/storage.module';
 import { RedisCacheModule } from '@/redis-cache/redis-cache.module';
 import { ServiceAlertsModule } from '@/service-alerts/service-alerts.module';
+import { ChatbotsModule } from '@/chatbots/chatbots.module';
+import { ChatbotEngineModule } from '@/chatbot-engine/chatbot-engine.module';
+import { DepartmentsModule } from '@/departments/departments.module';
 
 @Module({
   imports: [
@@ -41,6 +44,12 @@ import { ServiceAlertsModule } from '@/service-alerts/service-alerts.module';
     ChannelsModule,
     StorageModule,
     RedisCacheModule,
+    ChatbotsModule,
+    // `forwardRef` dos dois lados: o motor de chatbot precisa deste módulo
+    // para achar/enviar mensagens na conversa, e este precisa do motor para
+    // criar/retomar execuções ao processar uma mensagem recebida.
+    forwardRef(() => ChatbotEngineModule),
+    DepartmentsModule,
   ],
   controllers: [SupportChatsController],
   providers: [

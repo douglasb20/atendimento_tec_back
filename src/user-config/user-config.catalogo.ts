@@ -23,6 +23,13 @@ export type DefinicaoPreferencia = {
   tipo: TipoPreferencia;
   /** Agrupa os campos nas abas do modal de perfil. */
   grupo: 'aparencia' | 'notificacoes';
+  /**
+   * Subdivide a aba de notificações.
+   *
+   * Separa **o que** avisa (`mensagens`, `movimentacoes`) de **como** avisa
+   * (`entrega`), e deixa a chave geral (`geral`) à parte, no topo.
+   */
+  secao?: 'geral' | 'mensagens' | 'movimentacoes' | 'entrega';
   /** Vale enquanto a pessoa não escolher. */
   padrao: string | boolean;
   /** Valores aceitos, para os de texto que são uma lista fechada. */
@@ -59,52 +66,88 @@ export const CATALOGO = {
 
   // ==== Notificações ====
   //
-  // O que é dirigido a você diretamente nasce ligado; o que é da operação
-  // inteira nasce desligado, porque é ruído para quem não a monitora.
+  // Duas perguntas separadas: **o que** avisa (mensagens, movimentações) e
+  // **como** avisa (entrega). Um evento só chega se a chave geral, o evento e
+  // pelo menos um canal de entrega estiverem ligados.
+  //
+  // O que é dirigido a você nasce ligado; o que é da operação inteira nasce
+  // desligado, porque é ruído para quem não a monitora.
 
-  notif_chat_interno: {
-    rotulo: 'Mensagem do chat interno',
-    descricao: 'Avisa quando um colega manda mensagem direta.',
+  notif_habilitadas: {
+    rotulo: 'Habilitar notificações',
+    descricao: 'Controla todos os avisos do chat, inclusive o som.',
     tipo: 'booleano',
     grupo: 'notificacoes',
-    padrao: true,
-    ocultaParaSuperusuario: true,
-  },
-
-  notif_mensagem_cliente: {
-    rotulo: 'Mensagem de cliente',
-    descricao: 'Avisa quando chega mensagem numa conversa de atendimento.',
-    tipo: 'booleano',
-    grupo: 'notificacoes',
+    secao: 'geral',
     padrao: true,
   },
 
   notif_fila: {
-    rotulo: 'Atendimento novo na fila',
-    descricao: 'Avisa quando entra uma conversa que ninguém assumiu.',
+    rotulo: 'Mensagens na fila',
+    descricao: 'Avisos de mensagens em atendimentos que ninguém assumiu.',
     tipo: 'booleano',
     grupo: 'notificacoes',
+    secao: 'mensagens',
     padrao: false,
   },
 
-  notif_transferencia: {
-    rotulo: 'Atendimento transferido para mim',
-    descricao: 'Avisa quando um colega passa um atendimento para você.',
+  notif_mensagem_cliente: {
+    rotulo: 'Mensagens em atendimento',
+    descricao: 'Avisos de mensagens em conversas que já estão em atendimento.',
     tipo: 'booleano',
     grupo: 'notificacoes',
+    secao: 'mensagens',
     padrao: true,
   },
 
-  notif_com_portal_aberto: {
-    rotulo: 'Avisar mesmo com a tela de chat na frente',
-    descricao:
-      'Desligue para não receber aviso enquanto você já está na tela de chat, em foco - a mensagem aparece sozinha na lista.',
+  notif_chat_interno: {
+    rotulo: 'Mensagens do chat interno',
+    descricao: 'Avisos quando um colega manda mensagem direta.',
     tipo: 'booleano',
     grupo: 'notificacoes',
-    // Ligado: é o comportamento do Whaticket e dos mensageiros em geral - o
-    // aviso aparece mesmo com a aba na frente. Nasceu desligado por suposição
-    // minha, e o usuário mostrou que a expectativa é a oposta. Quem se
-    // incomodar desliga.
+    secao: 'mensagens',
+    padrao: true,
+    ocultaParaSuperusuario: true,
+  },
+
+  notif_transferencia: {
+    rotulo: 'Transferência',
+    descricao: 'Avisos quando um atendimento for transferido para você.',
+    tipo: 'booleano',
+    grupo: 'notificacoes',
+    secao: 'movimentacoes',
+    padrao: true,
+  },
+
+  notif_som: {
+    rotulo: 'Notificação sonora',
+    descricao: 'Tocar alerta sonoro no navegador.',
+    tipo: 'booleano',
+    grupo: 'notificacoes',
+    secao: 'entrega',
+    padrao: true,
+  },
+
+  // ⚠️ Os dois abaixo **se revezam**, nunca aparecem juntos: com o portal na
+  // frente vai o alerta na tela, minimizado ou em outra aba vai o do
+  // navegador. Decisão do usuário, seguindo a referência que ele trouxe.
+  // Substituiu `notif_com_portal_aberto`, que existia para o aviso do
+  // navegador aparecer também com a aba na frente.
+  notif_alerta_tela: {
+    rotulo: 'Alerta na tela',
+    descricao: 'Mostrar aviso dentro do portal quando ele estiver aberto na sua frente.',
+    tipo: 'booleano',
+    grupo: 'notificacoes',
+    secao: 'entrega',
+    padrao: true,
+  },
+
+  notif_navegador: {
+    rotulo: 'Notificação do navegador',
+    descricao: 'Mostrar notificação do sistema quando a aba estiver em segundo plano.',
+    tipo: 'booleano',
+    grupo: 'notificacoes',
+    secao: 'entrega',
     padrao: true,
   },
 } as const satisfies Record<string, DefinicaoPreferencia>;

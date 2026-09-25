@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsEmail, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateUserDto {
   @IsString({ message: (opt) => `Campo ${opt.property} aceita somente formato string` })
@@ -22,6 +22,16 @@ export class CreateUserDto {
   @IsOptional()
   @IsString({ message: (opt) => `Campo ${opt.property} aceita somente formato string` })
   avatar_url?: string;
+
+  /**
+   * Os setores da pessoa. Ausente, os vínculos ficam como estão; `[]` tira de
+   * todos. A diferença importa na edição: o perfil não envia o campo e não pode
+   * desfazer os setores de quem o salva.
+   */
+  @IsOptional()
+  @IsArray({ message: 'Informe os setores como lista' })
+  @IsInt({ each: true, message: 'Setor inválido' })
+  department_ids?: number[];
 
   /**
    * Custo/hora do atendente. **Obsoleto** - o formulário deixou de enviá-lo.

@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ChannelStatus } from '@types';
 import { DataSource, Not, Repository } from 'typeorm';
 import { Channels } from './entities/channels.entity';
@@ -35,6 +35,24 @@ export class ChannelsRepository extends Repository<Channels> {
       where: { channel_status_id: ChannelStatus.CONNECTED, deleted_at: null },
       order: { id: 'ASC' },
     });
+  }
+
+  /**
+   * O canal, só se estiver conectado - usado ao criar uma conversa nova
+   * (`SupportChatsService.criarNova`): mandar mensagem por um canal
+   * desconectado falharia na hora do envio, então a checagem entra antes de
+   * gastar uma transação criando contato/conversa.
+   */
+  async findByIdConectado(id: number): Promise<Channels> {
+    const channel = await this.findOne({
+      where: { id, channel_status_id: ChannelStatus.CONNECTED, deleted_at: null },
+    });
+
+    if (!channel) {
+      throw new BadRequestException('Canal não encontrado ou não está conectado');
+    }
+
+    return channel;
   }
 
   async findBySessionId(session_id: string, emitError = true) {

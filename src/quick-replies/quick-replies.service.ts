@@ -126,6 +126,7 @@ export class QuickRepliesService {
    */
   async copiaAnexoParaEnvio(id: number): Promise<{
     media_key: string;
+    media_url: string;
     media_type: string;
     mimetype: string;
     file_name: string;
@@ -143,6 +144,10 @@ export class QuickRepliesService {
 
     return {
       media_key: destino,
+      // A tela de revisão (`PreviewAnexos`) baixa este binário para modelá-lo
+      // como um `File` local, reaproveitando o mesmo fluxo do anexo manual -
+      // ver `PrepararAnexoRespostaRapida` no front.
+      media_url: this.storageService.getPublicUrl(destino),
       media_type: resposta.anexo_tipo,
       mimetype: resposta.anexo_mimetype,
       file_name: resposta.anexo_nome,

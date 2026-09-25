@@ -21,7 +21,7 @@ import { Contacts } from './entities/contacts.entity';
  * tem 11 dígitos depois do `+`, mas já começa com o DDI dele, e prefixá-lo
  * produziria um número diferente do digitado.
  */
-function comDdiBrasil(telefone?: string): string {
+export function comDdiBrasil(telefone?: string): string {
   const digitos = (telefone ?? '').replace(/\D/g, '');
   if (!digitos) return '';
 

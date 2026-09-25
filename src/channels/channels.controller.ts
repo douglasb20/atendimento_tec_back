@@ -34,7 +34,7 @@ export class ChannelsController {
   @Permissions('channel:view')
   @HttpCode(HttpStatus.OK)
   async findChannel(@Param('channelId') channelId: number) {
-    return this.channelsService.findChannel(channelId);
+    return this.channelsService.findChannelComSetores(channelId);
   }
 
   /**

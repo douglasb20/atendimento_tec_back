@@ -7,7 +7,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * (Campos personalizados) e `permissions` até 50 (transferir atendimento).
  *
  * Só o **cadastro** tem permissão. Usar uma resposta rápida na conversa é
- * responder ao cliente, e já exige `support.chat:update` — exigir outra faria
+ * responder ao cliente, e já exige `support.chat:update` - exigir outra faria
  * um atendente poder escrever à mão o que não pode inserir pronto.
  */
 export class CreateQuickReplyPermissions1789520000001 implements MigrationInterface {

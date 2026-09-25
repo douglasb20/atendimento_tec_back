@@ -4,7 +4,9 @@ import {
   Column,
   PrimaryGeneratedColumn,
   ManyToOne,
+  ManyToMany,
   JoinColumn,
+  JoinTable,
   OneToMany,
   BeforeInsert,
 } from 'typeorm';
@@ -13,6 +15,7 @@ import { ChannelStatus } from './channel-status.entity';
 import { SupportChats } from 'support-chats/entities/support-chats.entity';
 import { SupportChatMessages } from 'support-chats/messages/entities/support-chat-messages.entity';
 import { Integrations } from 'integrations/entities/integrations.entity';
+import { Departments } from '@/departments/entities/departments.entity';
 
 @Entity('channels')
 export class Channels {
@@ -87,6 +90,22 @@ export class Channels {
 
   @OneToMany(() => SupportChatMessages, (supportChatMessage) => supportChatMessage.channels)
   supportChatMessages: SupportChatMessages[];
+
+  /**
+   * Os setores atendidos por este canal - pode ser mais de um, como no
+   * Whaticket. Quem decide para qual setor vai cada conversa nova é o chatbot
+   * por fluxo, ainda não construído; por ora é só a associação.
+   *
+   * A tabela vem da migration `1789620000000`; o `@JoinTable` só aponta para
+   * ela.
+   */
+  @ManyToMany(() => Departments)
+  @JoinTable({
+    name: 'channel_x_department',
+    joinColumn: { name: 'channel_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'department_id', referencedColumnName: 'id' },
+  })
+  departments: Departments[];
 
   @BeforeInsert()
   generateSessionId() {

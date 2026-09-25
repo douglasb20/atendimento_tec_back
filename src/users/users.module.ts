@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -10,9 +10,14 @@ import { UserRefreshTokens } from './entities/user-refresh-tokens.entity';
 import { PermissionsRepository } from 'permissions/permissions.repository';
 import { StorageService } from 'storage/storage.service';
 import { RedisCacheModule } from '@/redis-cache/redis-cache.module';
+import { DepartmentsModule } from '@/departments/departments.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Users, Supports, UserRefreshTokens]), ConfigMailerModule, RedisCacheModule],
+  imports: [TypeOrmModule.forFeature([Users, Supports, UserRefreshTokens]),
+    ConfigMailerModule,
+    RedisCacheModule,
+    forwardRef(() => DepartmentsModule),
+  ],
   controllers: [UsersController],
   providers: [UsersService, UserRepository, PermissionsRepository, StorageService],
   // O `UserRepository` é usado pela redefinição de senha, que precisa achar o

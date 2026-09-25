@@ -5,7 +5,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * Duas colunas curtas, e não um JSON com o layout inteiro (como faz o sistema
  * que serviu de referência): o leque é fechado e pequeno, e o valor precisa
- * caber no cookie `userInfo`, que tem teto de 4 KB — já houve laço de
+ * caber no cookie `userInfo`, que tem teto de 4 KB - já houve laço de
  * redirecionamento aqui por estourá-lo. Se um dia guardarmos mais preferências
  * de layout (tamanho de fonte, modo do menu), aí sim cabe um `jsonb` ao lado.
  *
@@ -15,7 +15,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * e mudar o padrão depois não alcançaria quem nunca abriu a tela.
  *
  * Os valores válidos vivem em `front/scripts/temas.config.mjs` e são validados
- * no DTO — o banco guarda o identificador, como o `tipo` de `custom_fields`.
+ * no DTO - o banco guarda o identificador, como o `tipo` de `custom_fields`.
  */
 export class AddPreferenciasTemaToUsers1789510000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {

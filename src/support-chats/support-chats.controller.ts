@@ -25,10 +25,25 @@ import { SignMediaPostDto } from './dto/sign-media-post.dto';
 import { FinalizarAtendimentoDto } from './dto/finalizar-atendimento.dto';
 import { FinalizarSemAtendimentoDto } from './dto/finalizar-sem-atendimento.dto';
 import { TransferirAtendimentoDto } from './dto/transferir-atendimento.dto';
+import { CreateSupportChatDto } from './dto/create-support-chat.dto';
 
 @Controller('support-chats')
 export class SupportChatsController {
   constructor(private readonly supportChatsService: SupportChatsService) {}
+
+  /**
+   * Cria uma conversa nova, sem esperar o cliente escrever primeiro - o
+   * atendente escolhe o contato (existente ou número novo) e o canal.
+   * Antes das rotas `:id`, por convenção (segmento fixo não colide com
+   * `ParseIntPipe`, mas registrar aqui deixa isso explícito).
+   */
+  @Post('/nova')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:update')
+  @HttpCode(HttpStatus.CREATED)
+  async criarNova(@Body() dto: CreateSupportChatDto, @Req() req: Request) {
+    return this.supportChatsService.criarNova(dto, req.user['id']);
+  }
 
   @Post('/:id/send-message')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)

@@ -4,6 +4,8 @@ import {
   CreateDateColumn,
   Entity,
   JoinColumn,
+  JoinTable,
+  ManyToMany,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -12,6 +14,7 @@ import { UserRefreshTokens } from './user-refresh-tokens.entity';
 import { PermissionXUser } from 'permissions/entities/permission-x-user.entity';
 import { SupportChats } from 'support-chats/entities/support-chats.entity';
 import { PermissionGroups } from 'permission-groups/entities/permission-groups.entity';
+import { Departments } from '@/departments/entities/departments.entity';
 
 @Entity('users')
 export class Users {
@@ -92,4 +95,19 @@ export class Users {
 
   @OneToMany(() => SupportChats, (supportChats) => supportChats.user)
   supportChats: SupportChats[];
+
+  /**
+   * Os setores em que a pessoa atende - pode ser mais de um.
+   *
+   * A tabela vem da migration `1789610000000`; o `@JoinTable` só aponta para
+   * ela. Não é carregada por padrão: `findById` roda a cada requisição (é quem
+   * valida o token), e o join custaria em toda chamada da API.
+   */
+  @ManyToMany(() => Departments, (setor) => setor.users)
+  @JoinTable({
+    name: 'user_x_department',
+    joinColumn: { name: 'user_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'department_id', referencedColumnName: 'id' },
+  })
+  departments: Departments[];
 }

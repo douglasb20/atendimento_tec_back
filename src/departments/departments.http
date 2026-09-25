@@ -1,0 +1,69 @@
+# @name login
+POST {{url}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "douglasdev.cn@gmail.com",
+  "password": 1234
+}
+###
+
+@authToken = {{login.response.body.$.access_token}}
+
+@endpoint = /departments
+
+#### 1) Listar setores
+GET {{url}}{{endpoint}}
+Authorization: Bearer {{authToken}}
+
+###
+
+#### 2) Buscar setor por id
+GET {{url}}{{endpoint}}/1
+Authorization: Bearer {{authToken}}
+
+###
+
+#### 3) Criar setor
+POST {{url}}{{endpoint}}
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Suporte",
+  "description": "Atendimento técnico"
+}
+
+###
+
+#### 4) Atualizar setor
+PATCH {{url}}{{endpoint}}/1
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Suporte técnico"
+}
+
+###
+
+#### 5) Listar membros do setor (usuários ativos + quem já está no setor)
+GET {{url}}{{endpoint}}/1/users
+Authorization: Bearer {{authToken}}
+
+###
+
+#### 6) Atualizar membros do setor (substitui a lista inteira)
+PATCH {{url}}{{endpoint}}/1/users
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "user_ids": [1, 2]
+}
+
+###
+
+#### 7) Remover setor (desvincula usuários)
+DELETE {{url}}{{endpoint}}/1
+Authorization: Bearer {{authToken}}

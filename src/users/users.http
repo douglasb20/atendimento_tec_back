@@ -49,7 +49,7 @@ Authorization: Bearer {{authToken}}
 ###############################################################################
 # Preferência de tema
 #
-# Auto-serviço: `@SemPermissao`, e o id vem do token — ninguém altera a
+# Auto-serviço: `@SemPermissao`, e o id vem do token - ninguém altera a
 # preferência de outro.
 #
 # Os dois campos são independentes: omitir preserva o que está gravado, para o

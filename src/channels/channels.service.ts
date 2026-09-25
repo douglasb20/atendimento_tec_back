@@ -2,8 +2,9 @@ import { runInTransaction } from '@/Utils';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ChannelStatus, WhatsappWebhookPayload } from '@types';
 import { randomUUID } from 'node:crypto';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { WhatsappService } from 'whatsapp/whatsapp.service';
+import { DepartmentsRepository } from '@/departments/departments.repository';
 import { ChannelsRepository } from './channels.repository';
 import { CreateOrChannelDto } from './dto/create-or-channel.dto';
 import { Channels } from './entities/channels.entity';
@@ -14,6 +15,7 @@ export class ChannelsService {
   constructor(
     private readonly channelsRepository: ChannelsRepository,
     private readonly whatsappService: WhatsappService,
+    private readonly departmentsRepository: DepartmentsRepository,
     private dataSource: DataSource,
   ) {}
 
@@ -28,22 +30,68 @@ export class ChannelsService {
   }
 
   async createChannel(createChannelDto: CreateOrChannelDto): Promise<Channels> {
+    const { department_ids, ...dadosDoCanal } = createChannelDto;
+
     const channel = this.channelsRepository.create({
-      ...createChannelDto,
+      ...dadosDoCanal,
     });
 
     await this.channelsRepository.save(channel);
+
+    if (department_ids !== undefined) {
+      await runInTransaction(this.dataSource, (manager) =>
+        this.gravaSetores(channel.id, department_ids, manager),
+      );
+    }
+
     return channel;
   }
 
   async updateChannel(channelId: number, createChannelDto: CreateOrChannelDto): Promise<Channels> {
     const channel = await this.findChannel(channelId);
+    const { department_ids, ...dadosDoCanal } = createChannelDto;
+
     const channelUpdated = this.channelsRepository.create({
       ...channel,
-      ...createChannelDto,
+      ...dadosDoCanal,
     });
     await this.channelsRepository.save(channelUpdated);
+
+    // Só com o campo presente: o formulário sempre o envia hoje, mas outros
+    // caminhos de escrita (integração, por exemplo) não precisam derrubar os
+    // vínculos por omissão.
+    if (department_ids !== undefined) {
+      await runInTransaction(this.dataSource, (manager) =>
+        this.gravaSetores(channelId, department_ids, manager),
+      );
+    }
+
     return channel;
+  }
+
+  /**
+   * Substitui os setores do canal pelos informados.
+   *
+   * Apaga e regrava, como o mesmo caso em `UsersService`: são poucas linhas
+   * por canal, e o resultado é igual ao de calcular a diferença. Ids de setor
+   * removido são ignorados - a tela pode ter carregado a lista antes de
+   * alguém remover um deles.
+   */
+  private async gravaSetores(
+    channelId: number,
+    department_ids: number[],
+    manager: EntityManager,
+  ): Promise<void> {
+    const setores = await this.departmentsRepository.findByIds(department_ids, manager);
+
+    await manager.query('DELETE FROM channel_x_department WHERE channel_id = $1', [channelId]);
+
+    for (const setor of setores) {
+      await manager.query(
+        'INSERT INTO channel_x_department (channel_id, department_id) VALUES ($1, $2)',
+        [channelId, setor.id],
+      );
+    }
   }
 
   async removeChannel(channelId: number): Promise<void> {
@@ -77,6 +125,25 @@ export class ChannelsService {
       this.logger.error(`Erro ao localizar canal: Canal não encontrado com este id`);
       throw new NotFoundException('Canal não encontrado com este id');
     }
+    return channel;
+  }
+
+  /**
+   * O canal com os setores, para o formulário de edição pré-carregar o campo.
+   *
+   * Separado de `findChannel`: aquele é usado por oito outras rotas (iniciar
+   * sessão, encerrar, reiniciar…), e o join de setores custaria em todas para
+   * servir só a uma tela.
+   */
+  async findChannelComSetores(channelId: number): Promise<Channels> {
+    const channel = await this.findChannel(channelId);
+
+    channel.departments = await this.dataSource
+      .createQueryBuilder()
+      .relation(Channels, 'departments')
+      .of(channelId)
+      .loadMany();
+
     return channel;
   }
 
