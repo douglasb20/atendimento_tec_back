@@ -26,10 +26,40 @@ import { FinalizarAtendimentoDto } from './dto/finalizar-atendimento.dto';
 import { FinalizarSemAtendimentoDto } from './dto/finalizar-sem-atendimento.dto';
 import { TransferirAtendimentoDto } from './dto/transferir-atendimento.dto';
 import { CreateSupportChatDto } from './dto/create-support-chat.dto';
+import { AttendanceSettingsService } from '@/attendance-settings/attendance-settings.service';
+import { PermissionService } from 'permissions/permission.service';
+import { nomeCompleto } from '@/Utils';
 
 @Controller('support-chats')
 export class SupportChatsController {
-  constructor(private readonly supportChatsService: SupportChatsService) {}
+  constructor(
+    private readonly supportChatsService: SupportChatsService,
+    private readonly attendanceSettingsService: AttendanceSettingsService,
+    private readonly permissionService: PermissionService,
+  ) {}
+
+  /**
+   * O prefixo que identifica o atendente na mensagem que chega ao WhatsApp do
+   * cliente - lá só chega texto, e é a única forma de marcar quem respondeu.
+   *
+   * `req.user['name']` é só o primeiro nome (assim que o JWT é montado,
+   * `auth.service.ts`); "nome completo" concatena com `last_name` pelo ajuste
+   * `assinatura_nome_completo`. Sem `last_name` (contato de uma palavra só, ou
+   * cadastro antigo sem a separação), cai no primeiro nome de qualquer jeito -
+   * `nomeCompleto` já filtra o vazio.
+   */
+  private async assinatura(req: Request): Promise<string> {
+    const ehNomeCompleto = await this.attendanceSettingsService.getBooleano(
+      'assinatura_nome_completo',
+    );
+
+    if (!ehNomeCompleto) return req.user['name'];
+
+    return nomeCompleto({
+      name: req.user['name'],
+      last_name: req.user['last_name'],
+    });
+  }
 
   /**
    * Cria uma conversa nova, sem esperar o cliente escrever primeiro - o
@@ -58,7 +88,7 @@ export class SupportChatsController {
       id,
       req.user['id'],
       sendMessageDto.chat_id,
-      `*${req.user['name']}:*\n${sendMessageDto.message}`,
+      `*${await this.assinatura(req)}:*\n${sendMessageDto.message}`,
     );
   }
 
@@ -84,7 +114,7 @@ export class SupportChatsController {
       req.user['id'],
       replyMessageDto.chat_id,
       replyMessageDto.message_id,
-      `*${req.user['name']}:*\n${replyMessageDto.message}`,
+      `*${await this.assinatura(req)}:*\n${replyMessageDto.message}`,
     );
   }
 
@@ -92,8 +122,17 @@ export class SupportChatsController {
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('support.chat:view')
   @HttpCode(HttpStatus.OK)
-  async listAllSupportChats() {
-    return this.supportChatsService.listAllSupportChats();
+  async listAllSupportChats(@Req() req: Request) {
+    // O guard já libera `is_superuser` para a rota em si, mas essa checagem é
+    // separada - decide algo dentro dela (o que a lista mostra), não se pode
+    // chamá-la. Precisa da mesma exceção do guard: sem ela, o master
+    // continuaria sem ver atendimento alheio, já que nunca tem a permissão
+    // concedida explicitamente.
+    const podeVerOutros =
+      Boolean(req.user['is_superuser']) ||
+      (await this.permissionService.hasPermission(req.user['id'], ['support.chat:view_others']));
+
+    return this.supportChatsService.listAllSupportChats(req.user['id'], podeVerOutros);
   }
 
   @Get('/:id/messages')
@@ -151,7 +190,7 @@ export class SupportChatsController {
     return this.supportChatsService.sendMedia(id, req.user['id'], {
       ...sendMediaDto,
       caption: sendMediaDto.caption
-        ? `*${req.user['name']}:*\n${sendMediaDto.caption}`
+        ? `*${await this.assinatura(req)}:*\n${sendMediaDto.caption}`
         : sendMediaDto.caption,
     });
   }
@@ -299,7 +338,7 @@ export class SupportChatsController {
       id,
       req.user['id'],
       message_id,
-      `*${req.user['name']}:*\n${message.trim()}`,
+      `*${await this.assinatura(req)}:*\n${message.trim()}`,
     );
   }
 

@@ -47,6 +47,7 @@ import { ChatbotFlowExecutionsRepository } from '@/chatbot-engine/chatbot-flow-e
 import { Channels } from '@/channels/entities/channels.entity';
 import { DepartmentsRepository } from '@/departments/departments.repository';
 import { Departments } from '@/departments/entities/departments.entity';
+import { AttendanceSettingsService } from '@/attendance-settings/attendance-settings.service';
 
 /**
  * Tipo de mídia do envio → tipo interno persistido, o mesmo que o webhook
@@ -83,6 +84,7 @@ export class SupportChatsService {
     private readonly chatbotFlowExecutionsRepository: ChatbotFlowExecutionsRepository,
     private readonly departmentsRepository: DepartmentsRepository,
     private readonly contactsRepository: ContactsRepository,
+    private readonly attendanceSettingsService: AttendanceSettingsService,
   ) {}
 
   /**
@@ -426,8 +428,15 @@ export class SupportChatsService {
     }
   }
 
-  async listAllSupportChats() {
-    const conversas = await this.supportChatsRepository.findAllSupportChats();
+  async listAllSupportChats(usuarioId: number, podeVerOutros: boolean) {
+    const ordenarPorUltimaMensagem = await this.attendanceSettingsService.getBooleano(
+      'ordenar_atendimento_por_ultima_mensagem',
+    );
+    const conversas = await this.supportChatsRepository.findAllSupportChats(
+      ordenarPorUltimaMensagem,
+      usuarioId,
+      podeVerOutros,
+    );
 
     // A listagem carrega `user` e `contact`, e as colunas guardam a key. O
     // `<img>` da lista lateral aceita caminho relativo sem reclamar - só nao

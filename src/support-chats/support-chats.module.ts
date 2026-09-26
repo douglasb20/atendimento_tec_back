@@ -25,6 +25,7 @@ import { ServiceAlertsModule } from '@/service-alerts/service-alerts.module';
 import { ChatbotsModule } from '@/chatbots/chatbots.module';
 import { ChatbotEngineModule } from '@/chatbot-engine/chatbot-engine.module';
 import { DepartmentsModule } from '@/departments/departments.module';
+import { AttendanceSettingsModule } from '@/attendance-settings/attendance-settings.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { DepartmentsModule } from '@/departments/departments.module';
     // criar/retomar execuções ao processar uma mensagem recebida.
     forwardRef(() => ChatbotEngineModule),
     DepartmentsModule,
+    AttendanceSettingsModule,
   ],
   controllers: [SupportChatsController],
   providers: [

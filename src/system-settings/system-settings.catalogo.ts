@@ -13,6 +13,8 @@
 
 export type TipoAjuste = 'inteiro' | 'texto' | 'senha' | 'booleano';
 
+export type GrupoAjuste = 'comportamento' | 'email';
+
 export type DefinicaoAjuste = {
   /** Como o campo aparece na tela. */
   rotulo: string;
@@ -20,7 +22,7 @@ export type DefinicaoAjuste = {
   descricao: string;
   tipo: TipoAjuste;
   /** Agrupa os campos na tela. */
-  grupo: 'comportamento' | 'email';
+  grupo: GrupoAjuste;
   /** Sufixo exibido ao lado do valor (minutos, meses, MB…). */
   unidade?: string;
   min?: number;

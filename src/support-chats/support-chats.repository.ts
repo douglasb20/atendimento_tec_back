@@ -17,8 +17,23 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     return this.findBy({ support_chat_status_id: 1 });
   }
 
-  async findAllSupportChats() {
-    let supportChat = await this.createQueryBuilder('sc')
+  /**
+   * `ordenarPorUltimaMensagem` reflete o ajuste de atendimento homônimo -
+   * desligado, a fila mantém a ordem de chegada (`sc.id`, crescente: a
+   * conversa mais antiga primeiro), sem reordenar a cada mensagem nova.
+   *
+   * `podeVerOutros` reflete a permissão `support.chat:view_others` - sem ela,
+   * uma conversa `EM_ANDAMENTO` de outro atendente (`user_id` preenchido e
+   * diferente do `usuarioId` logado) não aparece na lista. O que está em
+   * espera/fila (sem dono ainda) continua visível para todos, com ou sem a
+   * permissão: a regra só entra depois que alguém assume a conversa.
+   */
+  async findAllSupportChats(
+    ordenarPorUltimaMensagem: boolean,
+    usuarioId: number,
+    podeVerOutros: boolean,
+  ) {
+    const query = this.createQueryBuilder('sc')
       // .select('sc.*')
       .leftJoinAndSelect('sc.contact', 'c')
       .leftJoinAndSelect('sc.channel', 'ch')
@@ -27,11 +42,24 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       // Quem assumiu a conversa, para a lista poder separar "meus atendimentos".
       .leftJoinAndSelect('sc.user', 'u')
       .innerJoin('support_chat_status', 'scs', 'scs.id = sc.support_chat_status_id')
-      .andWhere('scs.is_final = false')
-      // Conversa com mensagem mais recente primeiro, como em qualquer
-      // mensageiro. A data vem por subconsulta em vez do `updated_at` porque
-      // este muda em qualquer alteração da conversa (status, atribuição) e
-      // reordenaria a lista por motivos que o atendente não vê.
+      .andWhere('scs.is_final = false');
+
+    if (!podeVerOutros) {
+      query.andWhere(
+        `(sc.support_chat_status_id != :emAndamento OR sc.user_id IS NULL OR sc.user_id = :usuarioId)`,
+        { emAndamento: SupportChatStatusId.EM_ANDAMENTO, usuarioId },
+      );
+    }
+
+    if (!ordenarPorUltimaMensagem) {
+      return query.orderBy('sc.id', 'ASC').getMany();
+    }
+
+    // Conversa com mensagem mais recente primeiro, como em qualquer
+    // mensageiro. A data vem por subconsulta em vez do `updated_at` porque
+    // este muda em qualquer alteração da conversa (status, atribuição) e
+    // reordenaria a lista por motivos que o atendente não vê.
+    return query
       .addSelect(
         (sub) =>
           sub
@@ -43,8 +71,6 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       // NULLS LAST mantém no fim a conversa aberta que ainda não tem mensagem.
       .orderBy('"ultima_mensagem_em"', 'DESC', 'NULLS LAST')
       .getMany();
-
-    return supportChat;
   }
 
   async findSupportChatsById(id: number): Promise<SupportChats> {
