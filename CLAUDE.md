@@ -237,6 +237,34 @@ mecanismos existem por causa disso — não os remova sem entender o efeito:
 3. **Ack só avança**: eventos chegam fora de ordem, e um SERVER_ACK depois do
    READ faria a mensagem regredir de "lido" para "enviado". Exceção:
    `ACK_ERROR` sempre vale.
+4. **Lock Redis por `message_id`** (`saveMessage`, `lock:save-message:*`, TTL
+   5s): todo envio nosso (`saveOutgoing` - despedida automática, envio manual,
+   resposta rápida, chatbot) roda numa transação própria, **fora** da fila de
+   webhooks, e o eco do próprio envio chega pela fila concorrentemente,
+   passando por `saveIncoming`. As duas convergem para o mesmo `message_id` em
+   transações independentes; o lock serializa as duas escritas, mas sozinho
+   não decide qual delas está certa - só evita corromper a linha com um merge
+   parcial de duas gravações simultâneas. Fail-open se o Redis cair.
+5. **`ehEnvioNosso` em `saveMessage`**: quem decide a conversa certa quando a
+   mesma mensagem já foi gravada duas vezes. O eco de um envio nosso processa
+   de forma totalmente assíncrona pela fila - pode chegar segundos depois,
+   inclusive **após** a conversa original já ter sido finalizada, e
+   `onMessageCreate` abriria uma conversa nova para ele. Sem distinção, "quem
+   grava por último" decidia o `support_chat_id` final, e já aconteceu de
+   verdade: despedida automática gravada certinho na conversa sendo
+   finalizada, depois sobrescrita pelo eco tardio para a conversa nova que ele
+   abriu por engano. `saveOutgoing` (único caminho que resolve a conversa no
+   momento exato da ação, nunca via webhook) passa `ehEnvioNosso: true` e
+   sempre vence; qualquer outro caminho (`saveIncoming` e variantes) nunca
+   redecide a conversa de uma mensagem que já existe.
+6. **`lastMessage` só sai quando `support_chat` bate com o `support_chat_id`
+   final** (`saveMessage`): o parâmetro `support_chat` é a conversa que quem
+   chama resolveu **antes** de saber se é eco tardio; o item 5 pode ter
+   corrigido `message.support_chat_id` para outra. Sem essa comparação, a
+   prévia da conversa (`last_message`) ficava gravada na conversa errada -
+   mesmo caso da despedida automática, cuja prévia foi parar na conversa nova
+   que o eco abriu por engano, deixando-a com um texto que nunca foi trocado
+   ali de verdade (a conversa nasce sem nenhuma mensagem).
 
 `whatsappChatStateEmit` recarrega do banco **mas sobrescreve cinco campos** com o
 que veio do chamador, porque roda dentro da transação ainda não commitada. Sem o

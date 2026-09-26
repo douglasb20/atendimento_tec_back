@@ -18,6 +18,7 @@ import { Permissions } from 'permissions/permissions.decorator';
 import { PermissionGuard } from 'permissions/permissions.guard';
 import { CreateContactsDto } from './dto/create-contacts.dto';
 import { UpdateContactsDto } from './dto/update-contacts.dto';
+import { SignContactAvatarDto } from './dto/sign-contact-avatar.dto';
 
 @Controller('contacts')
 export class ContactsController {
@@ -71,5 +72,29 @@ export class ContactsController {
   @HttpCode(HttpStatus.OK)
   async getAllContactsByClients(@Query('client_id', ParseIntPipe) client_id: number) {
     return this.contactsService.getAllContactsByClients(client_id);
+  }
+
+  @Post('/contact/:contact_id/sign-avatar')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('contact:update')
+  @HttpCode(HttpStatus.OK)
+  async signAvatar(
+    @Param('contact_id', ParseIntPipe) contact_id: number,
+    @Body() dto: SignContactAvatarDto,
+  ) {
+    return this.contactsService.signAvatar(contact_id, dto);
+  }
+
+  /**
+   * O "sim" da confirmação de "quer buscar a foto do contato?", exibida ao
+   * remover o avatar manual - busca na Evolution na hora, não espera a
+   * próxima mensagem do contato.
+   */
+  @Post('/contact/:contact_id/buscar-foto-whatsapp')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('contact:update')
+  @HttpCode(HttpStatus.OK)
+  async buscarFotoDoWhatsapp(@Param('contact_id', ParseIntPipe) contact_id: number) {
+    return this.contactsService.buscarFotoDoWhatsapp(contact_id);
   }
 }

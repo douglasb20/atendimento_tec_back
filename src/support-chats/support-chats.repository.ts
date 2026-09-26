@@ -362,17 +362,19 @@ export class SupportChatsRepository extends Repository<SupportChats> {
   }
 
   /**
-   * Devolve a conversa ao estado de não lida, com o contador em 1.
+   * Devolve a conversa ao estado de não lida - um lembrete visual, não uma
+   * contagem.
    *
-   * O valor real não importa: a lista mostra um badge, não a contagem exata, e
-   * o gesto é "marcar para ver depois". Mais importante é que qualquer mensagem
-   * nova soma a partir daqui, em vez de recomeçar do zero.
+   * `marked_unread`, não `unread_count`: aquele é a mensagem real do
+   * contato ainda não vista, e a lista mostra o número dele; este é só o
+   * gesto de "marcar para ver depois", sem quantidade - o front mostra os
+   * dois de formas diferentes (bolinha simples aqui, badge com número lá).
    */
   async marcarComoNaoLida(id: number, manager: EntityManager): Promise<number> {
     const resultado = await manager
       .createQueryBuilder()
       .update(SupportChats)
-      .set({ unread_count: 1 })
+      .set({ marked_unread: true })
       .where('id = :id', { id })
       .execute();
 
@@ -447,9 +449,11 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     return Number(linhas?.[0]?.unread_count ?? 0);
   }
 
-  /** Zera a contagem quando o atendente abre a conversa. */
+  /** Zera a contagem quando o atendente responde - junto com o gesto manual
+   * de "marcar como não lida" (`marked_unread`), que também é resolvido por
+   * uma resposta de verdade, não só por abrir a conversa. */
   async zeraNaoLidas(support_chat_id: number): Promise<void> {
-    await this.update({ id: support_chat_id }, { unread_count: 0 });
+    await this.update({ id: support_chat_id }, { unread_count: 0, marked_unread: false });
   }
 
   async updateLastMessage(
@@ -461,10 +465,19 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       return;
     }
 
+    // `updated_at` precisa ser gravado explicitamente: `manager.update` não
+    // passa pela hook `onUpdate: 'CURRENT_TIMESTAMP'` da entidade (que, além
+    // disso, só tem efeito no MySQL - no Postgres, que é o banco daqui, o
+    // TypeORM nunca dispara isso sozinho). Sem isto, `whatsappChatStateEmit`
+    // "mentia" um `updated_at` novo só no payload do socket - o banco
+    // continuava com o valor antigo, e qualquer releitura fora do socket ao
+    // vivo (ex.: "marcar como não lida", que recarrega do banco) devolvia o
+    // horário desatualizado na lista.
     await manager.update(SupportChats, support_chat_id, {
       last_message: lastMessage.content,
       last_message_type: lastMessage.type,
       last_message_id: lastMessage.id,
+      updated_at: new Date(),
     });
   }
 }

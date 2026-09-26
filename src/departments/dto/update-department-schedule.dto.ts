@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -36,6 +37,13 @@ export class ScheduleIntervalDto {
 }
 
 export class UpdateDepartmentScheduleDto {
+  /** Switch mestre: desligado, o setor é sempre disponível, ignorando os
+   * intervalos abaixo - sem isso, um dia sem nenhum intervalo virava
+   * "fechado" mesmo quando o setor nunca tinha a intenção de restringir
+   * horário nenhum. */
+  @IsBoolean()
+  schedule_enabled: boolean;
+
   @IsArray({ message: 'Informe os intervalos como lista' })
   @ValidateNested({ each: true })
   @Type(() => ScheduleIntervalDto)

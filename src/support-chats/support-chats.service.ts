@@ -173,6 +173,12 @@ export class SupportChatsService {
     let primeiroFechado: Departments | null = null;
 
     for (const setor of setores) {
+      // Switch mestre desligado: setor sempre disponível, independente do
+      // que estiver salvo em `department_schedules` - evita interpretar um
+      // dia sem intervalo cadastrado como "fechado" quando o setor nunca
+      // teve a intenção de restringir horário nenhum.
+      if (!setor.schedule_enabled) return channel.mensagem_saudacao;
+
       const intervalos = await this.departmentsRepository.findSchedule(setor.id);
 
       const disponivel =
@@ -646,6 +652,17 @@ export class SupportChatsService {
           { sessionId, remote_jid: phoneContact, name, last_name },
           manager,
         );
+
+        // Contato marcado como "Ignorar atendimento": a mensagem é
+        // descartada aqui mesmo, antes de qualquer `SupportChats`/
+        // `SupportChatMessages` existir - sem protocolo, sem
+        // saudação/aviso/chatbot, como se nunca tivesse chegado. Cobre
+        // também o eco de uma mensagem nossa (sincronizada do celular),
+        // por decisão do usuário: contato ignorado não gera nada.
+        if (contact.ignore_support) {
+          this.logger.log(`Mensagem de ${contact.id} descartada (contato ignorado)`);
+          return null;
+        }
 
         const { supportChat, criada } = await this.supportChatsRepository.findOrOpenComSinal(
           contact.id,
@@ -1231,7 +1248,11 @@ export class SupportChatsService {
       throw new ForbiddenException('Somente quem assumiu o atendimento pode finalizá-lo');
     }
 
-    if (!supportChat.contact?.client_id) {
+    // `has_no_client` isenta contatos que nunca terão cliente de verdade
+    // (fornecedor, parceiro etc) - sem essa saída, o único jeito de encerrar
+    // esse tipo de conversa era "Finalizar sem atendimento", que não registra
+    // o histórico como um atendimento de fato.
+    if (!supportChat.contact?.client_id && !supportChat.contact?.has_no_client) {
       throw new BadRequestException(
         'Associe o contato a um cliente antes de finalizar o atendimento',
       );

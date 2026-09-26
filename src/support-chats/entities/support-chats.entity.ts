@@ -30,6 +30,14 @@ export class SupportChats {
   @Column({ name: 'unread_count', type: 'int', default: 0 })
   unread_count: number;
 
+  /** "Marcar como não lida" (ação manual do atendente) - distinto de
+   * `unread_count`, que é a contagem real de mensagens do contato ainda não
+   * vistas. O front mostra os dois de forma diferente: número para
+   * `unread_count`, bolinha simples para este campo. Zera quando o
+   * atendente responde (mesmo gatilho que zera `unread_count`). */
+  @Column({ name: 'marked_unread', type: 'boolean', default: false })
+  marked_unread: boolean;
+
   @Column({ name: 'last_message', type: 'text', nullable: true })
   last_message: string;
 

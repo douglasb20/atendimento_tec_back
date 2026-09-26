@@ -32,6 +32,14 @@ export class Departments {
   @Column({ type: 'varchar', length: 500, nullable: true, default: null })
   absence_message: string | null;
 
+  /** Switch mestre: desligado, o setor é sempre disponível, ignorando
+   * qualquer linha em `DepartmentSchedules` - existe porque um dia sem
+   * nenhum intervalo cadastrado é "fechado" (ver `weekday` na entidade
+   * filha), e sem este campo não havia como pausar o horário todo sem
+   * apagar a configuração de cada dia. */
+  @Column({ type: 'boolean', default: false })
+  schedule_enabled: boolean;
+
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 

@@ -542,64 +542,142 @@ export class MessagesService {
       raw_payload: '{}',
     } as Partial<SupportChatMessages>);
 
-    return this.saveMessage(message, manager, dados.supportChat);
+    // `ehEnvioNosso: true` - este é o único caminho que sabe a conversa certa
+    // com certeza, resolvida no momento da ação; protege contra o eco tardio
+    // dessa mesma mensagem reabrindo/reatribuindo a conversa depois.
+    return this.saveMessage(message, manager, dados.supportChat, true);
   }
+
+  /** TTL do lock de escrita por `message_id`, em milissegundos - cobre
+   * folgadamente a janela real (webhook do eco e HTTP de envio resolvem em
+   * milissegundos a baixo segundo), sem prender a chave por muito tempo se
+   * algo falhar no meio. */
+  private static readonly LOCK_SAVE_MESSAGE_TTL_MS = 5000;
 
   async saveMessage(
     message: SupportChatMessages,
     manager: EntityManager,
     support_chat: SupportChats = null,
+    /**
+     * `true` só quando quem chama é `saveOutgoing` - o único caminho que
+     * resolve a conversa no momento exato da ação do atendente (ou do
+     * sistema, ex. despedida automática), sem depender do webhook. O eco
+     * dessa mesma mensagem, vindo pela fila, processa de forma totalmente
+     * assíncrona - pode chegar segundos depois, inclusive após a conversa
+     * original já ter sido finalizada, e reabriria uma conversa nova via
+     * `onMessageCreate`. Sem esta distinção, o merge abaixo deixa "quem grava
+     * por último" decidir a conversa, e o eco tardio pode sobrescrever uma
+     * mensagem já corretamente gravada pelo envio - já aconteceu de verdade
+     * com a despedida automática.
+     */
+    ehEnvioNosso: boolean = false,
   ): Promise<MessageWithLastMessage> {
-    // O envio pelo portal grava uma linha provisória antes do provider
-    // confirmar, para a mensagem existir no histórico mesmo que o webhook se
-    // perca. Quando ele chega, completa aquela linha em vez de criar outra -
-    // sem isto o `manager.save` inseriria uma duplicata, já que a entidade
-    // montada aqui não carrega o `id`.
-    const existente = message.message_id
-      ? await this.messagesRepository.findOneByMessageId(message.message_id)
-      : null;
+    // O envio pelo portal (`saveOutgoing`) e o eco do próprio envio, que volta
+    // pelo webhook (`saveIncoming`), gravam o MESMO `message_id` em transações
+    // concorrentes e independentes - sem coordenação, o merge abaixo roda duas
+    // vezes ao mesmo tempo, e quem commita por último decide o resultado
+    // (inclusive `support_chat_id`, quando as duas gravações discordam de qual
+    // é a conversa certa). Já causou mensagem de despedida gravada na
+    // conversa nova aberta pelo eco, em vez da que estava sendo finalizada.
+    // O lock serializa as duas: quem chega depois espera a linha da primeira
+    // já commitada, e o merge passa a ver o `existente` de verdade. Sem
+    // `message_id` (não deveria ocorrer) não há com que colidir - segue sem
+    // lock. Redis fora do ar: segue sem lock também (fail-open, mesmo
+    // espírito da reserva de mídia) - preferível ao envio inteiro falhar por
+    // causa de uma proteção de corrida.
+    const lockKey = message.message_id ? `lock:save-message:${message.message_id}` : null;
+    const token = lockKey ? await this.adquireLockComRetry(lockKey) : null;
 
-    if (existente) {
-      // O `datetime` da linha provisória é o instante do envio, que define a
-      // posição na conversa; o do webhook chega depois e reordenaria a lista.
-      message = { ...existente, ...message, id: existente.id, datetime: existente.datetime };
+    try {
+      const existente = message.message_id
+        ? await this.messagesRepository.findOneByMessageId(message.message_id)
+        : null;
 
-      // O webhook não traz o nome nem o tamanho do arquivo que nós enviamos -
-      // sem isto, o espalhamento acima sobrescreveria com null o que a linha
-      // provisória guardou, e o documento voltaria a aparecer sem nome.
-      message.file_name ??= existente.file_name;
-      message.media_size ||= existente.media_size;
+      if (existente) {
+        // O `datetime` da linha provisória é o instante do envio, que define a
+        // posição na conversa; o do webhook chega depois e reordenaria a lista.
+        message = { ...existente, ...message, id: existente.id, datetime: existente.datetime };
 
-      // Reações não vêm nos eventos de mensagem: um `messages.update` traria o
-      // mapa vazio e apagaria o que as pessoas já reagiram. Só o handler de
-      // reação mexe nelas, e ele monta o mapa completo.
-      if (!message.reaction || Object.keys(message.reaction).length === 0) {
-        message.reaction = existente.reaction ?? {};
-        message.has_reaction = existente.has_reaction;
+        // A conversa só pode mudar quando quem está gravando É o envio direto
+        // (sabe com certeza a conversa certa); o eco tardio nunca redecide a
+        // conversa de uma mensagem que já existe - preserva o que já estava
+        // gravado, seja porque o envio já passou por aqui antes, seja porque
+        // outro eco (igualmente incerto) já tinha gravado.
+        if (!ehEnvioNosso) {
+          message.support_chat_id = existente.support_chat_id;
+        }
+
+        // O webhook não traz o nome nem o tamanho do arquivo que nós enviamos -
+        // sem isto, o espalhamento acima sobrescreveria com null o que a linha
+        // provisória guardou, e o documento voltaria a aparecer sem nome.
+        message.file_name ??= existente.file_name;
+        message.media_size ||= existente.media_size;
+
+        // Reações não vêm nos eventos de mensagem: um `messages.update` traria o
+        // mapa vazio e apagaria o que as pessoas já reagiram. Só o handler de
+        // reação mexe nelas, e ele monta o mapa completo.
+        if (!message.reaction || Object.keys(message.reaction).length === 0) {
+          message.reaction = existente.reaction ?? {};
+          message.has_reaction = existente.has_reaction;
+        }
       }
-    }
 
-    const savedMessage = await manager.save(SupportChatMessages, message);
-    const savedMessageWithLastMessage: MessageWithLastMessage = {
-      ...savedMessage,
-      lastMessage: null,
-    };
-
-    if (support_chat) {
-      savedMessageWithLastMessage.lastMessage = {
-        id: savedMessage.message_id,
-        type: savedMessage.type,
-        content: savedMessage.content,
+      const savedMessage = await manager.save(SupportChatMessages, message);
+      const savedMessageWithLastMessage: MessageWithLastMessage = {
+        ...savedMessage,
+        lastMessage: null,
       };
+
+      // `support_chat` é a conversa que o CHAMADOR resolveu antes de saber se
+      // isto é eco tardio - `!ehEnvioNosso` pode ter corrigido
+      // `support_chat_id` para outra conversa acima. Comparar contra o valor
+      // final salvo evita que quem chama atualize a prévia (`last_message`)
+      // da conversa errada: já aconteceu de verdade com a despedida
+      // automática, cuja prévia foi parar na conversa nova que o eco abriu
+      // por engano, em vez da que realmente recebeu a mensagem.
+      if (support_chat && String(support_chat.id) === String(savedMessage.support_chat_id)) {
+        savedMessageWithLastMessage.lastMessage = {
+          id: savedMessage.message_id,
+          type: savedMessage.type,
+          content: savedMessage.content,
+        };
+      }
+
+      if (savedMessage.has_media && savedMessage.media_url) {
+        savedMessageWithLastMessage.media_url = this.storageService.getPublicUrl(
+          savedMessage.media_url,
+        );
+      }
+
+      return savedMessageWithLastMessage;
+    } finally {
+      if (lockKey && token) await this.redisCacheRepository.unlock(lockKey, token);
+    }
+  }
+
+  /**
+   * Até 3 tentativas com pequeno backoff antes de desistir do lock. Não é
+   * fatal não conseguir: significa que a outra transação está processando o
+   * mesmíssimo `message_id` agora, então seguir sem lock aqui na pior das
+   * hipóteses volta a ter a corrida original - melhor que travar o envio.
+   */
+  private async adquireLockComRetry(lockKey: string): Promise<string | null> {
+    for (let tentativa = 0; tentativa < 3; tentativa++) {
+      try {
+        const token = await this.redisCacheRepository.lock(
+          lockKey,
+          MessagesService.LOCK_SAVE_MESSAGE_TTL_MS,
+        );
+        if (token) return token;
+      } catch (err) {
+        this.logger.warn(`Lock de mensagem indisponível, seguindo sem ele: ${err.message}`);
+        return null;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 150));
     }
 
-    if (savedMessage.has_media && savedMessage.media_url) {
-      savedMessageWithLastMessage.media_url = this.storageService.getPublicUrl(
-        savedMessage.media_url,
-      );
-    }
-
-    return savedMessageWithLastMessage;
+    return null;
   }
 
   /**

@@ -1,13 +1,21 @@
+import { randomUUID } from 'crypto';
 import { nomeCompleto, runInTransaction } from '@/Utils';
 import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
 import { Clients } from 'clients/entities/clients.entity';
 import { DataSource, EntityManager } from 'typeorm';
 import { WhatsappService } from 'whatsapp/whatsapp.service';
 import { CustomFieldsService } from '@/custom-fields/custom-fields.service';
+import { PresignedUpload, StorageService } from '@/storage/storage.service';
+import { ChannelsRepository } from '@/channels/channels.repository';
 import { ContactsRepository } from './contacts.repository';
 import { CreateContactsDto } from './dto/create-contacts.dto';
 import { UpdateContactsDto } from './dto/update-contacts.dto';
+import { SignContactAvatarDto } from './dto/sign-contact-avatar.dto';
 import { Contacts } from './entities/contacts.entity';
+
+/** Prefixo fixo no servidor - nunca vindo do body, mesmo padrão do
+ * `sign-media` do chatbot (mais seguro que aceitar prefixo do cliente). */
+const PREFIXO_AVATAR_CONTATO = 'contact/avatar';
 
 /**
  * Telefone em dígitos, com o DDI do Brasil quando for um número nacional.
@@ -42,17 +50,41 @@ export class ContactsService {
     private contactRepository: ContactsRepository,
     private whatsappService: WhatsappService,
     private customFieldsService: CustomFieldsService,
+    private storageService: StorageService,
+    private channelsRepository: ChannelsRepository,
     private dataSource: DataSource,
   ) {}
+
+  /**
+   * `avatar_url` guarda a **key** do bucket, não a URL - a API nunca pode
+   * devolvê-la crua (o `next/image` do front rejeita: "must start with a
+   * leading slash or be an absolute URL"). Mesma tradução que
+   * `SupportChatsService.traduzAvatares` já faz para o contato dentro de uma
+   * conversa; aqui cobre os retornos diretos deste módulo (listagem,
+   * criação, atualização, busca de foto do WhatsApp).
+   *
+   * `is_avatar_external` (a foto do WhatsApp) já é uma URL pronta - convertê-la
+   * de novo apontaria para um objeto que não existe no nosso bucket.
+   * `getPublicUrl` é idempotente, então repetir a chamada não faz mal.
+   */
+  private traduzAvatar<T extends Contacts | null | undefined>(contact: T): T {
+    if (contact?.avatar_url && !contact.is_avatar_external) {
+      contact.avatar_url = this.storageService.getPublicUrl(contact.avatar_url);
+    }
+    return contact;
+  }
 
   async getAllContacts() {
     // `camposPersonalizados` vem junto: a listagem os exibe, e buscá-los
     // depois seria uma consulta por linha.
-    return this.contactRepository.find({
+    const contatos = await this.contactRepository.find({
       where: { status: 1 },
       relations: ['camposPersonalizados'],
       order: { name: 'ASC', last_name: 'ASC' },
     });
+
+    contatos.forEach((contato) => this.traduzAvatar(contato));
+    return contatos;
   }
 
   async saveContactsFromClient(contacts: CreateContactsDto[], client: Clients) {
@@ -168,9 +200,31 @@ export class ContactsService {
   ) {
     return runInTransaction(this.dataSource, async (manager) => {
       try {
+        const atual = await this.contactRepository.findById(contact_id);
+
+        // `=== null`, não "falsy": remover é pedir `avatar_url: null`
+        // explicitamente. Ausente, o repository mantém o que já está
+        // gravado - mesma distinção que `UsersService.updateUser` já faz.
+        if (updateContactDto.avatar_url === null && atual?.avatar_url && atual.avatar_is_manual) {
+          await this.storageService.deleteObject(atual.avatar_url);
+        }
+
+        const dadosContato = {
+          ...updateContactDto,
+          // A key só foi enviada porque um upload manual acabou de
+          // acontecer (`changed_avatar`) - sem isso `avatar_url` poderia
+          // vir de outro fluxo e marcar `is_manual` por engano.
+          ...(updateContactDto.changed_avatar && {
+            is_avatar_external: false,
+            avatar_is_manual: true,
+          }),
+          // Remoção explícita: volta a deixar o webhook preencher de novo.
+          ...(updateContactDto.avatar_url === null && { avatar_is_manual: false }),
+        };
+
         const contact = await this.contactRepository.updateContact(
           contact_id,
-          updateContactDto,
+          dadosContato,
           manager,
           client_id,
         );
@@ -194,7 +248,10 @@ export class ContactsService {
 
         // Recarregado com a relação: o `save` devolve só as colunas, e quem
         // acabou de associar um cliente precisa do nome dele para exibir.
-        return (await this.contactRepository.findByIdComCliente(contact.id, manager)) ?? contact;
+        const recarregado =
+          (await this.contactRepository.findByIdComCliente(contact.id, manager)) ?? contact;
+
+        return this.traduzAvatar(recarregado);
       } catch (err) {
         this.logger.error(err.message);
         throw new BadRequestException(err.message);
@@ -203,11 +260,14 @@ export class ContactsService {
   }
 
   async getAllContactsByClients(client_id: number) {
-    return this.contactRepository.find({
+    const contatos = await this.contactRepository.find({
       where: { client_id, status: 1 },
       relations: ['camposPersonalizados'],
       order: { name: 'ASC', last_name: 'ASC' },
     });
+
+    contatos.forEach((contato) => this.traduzAvatar(contato));
+    return contatos;
   }
 
   async findOrCreateByRemoteJid(
@@ -261,7 +321,12 @@ export class ContactsService {
     //
     // Só quando está vazia: refazer a chamada em toda mensagem somaria uma ida
     // à Evolution por mensagem recebida, e a foto muda raramente.
-    if (!contact.avatar_url) {
+    //
+    // `avatar_is_manual` sempre bloqueia: o atendente definiu a foto por
+    // upload, e o webhook não pode substituí-la só porque o campo está vazio
+    // não é mais o critério - aqui ele nem chega vazio, mas o guard fica
+    // explícito para não depender só disso.
+    if (!contact.avatar_url && !contact.avatar_is_manual) {
       const profilePicUrl = await this.whatsappService.getProfilePicUrl(sessionId, remote_jid);
 
       if (profilePicUrl) {
@@ -273,5 +338,66 @@ export class ContactsService {
     }
 
     return contact;
+  }
+
+  /**
+   * Assinatura de upload para o avatar manual do contato.
+   *
+   * Prefixo fixo no servidor (`PREFIXO_AVATAR_CONTATO`), nunca vindo do
+   * body - mesma decisão do `sign-media` do chatbot. Reaproveita a key já
+   * gravada quando o contato já tem um avatar manual (evita acumular
+   * arquivo órfão a cada troca de foto).
+   */
+  async signAvatar(contact_id: number, dto: SignContactAvatarDto): Promise<PresignedUpload> {
+    const contact = await this.contactRepository.findById(contact_id);
+    if (!contact) {
+      throw new BadRequestException('Contato não localizado com este id');
+    }
+
+    const extensao = dto.fileType.split('/')[1] ?? 'jpg';
+    const key =
+      contact.avatar_is_manual && contact.avatar_url
+        ? contact.avatar_url
+        : `${PREFIXO_AVATAR_CONTATO}/${randomUUID()}.${extensao}`;
+
+    return this.storageService.createPresignedPost(key, dto.fileType);
+  }
+
+  /**
+   * Busca a foto de perfil do WhatsApp na hora, para um contato que acabou
+   * de ter o avatar manual removido - o atendente confirma antes ("quer
+   * buscar a foto do contato?"), então esta chamada já é o "sim".
+   *
+   * Sem canal conectado, ou contato sem foto no WhatsApp: devolve o contato
+   * como está (sem foto), sem erro - a ausência de foto não é uma falha.
+   */
+  async buscarFotoDoWhatsapp(contact_id: number): Promise<Contacts> {
+    const contact = await this.contactRepository.findById(contact_id);
+    if (!contact) {
+      throw new BadRequestException('Contato não localizado com este id');
+    }
+
+    const canal = await this.channelsRepository.findQualquerConectado();
+    if (!canal) {
+      throw new BadRequestException('Nenhum canal conectado para buscar a foto agora');
+    }
+
+    const profilePicUrl = await this.whatsappService.getProfilePicUrl(
+      canal.session_id,
+      contact.remote_jid,
+    );
+
+    return runInTransaction(this.dataSource, async (manager) => {
+      contact.avatar_url = profilePicUrl || null;
+      contact.is_avatar_external = Boolean(profilePicUrl);
+      contact.avatar_is_manual = false;
+
+      await manager.save(Contacts, contact);
+
+      const recarregado =
+        (await this.contactRepository.findByIdComCliente(contact.id, manager)) ?? contact;
+
+      return this.traduzAvatar(recarregado);
+    });
   }
 }

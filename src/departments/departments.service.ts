@@ -10,6 +10,7 @@ import { UpdateDepartmentScheduleDto } from './dto/update-department-schedule.dt
 import { Departments } from './entities/departments.entity';
 
 export type DepartmentScheduleResult = {
+  schedule_enabled: boolean;
   intervals: { weekday: number; start_time: string; end_time: string }[];
   absence_message: string | null;
 };
@@ -134,6 +135,7 @@ export class DepartmentsService {
     const intervalos = await this.departmentsRepository.findSchedule(id);
 
     return {
+      schedule_enabled: setor.schedule_enabled,
       // O driver do Postgres devolve `time` como `HH:mm:ss` - a tela só
       // precisa de `HH:mm`.
       intervals: intervalos.map((i) => ({
@@ -154,12 +156,12 @@ export class DepartmentsService {
   async updateSchedule(id: number, dto: UpdateDepartmentScheduleDto): Promise<DepartmentScheduleResult> {
     const setor = await this.departmentsRepository.findById(id); // 404 se o setor não existir
 
-    // Horário ativo (≥1 intervalo) sem mensagem de ausência deixaria o canal
-    // mudo fora do expediente - a mensagem que vier no DTO vale, senão a que
-    // já está gravada (a tela pode mandar só `intervals` numa chamada).
+    // Só exige mensagem quando o switch mestre está ligado - com ele
+    // desligado, os intervalos salvos não têm efeito nenhum (o setor fica
+    // sempre disponível), então não faz sentido travar o salvamento.
     const mensagemFinal = dto.absence_message !== undefined ? dto.absence_message?.trim() : setor.absence_message;
 
-    if (dto.intervals.length > 0 && !mensagemFinal) {
+    if (dto.schedule_enabled && !mensagemFinal) {
       throw new BadRequestException(
         'Informe a mensagem de ausência antes de ativar o horário de atendimento',
       );
@@ -168,11 +170,12 @@ export class DepartmentsService {
     await runInTransaction(this.dataSource, async (manager) => {
       await this.departmentsRepository.substituiSchedule(id, dto.intervals, manager);
 
-      if (dto.absence_message !== undefined) {
-        await manager.update(Departments, id, {
-          absence_message: dto.absence_message?.trim() || null,
-        });
-      }
+      await manager.update(Departments, id, {
+        schedule_enabled: dto.schedule_enabled,
+        ...(dto.absence_message !== undefined
+          ? { absence_message: dto.absence_message?.trim() || null }
+          : {}),
+      });
     });
 
     this.logger.log(`Horário do setor ${id} atualizado: ${dto.intervals.length} intervalo(s)`);
