@@ -673,6 +673,20 @@ export class SupportChatsService {
           return null;
         }
 
+        // Eco de uma mensagem que JÁ enviamos por `saveOutgoing` (despedida
+        // automática, resposta rápida, envio manual) - `saveMessage` sabe
+        // preservar o `support_chat_id` correto quando o eco chega depois,
+        // mas isso não evita abrir uma conversa nova aqui, já órfã, se a
+        // original tiver sido finalizada nesse meio-tempo (ex.: despedida
+        // cujo eco chega após o atendimento já ter sido encerrado). Achar a
+        // mensagem já gravada evita a conversa fantasma vazia em "Aguardando".
+        if (data.message.id?.fromMe) {
+          const jaGravada = await this.messagesService.findByMessageId(data.message.id.id);
+          if (jaGravada) {
+            return null;
+          }
+        }
+
         const { supportChat, criada } = await this.supportChatsRepository.findOrOpenComSinal(
           contact.id,
           channel.id,
@@ -1239,6 +1253,7 @@ export class SupportChatsService {
     id: number,
     user_id: number,
     dto: FinalizarAtendimentoDto,
+    podeEncerrarQualquer = false,
   ): Promise<SupportChats> {
     const supportChat = await this.supportChatsRepository.findParaEstado(id);
     if (!supportChat) {
@@ -1253,7 +1268,10 @@ export class SupportChatsService {
       throw new BadRequestException('Inicie o atendimento antes de finalizá-lo');
     }
 
-    if (Number(supportChat.user_id) !== Number(user_id)) {
+    // O master (`is_superuser`) encerra atendimento de qualquer atendente -
+    // mesma exceção do guard de permissão, replicada aqui porque esta
+    // checagem decide algo dentro da rota, não se pode chamá-la.
+    if (!podeEncerrarQualquer && Number(supportChat.user_id) !== Number(user_id)) {
       throw new ForbiddenException('Somente quem assumiu o atendimento pode finalizá-lo');
     }
 
@@ -1386,7 +1404,8 @@ export class SupportChatsService {
    *
    * Só o dono transfere - mesma regra de `finalizarAtendimento`, e pelo mesmo
    * motivo: a conversa é responsabilidade de quem a assumiu, e tirá-la dele sem
-   * que ele saiba é o tipo de coisa que se descobre tarde demais.
+   * que ele saiba é o tipo de coisa que se descobre tarde demais. O master
+   * (`is_superuser`) é a mesma exceção de lá.
    *
    * ⚠️ Transferir passa junto o **direito de finalizar**: `finalizarAtendimento`
    * valida o dono, e depois daqui ele é outro.
@@ -1395,6 +1414,7 @@ export class SupportChatsService {
     id: number,
     user_id: number,
     dto: TransferirAtendimentoDto,
+    podeTransferirQualquer = false,
   ): Promise<SupportChats> {
     const supportChat = await this.supportChatsRepository.findParaEstado(id);
     if (!supportChat) {
@@ -1409,14 +1429,19 @@ export class SupportChatsService {
       throw new BadRequestException('Inicie o atendimento antes de transferi-lo');
     }
 
-    if (Number(supportChat.user_id) !== Number(user_id)) {
+    // O master (`is_superuser`) transfere atendimento de qualquer atendente -
+    // mesma exceção de `finalizarAtendimento`.
+    if (!podeTransferirQualquer && Number(supportChat.user_id) !== Number(user_id)) {
       throw new ForbiddenException('Somente quem assumiu o atendimento pode transferi-lo');
     }
 
     const destinoId = dto.user_destino_id ?? null;
 
     if (destinoId !== null) {
-      if (Number(destinoId) === Number(user_id)) {
+      // Compara com o dono real da conversa, não com quem chama: o master
+      // pode estar transferindo em nome de outro atendente, e "já é seu"
+      // precisa continuar significando "já é do dono atual".
+      if (Number(destinoId) === Number(supportChat.user_id)) {
         throw new BadRequestException('O atendimento já é seu');
       }
       // Lança `BadRequestException` se não existir ou estiver inativo - não

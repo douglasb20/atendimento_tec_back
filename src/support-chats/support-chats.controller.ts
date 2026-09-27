@@ -270,10 +270,14 @@ export class SupportChatsController {
     @Body() finalizarAtendimentoDto: FinalizarAtendimentoDto,
     @Req() req: Request,
   ) {
+    // Só o master encerra atendimento de outro atendente - mesma exceção do
+    // guard, replicada aqui porque a regra de dono é checada dentro do
+    // service, não no guard.
     return this.supportChatsService.finalizarAtendimento(
       id,
       req.user['id'],
       finalizarAtendimentoDto,
+      Boolean(req.user['is_superuser']),
     );
   }
 
@@ -311,11 +315,12 @@ export class SupportChatsController {
     @Req() req: Request,
   ) {
     // O ator vem do token, nunca do corpo: senão daria para transferir em nome
-    // de outro atendente.
+    // de outro atendente. Só o master transfere atendimento de outro dono.
     return this.supportChatsService.transferirAtendimento(
       id,
       req.user['id'],
       transferirAtendimentoDto,
+      Boolean(req.user['is_superuser']),
     );
   }
 
