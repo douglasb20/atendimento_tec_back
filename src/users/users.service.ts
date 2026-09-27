@@ -21,6 +21,7 @@ import { UserRepository } from './users.repository';
 import { RedisCacheRepository } from '@/redis-cache/redis-cache.repository';
 import { UserConfigService } from '@/user-config/user-config.service';
 import { DepartmentsRepository } from '@/departments/departments.repository';
+import { StatusConvite, UserInvitesService } from './user-invites.service';
 
 @Injectable({ scope: Scope.REQUEST })
 export class UsersService {
@@ -34,14 +35,21 @@ export class UsersService {
     private readonly storageService: StorageService,
     private readonly userConfigService: UserConfigService,
     private readonly departmentsRepository: DepartmentsRepository,
+    private readonly userInvitesService: UserInvitesService,
     private dataSource: DataSource,
   ) {
     this.query = this.dataSource.createQueryRunner();
   }
 
-  async findAll(): Promise<Users[]> {
+  async findAll(): Promise<(Users & { convite_status: StatusConvite })[]> {
     const users = await this.usersRepository.findActives();
-    return users;
+
+    const status = await this.userInvitesService.statusPorUsuarios(users.map((u) => u.id));
+
+    return users.map((user) => ({
+      ...user,
+      convite_status: status.get(user.id) ?? ('aceito' as StatusConvite),
+    }));
   }
 
   async findOne(id: number): Promise<Users> {
@@ -90,6 +98,13 @@ export class UsersService {
     }
   }
 
+  /**
+   * Cria o usuário sem senha e o convida por e-mail a defini-la.
+   *
+   * O convite é gravado na mesma transação do cadastro - um cadastro que
+   * reverte não pode deixar um convite órfão apontando para um usuário que
+   * não existe. O e-mail, por não ser transacional, só sai depois do commit.
+   */
   async addUser(createUserDto: CreateUserDto): Promise<Users> {
     await this.recusaEmailEmUso(createUserDto.email);
 
@@ -107,8 +122,20 @@ export class UsersService {
         await this.gravaSetores(newUser.id, department_ids, this.query.manager);
       }
 
+      const { token: tokenConvite } = await this.userInvitesService.criar(
+        newUser.id,
+        this.query.manager,
+      );
+
       delete newUser.password;
       await this.query.commitTransaction();
+
+      await this.userInvitesService.enviarConvite(newUser.email, tokenConvite).catch((err) => {
+        // O usuário já está criado e a listagem já mostra "Convite pendente";
+        // uma falha no envio (SMTP mal configurado, por exemplo) não pode
+        // derrubar o cadastro - o admin ainda tem "Reenviar convite".
+        this.logger.error(`Falha ao enviar convite ao usuário ${newUser.id}: ${err.message}`);
+      });
 
       return newUser;
     } catch (err) {
@@ -123,7 +150,16 @@ export class UsersService {
     updateUserDto: UpdateUserDto,
     solicitante?: Users,
   ): Promise<Users> {
-    await this.recusaSeSuperusuario(user_id, 'alterado');
+    // A recusa é para o CRUD administrativo (`/users/:id`), que barra mexer
+    // no cadastro de *outro* usuário quando ele é o master. Auto-edição
+    // (`/users/meu-perfil`, onde `solicitante` é sempre a própria pessoa) não
+    // pode cair na mesma regra: o master também precisa poder trocar o
+    // próprio nome, e-mail ou senha - é o CRUD de terceiros que fica de fora.
+    const autoEdicao = solicitante && Number(solicitante.id) === Number(user_id);
+
+    if (!autoEdicao) {
+      await this.recusaSeSuperusuario(user_id, 'alterado');
+    }
 
     if (solicitante) {
       await this.recusaCamposSemPermissao(user_id, updateUserDto, solicitante);
@@ -207,6 +243,16 @@ export class UsersService {
         [user_id, setor.id],
       );
     }
+  }
+
+  /** Reenvia o convite: novo link, novo e-mail. */
+  async reenviarConvite(user_id: number): Promise<{ url: string }> {
+    return this.userInvitesService.reenviar(user_id);
+  }
+
+  /** Só devolve o link, para o admin copiar e mandar por outro canal. */
+  async linkConvite(user_id: number): Promise<{ url: string }> {
+    return this.userInvitesService.gerarLink(user_id);
   }
 
   async deleteUser(user_id: number): Promise<Users> {

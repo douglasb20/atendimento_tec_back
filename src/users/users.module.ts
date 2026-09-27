@@ -3,9 +3,13 @@ import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Users } from './entities/users.entity';
+import { UserInvites } from './entities/user-invites.entity';
 import { ConfigMailerModule } from 'core/mailer/configmailer.module';
 import { Supports } from 'supports/entities/supports.entity';
 import { UserRepository } from './users.repository';
+import { UserInvitesRepository } from './user-invites.repository';
+import { UserInvitesService } from './user-invites.service';
+import { UserInvitesController } from './user-invites.controller';
 import { UserRefreshTokens } from './entities/user-refresh-tokens.entity';
 import { PermissionsRepository } from 'permissions/permissions.repository';
 import { StorageService } from 'storage/storage.service';
@@ -13,13 +17,20 @@ import { RedisCacheModule } from '@/redis-cache/redis-cache.module';
 import { DepartmentsModule } from '@/departments/departments.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Users, Supports, UserRefreshTokens]),
+  imports: [TypeOrmModule.forFeature([Users, Supports, UserRefreshTokens, UserInvites]),
     ConfigMailerModule,
     RedisCacheModule,
     forwardRef(() => DepartmentsModule),
   ],
-  controllers: [UsersController],
-  providers: [UsersService, UserRepository, PermissionsRepository, StorageService],
+  controllers: [UsersController, UserInvitesController],
+  providers: [
+    UsersService,
+    UserRepository,
+    UserInvitesRepository,
+    UserInvitesService,
+    PermissionsRepository,
+    StorageService,
+  ],
   // O `UserRepository` é usado pela redefinição de senha, que precisa achar o
   // usuário pelo e-mail e gravar a senha nova.
   exports: [UserRepository],

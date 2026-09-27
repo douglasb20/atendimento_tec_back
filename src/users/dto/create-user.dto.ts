@@ -15,10 +15,6 @@ export class CreateUserDto {
   @IsEmail({}, { message: (opt) => `Formato do campo ${opt.property} inválido` })
   email: string;
 
-  @IsString({ message: (opt) => `Campo ${opt.property} aceita somente formato string` })
-  @IsNotEmpty({ message: (opt) => `Campo ${opt.property} é obrigatório` })
-  password: string;
-
   @IsOptional()
   @IsString({ message: (opt) => `Campo ${opt.property} aceita somente formato string` })
   avatar_url?: string;

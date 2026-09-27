@@ -49,6 +49,19 @@ export const CATALOGO = {
     env: 'RESET_SENHA_EXPIRACAO_MIN',
   },
 
+  convite_usuario_expiracao_min: {
+    rotulo: 'Validade do convite de novo usuário',
+    descricao:
+      'Quanto tempo o link enviado por e-mail para o novo atendente continua servindo. Abaixo de 5 minutos o convidado não consegue abrir o e-mail a tempo.',
+    tipo: 'inteiro',
+    grupo: 'comportamento',
+    unidade: 'minutos',
+    min: 5,
+    max: 1440,
+    padrao: 30,
+    env: 'CONVITE_USUARIO_EXPIRACAO_MIN',
+  },
+
   midia_retencao_meses: {
     rotulo: 'Retenção de mídia do atendimento',
     descricao:

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'node:crypto';
 import { Users } from './entities/users.entity';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -89,10 +90,15 @@ export class UserRepository extends Repository<Users> {
     return user;
   }
 
+  /**
+   * Cadastro via convite: o admin não define senha nenhuma. A coluna nunca
+   * fica vazia (abriria brecha de login sem senha) - grava um valor
+   * aleatório que ninguém jamais vê, substituído quando o convidado aceita.
+   */
   async createUser(user: CreateUserDto, manager: EntityManager) {
     const newUser = this.create({
       ...user,
-      password: await bcrypt.hash(user.password, 10),
+      password: await bcrypt.hash(randomBytes(32).toString('hex'), 10),
     });
     return await manager.save(Users, newUser);
   }
@@ -119,8 +125,16 @@ export class UserRepository extends Repository<Users> {
     if (updateUserDto.password) {
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
+
+    // `findById` carrega a relação `permissionGroup`, que mapeia a mesma
+    // coluna que o escalar `permission_group_id` (mesmo `@JoinColumn`). Um
+    // `save` com os dois preenchidos deixa o TypeORM montar o UPDATE a partir
+    // da relação (o grupo antigo) em vez do escalar novo - trocar de grupo
+    // silenciosamente não tinha efeito nenhum. Removida antes do merge, só o
+    // escalar decide.
+    const { permissionGroup, ...userSemRelacoes } = user;
     const updateUser = this.create({
-      ...user,
+      ...userSemRelacoes,
       ...updateUserDto,
     });
     return await manager.save(Users, updateUser);

@@ -153,4 +153,22 @@ export class UsersController {
   async deleteUser(@Param('id') id: string) {
     return this.usersService.deleteUser(Number(id));
   }
+
+  /** Novo link + novo e-mail de convite. Mesma permissão de criar o usuário. */
+  @Post(':id/reenviar-convite')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('user:add')
+  @HttpCode(HttpStatus.OK)
+  async reenviarConvite(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.reenviarConvite(id);
+  }
+
+  /** Só o link, sem mandar e-mail - para o admin copiar e enviar por fora. */
+  @Post(':id/link-convite')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('user:add')
+  @HttpCode(HttpStatus.OK)
+  async linkConvite(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.linkConvite(id);
+  }
 }

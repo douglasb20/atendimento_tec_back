@@ -27,10 +27,19 @@ export class DepartmentsController {
 
   @Get()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  // `user:update` também lista: o cadastro de usuário escolhe os setores, e
-  // quem edita usuário sem gerenciar setores precisa ao menos vê-los. O guard é
-  // OU entre as permissões.
-  @Permissions('department:view', 'user:update', 'user:add')
+  // As permissões de escrita de outros módulos também listam: quem configura
+  // usuário, conexão ou inicia um atendimento escolhe o setor deles, e exigir
+  // `department:view` só para isso obrigaria a dar acesso ao módulo de
+  // Setores para tarefas que não são de setor. O guard é OU entre as
+  // permissões.
+  @Permissions(
+    'department:view',
+    'user:update',
+    'user:add',
+    'channel:update',
+    'channel:add',
+    'support.chat:update',
+  )
   @HttpCode(HttpStatus.OK)
   findAll() {
     return this.departmentsService.findAll();

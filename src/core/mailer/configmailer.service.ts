@@ -110,6 +110,29 @@ export class ConfigMailerService {
   }
 
   /**
+   * Envia o convite de cadastro a um novo atendente.
+   *
+   * O token vem pronto de quem chama - esta classe só o transporta.
+   */
+  async SendConviteUsuario(email: string, token: string, validadeMinutos: number): Promise<void> {
+    const base = (process.env.URL_FRONTEND ?? 'http://localhost:3000').replace(/\/+$/, '');
+    const url = `${base}/auth/aceitar-convite/${token}`;
+
+    const config = await this.configAtual();
+
+    await this.mailerService.sendMail({
+      transporterName: await this.transporte(config),
+      from: config.from || undefined,
+      to: email,
+      subject: 'Você foi convidado para o sistema',
+      template: 'convite_usuario',
+      context: { url, validade: validadeMinutos },
+    });
+
+    this.logger.log(`E-mail de convite enviado para ${email}`);
+  }
+
+  /**
    * Envia uma mensagem de teste, com credenciais avulsas ou as gravadas.
    *
    * Existe para a configuração ser conferida **antes** de valer: uma senha
