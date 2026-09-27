@@ -3,11 +3,10 @@ import { forwardRef, Module } from '@nestjs/common';
 import { AuthModule } from 'auth/auth.module';
 
 import { ChannelsModule } from '@/channels/channels.module';
-import { IntegrationsModule } from '@/integrations/integrations.module';
 import { SupportChatsModule } from '@/support-chats/support-chats.module';
 import { WhatsappMessagesProcessor } from './processors/whatsapp-messages.processor';
 import { WhatsappSessionProcessor } from './processors/whatsapp-session.processor';
-import { ProviderFactory } from './providers/provider.factory';
+import { EvolutionProvider } from './providers/evolution/evolution.provider';
 import { WhatsappController } from './whatsapp.controller';
 import { WhatsappGateway } from './whatsapp.gateway';
 import { WhatsappService } from './whatsapp.service';
@@ -15,10 +14,6 @@ import { WhatsappService } from './whatsapp.service';
 @Module({
   imports: [
     AuthModule,
-    // `forwardRef` dos dois lados: o IntegrationsModule importa este para usar
-    // a ProviderFactory no teste de conexão, e a factory depende do
-    // IntegrationsService para resolver credenciais.
-    forwardRef(() => IntegrationsModule),
     BullModule.registerQueue(
       {
         name: 'whatsapp-messages-queue',
@@ -34,10 +29,10 @@ import { WhatsappService } from './whatsapp.service';
   providers: [
     WhatsappService,
     WhatsappGateway,
-    ProviderFactory,
+    EvolutionProvider,
     WhatsappSessionProcessor,
     WhatsappMessagesProcessor,
   ],
-  exports: [WhatsappService, WhatsappGateway, ProviderFactory],
+  exports: [WhatsappService, WhatsappGateway, EvolutionProvider],
 })
 export class WhatsappModule {}

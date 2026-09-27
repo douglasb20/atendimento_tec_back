@@ -9,7 +9,7 @@ import { MessageMedia } from '@types';
  * futuramente sem alterar nada acima desta camada.
  */
 export interface WhatsappProvider {
-  /** Nome do provider, correspondendo ao slug em `integration_providers`. */
+  /** Nome do provider, para distinguir qual implementação está por trás. */
   readonly slug: string;
 
   /**

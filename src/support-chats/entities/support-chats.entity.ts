@@ -5,6 +5,7 @@ import { Users } from 'users/entities/users.entity';
 import { Channels } from 'channels/entities/channels.entity';
 import { MessageTypes } from '@/@types';
 import { Contacts } from '@/contacts/entities/contacts.entity';
+import { Departments } from '@/departments/entities/departments.entity';
 
 @Entity('support_chats')
 export class SupportChats {
@@ -20,6 +21,15 @@ export class SupportChats {
 
   @Column({ name: 'contact_id', type: 'int' })
   contact_id: number;
+
+  /**
+   * Setor escolhido ao criar o atendimento (modal "Novo atendimento").
+   *
+   * Nulo nas conversas abertas pelo fluxo normal (mensagem do contato via
+   * webhook) - só `criarNova` grava isto.
+   */
+  @Column({ name: 'department_id', type: 'int', nullable: true })
+  department_id: number | null;
 
   @Column({ name: 'support_chat_status_id', type: 'int' })
   support_chat_status_id: number;
@@ -110,4 +120,8 @@ export class SupportChats {
   @ManyToOne(() => Channels, (channel) => channel.supportChats, { eager: true })
   @JoinColumn({ name: 'channel_id' })
   channel: Channels;
+
+  @ManyToOne(() => Departments)
+  @JoinColumn({ name: 'department_id' })
+  department: Departments;
 }

@@ -26,4 +26,14 @@ export class CreateSupportChatDto {
   @IsString()
   @MaxLength(90)
   name?: string;
+
+  /**
+   * Setor da conversa nova. Opcional: nem todo atendente está associado a um
+   * setor, e a validação de que o valor é um dos setores do atendente fica no
+   * service (`SupportChatsService.criarNova`), que precisa consultar o banco.
+   */
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  department_id?: number;
 }

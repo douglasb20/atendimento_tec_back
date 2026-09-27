@@ -187,11 +187,15 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     channel_id: number,
     manager: EntityManager,
     user_id?: number,
+    department_id?: number | null,
   ): Promise<{ supportChat: SupportChats; criada: boolean }> {
     const existente = await this.buscaAberta(contact_id, channel_id);
     if (existente) return { supportChat: existente, criada: false };
 
-    return { supportChat: await this.abre(contact_id, channel_id, manager, user_id), criada: true };
+    return {
+      supportChat: await this.abre(contact_id, channel_id, manager, user_id, department_id),
+      criada: true,
+    };
   }
 
   async findOrOpen(
@@ -224,6 +228,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     channel_id: number,
     manager: EntityManager,
     user_id?: number,
+    department_id?: number | null,
   ): Promise<SupportChats> {
     const protocol = await this.protocolCountersRepository.generateProtocol(manager);
 
@@ -233,6 +238,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
         user_id: user_id || null,
         channel_id,
         contact_id,
+        department_id: department_id ?? null,
         support_chat_status_id: SupportChatStatusId.AGUARDANDO,
         protocol,
       }),

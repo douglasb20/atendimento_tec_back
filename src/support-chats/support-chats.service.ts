@@ -48,6 +48,7 @@ import { Channels } from '@/channels/entities/channels.entity';
 import { DepartmentsRepository } from '@/departments/departments.repository';
 import { Departments } from '@/departments/entities/departments.entity';
 import { AttendanceSettingsService } from '@/attendance-settings/attendance-settings.service';
+import { ChannelsService } from '@/channels/channels.service';
 
 /**
  * Tipo de mídia do envio → tipo interno persistido, o mesmo que o webhook
@@ -85,6 +86,7 @@ export class SupportChatsService {
     private readonly departmentsRepository: DepartmentsRepository,
     private readonly contactsRepository: ContactsRepository,
     private readonly attendanceSettingsService: AttendanceSettingsService,
+    private readonly channelsService: ChannelsService,
   ) {}
 
   /**
@@ -157,14 +159,23 @@ export class SupportChatsService {
    * **primeiro setor vinculado** (menor `id`) - decisão do usuário, evita
    * concatenar textos de vários setores fechados ao mesmo tempo.
    */
-  private async decideMensagemDeAbertura(channel: Channels): Promise<string | null | undefined> {
+  /**
+   * O texto e se é o caso de levar o anexo de saudação do canal junto.
+   *
+   * O anexo só acompanha a saudação de verdade - a mensagem de ausência de um
+   * setor fora do horário é outro texto, cadastrado à parte, sem anexo
+   * previsto hoje.
+   */
+  private async decideMensagemDeAbertura(
+    channel: Channels,
+  ): Promise<{ texto: string | null | undefined; comAnexo: boolean }> {
     const setores = await this.dataSource
       .createQueryBuilder()
       .relation(Channels, 'departments')
       .of(channel.id)
       .loadMany<Departments>();
 
-    if (!setores.length) return channel.mensagem_saudacao;
+    if (!setores.length) return { texto: channel.mensagem_saudacao, comAnexo: true };
 
     setores.sort((a, b) => a.id - b.id);
 
@@ -179,7 +190,7 @@ export class SupportChatsService {
       // que estiver salvo em `department_schedules` - evita interpretar um
       // dia sem intervalo cadastrado como "fechado" quando o setor nunca
       // teve a intenção de restringir horário nenhum.
-      if (!setor.schedule_enabled) return channel.mensagem_saudacao;
+      if (!setor.schedule_enabled) return { texto: channel.mensagem_saudacao, comAnexo: true };
 
       const intervalos = await this.departmentsRepository.findSchedule(setor.id);
 
@@ -189,20 +200,29 @@ export class SupportChatsService {
           (i) => i.weekday === diaAtual && i.start_time <= horaAtual && horaAtual < i.end_time,
         );
 
-      if (disponivel) return channel.mensagem_saudacao;
+      if (disponivel) return { texto: channel.mensagem_saudacao, comAnexo: true };
 
       if (!primeiroFechado) primeiroFechado = setor;
     }
 
-    return primeiroFechado?.absence_message ?? channel.mensagem_saudacao;
+    return primeiroFechado
+      ? { texto: primeiroFechado.absence_message, comAnexo: false }
+      : { texto: channel.mensagem_saudacao, comAnexo: true };
   }
 
+  /**
+   * `copiaAnexo` só roda quando o texto realmente vai sair - buscar o anexo
+   * antes seria copiar mídia no storage para uma mensagem que pode nem ser
+   * enviada (contato sem `remote_jid`, texto vazio depois das variáveis).
+   */
   private async enviaMensagemAutomatica(
     supportChat: SupportChats,
     texto: string | null | undefined,
+    copiaAnexo?: () => ReturnType<ChannelsService['copiaAnexoSaudacaoParaEnvio']>,
   ): Promise<void> {
     const mensagem = montaMensagemAutomatica(texto, supportChat);
-    if (!mensagem) return;
+    const anexo = copiaAnexo ? await copiaAnexo() : null;
+    if (!mensagem && !anexo) return;
 
     try {
       const destino = supportChat.contact?.remote_jid;
@@ -212,11 +232,17 @@ export class SupportChatsService {
       }
 
       const enviadoEm = new Date();
-      const enviada = await this.whatsappService.sendMessage(
-        supportChat.channel.session_id,
-        destino,
-        mensagem,
-      );
+
+      const enviada = anexo
+        ? await this.whatsappService.sendMedia(supportChat.channel.session_id, {
+            to: destino,
+            mediaType: anexo.media_type as SendMediaType,
+            media: anexo.media_url,
+            mimetype: anexo.mimetype,
+            caption: mensagem || undefined,
+            fileName: anexo.file_name,
+          })
+        : await this.whatsappService.sendMessage(supportChat.channel.session_id, destino, mensagem);
 
       await runInTransaction(this.dataSource, (manager) =>
         this.messagesService.saveOutgoing(
@@ -225,8 +251,11 @@ export class SupportChatsService {
             channel: supportChat.channel,
             supportChat,
             to: destino,
-            content: mensagem,
-            type: MessageTypes.TEXT,
+            content: mensagem ?? '',
+            type: anexo ? TIPO_INTERNO_POR_MIDIA[anexo.media_type as SendMediaType] : MessageTypes.TEXT,
+            mediaUrl: anexo?.media_key,
+            mediaType: anexo?.mimetype,
+            fileName: anexo?.file_name,
             sentAt: enviadoEm,
           },
           manager,
@@ -787,8 +816,14 @@ export class SupportChatsService {
       // chatbot, o texto ainda pode ser trocado pela mensagem de ausência de
       // um setor fora do horário (ver `decideMensagemDeAbertura`).
       if (!chatbotParaEnfileirar) {
-        const texto = await this.decideMensagemDeAbertura(conversa.channel);
-        await this.enviaMensagemAutomatica(conversa, texto);
+        const { texto, comAnexo } = await this.decideMensagemDeAbertura(conversa.channel);
+        await this.enviaMensagemAutomatica(
+          conversa,
+          texto,
+          comAnexo
+            ? () => this.channelsService.copiaAnexoSaudacaoParaEnvio(conversa.channel.id)
+            : undefined,
+        );
       }
 
       await this.enviaAvisosAtivos(conversa);
@@ -1097,6 +1132,34 @@ export class SupportChatsService {
   }
 
   /**
+   * O setor a gravar na conversa nova, validado contra os do atendente.
+   *
+   * Atendente associado a setor(es) só pode escolher um dos seus - sem isso,
+   * o `department_id` do corpo seria uma entrada livre, e qualquer atendente
+   * poderia gravar uma conversa em nome de um setor que não é dele. Sem setor
+   * nenhum associado, a restrição não se aplica (mesma regra do front: quem
+   * não tem setor vê e pode escolher qualquer um).
+   */
+  private async validaSetorDoAtendente(
+    user_id: number,
+    department_id?: number,
+  ): Promise<number | null> {
+    if (!department_id) return null;
+
+    const atendente = await this.userRepository.findByIdComSetores(user_id);
+    const setoresDoAtendente = atendente.departments ?? [];
+
+    if (setoresDoAtendente.length === 0) return department_id;
+
+    const pertence = setoresDoAtendente.some((setor) => setor.id === department_id);
+    if (!pertence) {
+      throw new BadRequestException('Você não pertence a este setor.');
+    }
+
+    return department_id;
+  }
+
+  /**
    * Cria uma conversa do zero, sem esperar uma mensagem chegar pelo webhook -
    * o atendente escolhe quem vai atender (contato existente ou número novo)
    * e por qual canal, e já nasce dono dela (`EM_ANDAMENTO`), pronta para
@@ -1113,6 +1176,7 @@ export class SupportChatsService {
     }
 
     const channel = await this.channelsRepository.findByIdConectado(dto.channel_id);
+    const departmentId = await this.validaSetorDoAtendente(user_id, dto.department_id);
 
     const { supportChat, criada } = await runInTransaction(this.dataSource, async (manager) => {
       const contactId = dto.contact_id
@@ -1124,6 +1188,7 @@ export class SupportChatsService {
         channel.id,
         manager,
         user_id,
+        departmentId,
       );
 
       // Só promove a dono quem de fato criou agora - uma conversa que já
@@ -1296,7 +1361,13 @@ export class SupportChatsService {
     // `sem_despedida` pula o envio: há conversa que termina com o cliente já
     // resolvido e despedido, e repetir o texto padrão soa automático.
     if (!dto.sem_despedida) {
-      await this.enviaMensagemAutomatica(supportChat, supportChat.channel?.mensagem_despedida);
+      await this.enviaMensagemAutomatica(
+        supportChat,
+        supportChat.channel?.mensagem_despedida,
+        supportChat.channel?.id
+          ? () => this.channelsService.copiaAnexoDespedidaParaEnvio(supportChat.channel.id)
+          : undefined,
+      );
     }
 
     const afetadas = await runInTransaction(this.dataSource, (manager) =>

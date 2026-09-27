@@ -327,8 +327,13 @@ export class UsersService {
   }
 
   async userInfo(user_id: number) {
-    const user = await this.usersRepository.findById(user_id);
+    const user = await this.usersRepository.findByIdComSetores(user_id);
     const userWithAvatar = await this.getUserWithURLAvatar(user);
+
+    // Só `id`/`name`: o registro completo de `Departments` (horários,
+    // `schedule_enabled` etc.) não cabe no orçamento do cookie, e o front só
+    // usa isso para filtrar o dropdown de setor do "Novo atendimento".
+    const departments = (user.departments ?? []).map((d) => ({ id: d.id, name: d.name }));
 
     // Só os nomes, não os registros inteiros.
     //
@@ -350,7 +355,7 @@ export class UsersService {
     // quatro booleanos.
     const preferencias = await this.userConfigService.paraUsuario(user_id);
 
-    return { ...userWithAvatar, permissions, ...preferencias };
+    return { ...userWithAvatar, permissions, departments, ...preferencias };
   }
 
   /**

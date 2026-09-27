@@ -1,13 +1,13 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { Queue } from 'bullmq';
 
 import { ChannelsRepository } from 'channels/channels.repository';
 import { Channels } from 'channels/entities/channels.entity';
 import { DataTypeWhatsapp, MessageMedia, WhatsappWebhookPayload } from '@types';
 import { EvolutionMapper } from './providers/evolution/evolution.mapper';
+import { EvolutionProvider } from './providers/evolution/evolution.provider';
 import { EvolutionWebhookBody } from './providers/evolution/evolution.types';
-import { ProviderFactory } from './providers/provider.factory';
 import {
   ProviderClientInfo,
   ProviderConnectionStatus,
@@ -23,9 +23,9 @@ import { WhatsappGateway } from './whatsapp.gateway';
  * Fachada de WhatsApp da aplicação.
  *
  * Mantém as filas, o roteamento de webhooks e a emissão de eventos por socket,
- * delegando as chamadas ao provider resolvido para o canal. Os consumidores
- * (`ChannelsService`, `SupportChatsService`, `ContactsService`, `MessagesService`)
- * seguem chamando por `sessionId`, sem conhecer qual provider está por trás.
+ * delegando as chamadas ao `EvolutionProvider` (único gateway suportado hoje).
+ * Os consumidores (`ChannelsService`, `SupportChatsService`, `ContactsService`,
+ * `MessagesService`) seguem chamando por `sessionId`, sem conhecer o provider.
  */
 @Injectable()
 export class WhatsappService {
@@ -37,7 +37,7 @@ export class WhatsappService {
     @InjectQueue('whatsapp-session-queue')
     private readonly sessionQueue: Queue<WhatsappWebhookPayload>,
     private readonly whatsappGateway: WhatsappGateway,
-    private readonly providerFactory: ProviderFactory,
+    private readonly evolutionProvider: EvolutionProvider,
     @Inject(forwardRef(() => ChannelsRepository))
     private readonly channelsRepository: ChannelsRepository,
   ) {}
@@ -212,9 +212,7 @@ export class WhatsappService {
     // dela, e `findBySessionId` não traz a coluna (`select: false`) - o canal
     // chegaria sem ele e a chamada cairia na chave global.
     const channel = await this.channelsRepository.findBySessionIdWithToken(sessionId);
-    const { provider, session } = await this.providerFactory.forChannel(channel);
-
-    const result = await provider.requestConnection(session);
+    const result = await this.evolutionProvider.requestConnection(this.sessaoDoCanal(channel));
 
     // A Evolution devolve o token da instância apenas na criação.
     if (result.instanceToken) {
@@ -354,10 +352,25 @@ export class WhatsappService {
     return provider.deleteMessage(session, chatId, messageId, fromMe);
   }
 
-  /** Canal + provider + sessão a partir do `session_id`. */
+  /** Provider + sessão a partir do `session_id`. */
   private async resolve(sessionId: string) {
     const channel = await this.channelsRepository.findBySessionIdWithToken(sessionId);
-    return this.providerFactory.forChannel(channel);
+    return { provider: this.evolutionProvider, session: this.sessaoDoCanal(channel) };
+  }
+
+  /** A referência de sessão que o provider espera, a partir do canal carregado. */
+  private sessaoDoCanal(
+    channel: Pick<Channels, 'id' | 'session_id'> & { instance_token?: string | null },
+  ) {
+    if (!channel.session_id) {
+      throw new BadRequestException('O canal não possui uma sessão associada.');
+    }
+
+    return {
+      sessionId: channel.session_id,
+      instanceToken: channel.instance_token ?? null,
+      channelId: channel.id,
+    };
   }
 
   /** Exposto para o webhook validar o segredo da integração do canal. */

@@ -26,6 +26,10 @@ export class Departments {
   @Column({ type: 'varchar', length: 255, nullable: true, default: null })
   description: string | null;
 
+  /** Cor do setor, `#RRGGBB` - mesmo formato de `tags.color`. */
+  @Column({ type: 'varchar', length: 7, nullable: true, default: null })
+  color: string | null;
+
   /** Texto exibido ao contato fora do horário configurado - vazio quando o
    * setor não tem horário (sempre disponível) ou simplesmente não define uma
    * mensagem própria. */

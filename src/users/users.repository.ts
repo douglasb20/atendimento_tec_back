@@ -69,6 +69,26 @@ export class UserRepository extends Repository<Users> {
     return user;
   }
 
+  /**
+   * Como `findById`, mas com os setores carregados.
+   *
+   * Separado, e não um `relations` a mais em `findById`: aquele roda em toda
+   * validação de token (`auth.service.ts`), e o join de setores pesaria numa
+   * consulta que já acontece a cada requisição autenticada. Aqui é só para o
+   * `userInfo`, que o front chama uma vez por sessão/refresh.
+   */
+  async findByIdComSetores(id: number) {
+    const user = await this.findOne({
+      where: { id: id, status: 1 },
+      relations: ['permissionGroup', 'departments'],
+    });
+    if (!user) {
+      this.logger.error(`Erro de atualizar usuário: Usuário não localizado com este id`);
+      throw new BadRequestException('Usuário não localizado com este id');
+    }
+    return user;
+  }
+
   async createUser(user: CreateUserDto, manager: EntityManager) {
     const newUser = this.create({
       ...user,

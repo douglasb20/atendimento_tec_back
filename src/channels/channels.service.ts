@@ -2,12 +2,18 @@ import { runInTransaction } from '@/Utils';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ChannelStatus, WhatsappWebhookPayload } from '@types';
 import { randomUUID } from 'node:crypto';
+import { extname } from 'node:path';
 import { DataSource, EntityManager } from 'typeorm';
 import { WhatsappService } from 'whatsapp/whatsapp.service';
 import { DepartmentsRepository } from '@/departments/departments.repository';
+import { PresignedUpload, StorageService } from '@/storage/storage.service';
 import { ChannelsRepository } from './channels.repository';
+import { AssinarAnexoCanalDto } from './dto/assinar-anexo-canal.dto';
 import { CreateOrChannelDto } from './dto/create-or-channel.dto';
 import { Channels } from './entities/channels.entity';
+
+/** Onde os anexos de saudação/despedida vivem. O cron de retenção não varre este prefixo. */
+const PREFIXO_ANEXO = 'channels';
 
 @Injectable()
 export class ChannelsService {
@@ -16,6 +22,7 @@ export class ChannelsService {
     private readonly channelsRepository: ChannelsRepository,
     private readonly whatsappService: WhatsappService,
     private readonly departmentsRepository: DepartmentsRepository,
+    private readonly storageService: StorageService,
     private dataSource: DataSource,
   ) {}
 
@@ -50,6 +57,11 @@ export class ChannelsService {
   async updateChannel(channelId: number, createChannelDto: CreateOrChannelDto): Promise<Channels> {
     const channel = await this.findChannel(channelId);
     const { department_ids, ...dadosDoCanal } = createChannelDto;
+
+    // O anexo antigo sai do storage quando é trocado ou removido: sem isto o
+    // bucket acumularia arquivos que nada mais referencia.
+    await this.removeAnexoTrocado(channel.saudacao_anexo_key, dadosDoCanal.saudacao_anexo_key);
+    await this.removeAnexoTrocado(channel.despedida_anexo_key, dadosDoCanal.despedida_anexo_key);
 
     const channelUpdated = this.channelsRepository.create({
       ...channel,
@@ -112,14 +124,11 @@ export class ChannelsService {
    * substituía o canal da listagem por essa versão incompleta. O aviso de
    * sincronização passava a dizer que o status anterior era "desconhecido",
    * mesmo estando na tela um instante antes.
-   *
-   * `integration` entra pelo mesmo motivo que na listagem: é o que distingue
-   * um canal na integração padrão de outro com servidor próprio.
    */
   async findChannel(channelId: number): Promise<Channels> {
     const channel = await this.channelsRepository.findOne({
       where: { id: channelId },
-      relations: ['channelStatus', 'integration'],
+      relations: ['channelStatus'],
     });
     if (!channel) {
       this.logger.error(`Erro ao localizar canal: Canal não encontrado com este id`);
@@ -144,7 +153,115 @@ export class ChannelsService {
       .of(channelId)
       .loadMany();
 
-    return channel;
+    return this.comUrlDosAnexos(channel);
+  }
+
+  /**
+   * URL assinada para subir o anexo da saudação ou da despedida.
+   *
+   * ⚠️ O prefixo é fixo aqui, não vem do corpo: o `sign-media-post` do chat
+   * aceita o caminho de quem chama, o que deixa qualquer autenticado escrever
+   * onde quiser no bucket.
+   *
+   * A extensão sai do **nome original** - derivá-la do mimetype produz
+   * `.vnd.openxmlformats-officedocument.wordprocessingml.document` num
+   * `.docx`, e aqui o arquivo fica com esse nome para sempre.
+   */
+  async assinarAnexo(dto: AssinarAnexoCanalDto): Promise<PresignedUpload> {
+    const extensao = extname(dto.fileName) || '';
+    const key = `${PREFIXO_ANEXO}/${randomUUID()}${extensao}`;
+
+    return this.storageService.createPresignedPost(key, dto.fileType);
+  }
+
+  /**
+   * Uma cópia descartável do anexo da saudação, para ser enviada como mídia.
+   *
+   * ⚠️ **É isto que protege o cadastro.** A mensagem enviada guarda a key da
+   * mídia, e o cron de retenção apaga por essa key depois de alguns meses, sem
+   * olhar prefixo. Se a mensagem apontasse para o arquivo do cadastro, o
+   * primeiro envio o condenaria - e a saudação de todo mundo quebraria de uma
+   * vez, em silêncio.
+   */
+  async copiaAnexoSaudacaoParaEnvio(channelId: number) {
+    const channel = await this.findChannel(channelId);
+    return this.copiaAnexoParaEnvio(
+      channel.saudacao_anexo_key,
+      channel.saudacao_anexo_nome,
+      channel.saudacao_anexo_mimetype,
+      channel.saudacao_anexo_tipo,
+    );
+  }
+
+  /** Mesma proteção da saudação, para o anexo da despedida. */
+  async copiaAnexoDespedidaParaEnvio(channelId: number) {
+    const channel = await this.findChannel(channelId);
+    return this.copiaAnexoParaEnvio(
+      channel.despedida_anexo_key,
+      channel.despedida_anexo_nome,
+      channel.despedida_anexo_mimetype,
+      channel.despedida_anexo_tipo,
+    );
+  }
+
+  private async copiaAnexoParaEnvio(
+    anexoKey: string | null,
+    anexoNome: string | null,
+    anexoMimetype: string | null,
+    anexoTipo: string | null,
+  ): Promise<{
+    media_key: string;
+    media_url: string;
+    media_type: string;
+    mimetype: string;
+    file_name: string;
+  } | null> {
+    if (!anexoKey) return null;
+
+    const extensao = extname(anexoNome ?? '') || extname(anexoKey) || '';
+    const destino = `chat/media/${randomUUID()}${extensao}`;
+
+    await this.storageService.copyObject(anexoKey, destino);
+
+    return {
+      media_key: destino,
+      media_url: this.storageService.getPublicUrl(destino),
+      media_type: anexoTipo,
+      mimetype: anexoMimetype,
+      file_name: anexoNome,
+    };
+  }
+
+  /** A coluna guarda a key; a tela precisa da URL para mostrar o anexo. */
+  private comUrlDosAnexos(channel: Channels): Channels {
+    const comUrl = channel as Channels & {
+      saudacao_anexo_url?: string;
+      despedida_anexo_url?: string;
+    };
+
+    if (channel.saudacao_anexo_key) {
+      comUrl.saudacao_anexo_url = this.storageService.getPublicUrl(channel.saudacao_anexo_key);
+    }
+    if (channel.despedida_anexo_key) {
+      comUrl.despedida_anexo_url = this.storageService.getPublicUrl(channel.despedida_anexo_key);
+    }
+
+    return comUrl;
+  }
+
+  /** Falha ao apagar não derruba a operação: o cadastro já foi alterado. */
+  private async removeAnexoTrocado(
+    keyAtual: string | null,
+    keyNova: string | null | undefined,
+  ): Promise<void> {
+    const trocou = keyNova !== undefined && keyNova !== keyAtual;
+    if (!trocou || !keyAtual) return;
+
+    try {
+      await this.storageService.deleteObject(keyAtual);
+    } catch (err) {
+      this.logger.warn(`Não foi possível remover o anexo ${keyAtual}: ${err.message}`);
+    }
   }
 
   async startSession(channelId: number): Promise<void> {

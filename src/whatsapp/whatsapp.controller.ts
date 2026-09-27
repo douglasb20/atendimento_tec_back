@@ -11,7 +11,6 @@ import {
 } from '@nestjs/common';
 import { timingSafeEqual } from 'node:crypto';
 
-import { IntegrationsService } from 'integrations/integrations.service';
 import { EvolutionWebhookDto } from './dto/evolution-webhook.dto';
 import { WhatsappService } from './whatsapp.service';
 
@@ -19,10 +18,7 @@ import { WhatsappService } from './whatsapp.service';
 export class WhatsappController {
   private readonly logger = new Logger(WhatsappController.name);
 
-  constructor(
-    private readonly whatsappService: WhatsappService,
-    private readonly integrationsService: IntegrationsService,
-  ) {}
+  constructor(private readonly whatsappService: WhatsappService) {}
 
   /**
    * Recebe os eventos do provider.
@@ -47,7 +43,7 @@ export class WhatsappController {
       throw new BadRequestException('Instância não vinculada a nenhum canal');
     }
 
-    await this.assertAuthorized(channel.integration_id, webhookSecret);
+    this.assertAuthorized(webhookSecret);
 
     // Falhas aqui sobem como 5xx de propósito: são transitórias e vale reentregar.
     await this.whatsappService.processWebhook({
@@ -64,18 +60,14 @@ export class WhatsappController {
   }
 
   /**
-   * Valida o segredo configurado na integração. Usamos um header próprio porque
-   * o campo `apikey` do corpo da Evolution vem nulo por padrão.
+   * Valida o segredo configurado em `EVOLUTION_WEBHOOK_SECRET`. Usamos um
+   * header próprio porque o campo `apikey` do corpo da Evolution vem nulo por
+   * padrão.
    */
-  private async assertAuthorized(
-    integrationId: number | null,
-    receivedSecret?: string,
-  ): Promise<void> {
-    const expectedSecret = integrationId
-      ? await this.integrationsService.getWebhookSecret(integrationId)
-      : null;
+  private assertAuthorized(receivedSecret?: string): void {
+    const expectedSecret = process.env.EVOLUTION_WEBHOOK_SECRET;
 
-    // Integração sem segredo definido (ex.: canal legado) não bloqueia o fluxo.
+    // Sem segredo configurado no ambiente, não há o que validar.
     if (!expectedSecret) return;
 
     if (!receivedSecret || !this.secretsMatch(receivedSecret, expectedSecret)) {

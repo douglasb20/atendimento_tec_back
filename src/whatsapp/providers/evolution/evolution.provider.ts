@@ -1,8 +1,12 @@
-import { BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import axios, { AxiosInstance, isAxiosError } from 'axios';
 
 import { MessageMedia } from '@types';
-import { ResolvedIntegration } from 'integrations/integrations.service';
 import {
   ProviderClientInfo,
   ProviderConnectionResult,
@@ -65,38 +69,60 @@ const MEDIA_TYPE_MAP: Record<ProviderMediaType, string> = {
 /**
  * Implementação do provider para a Evolution API v2.3.7 (Baileys).
  *
- * Cada instância é construída para uma integração específica: a URL base e a
- * apikey vêm do banco, não de variáveis de ambiente, porque podem coexistir
- * várias integrações.
+ * Singleton lido de variáveis de ambiente: o sistema nunca tem mais de um
+ * gateway WhatsApp não-oficial ativo ao mesmo tempo, então não há mais
+ * sentido em "integração" como entidade configurável em banco - trocar de
+ * gateway no futuro substitui este provider inteiro, não uma linha de tabela.
  */
+@Injectable()
 export class EvolutionProvider implements WhatsappProvider {
   readonly slug = 'evolution';
 
   private readonly logger = new Logger(EvolutionProvider.name);
   private readonly http: AxiosInstance;
+  private readonly webhookUrl: string;
+  private readonly webhookSecret: string;
 
-  constructor(
-    private readonly integration: ResolvedIntegration,
-    private readonly webhookUrl: string,
-  ) {
-    if (!integration.base_url) {
-      throw new BadRequestException(
-        `A integração "${integration.name}" não tem base_url configurada.`,
-      );
+  constructor() {
+    const baseUrl = process.env.EVOLUTION_BASE_URL;
+
+    // Quebra o boot, não uma requisição - mesmo espírito de `CRYPTO_KEY`/
+    // `CRYPTO_IV`: um provider parcialmente configurado só explodiria no
+    // primeiro uso, e tarde demais para ser óbvio o motivo.
+    if (!baseUrl) {
+      throw new Error('EVOLUTION_BASE_URL não configurada.');
     }
 
+    this.webhookSecret = process.env.EVOLUTION_WEBHOOK_SECRET ?? '';
+    this.webhookUrl = this.resolveWebhookUrl();
+
     this.http = axios.create({
-      baseURL: integration.base_url.replace(/\/+$/, ''),
+      baseURL: baseUrl.replace(/\/+$/, ''),
       headers: {
         'Content-Type': 'application/json',
         // A Evolution autentica por um header `apikey` simples (não Bearer).
         // Este é o padrão: a chave **global**, necessária para criar, listar e
         // remover instâncias. As operações sobre uma instância específica o
         // sobrescrevem com o token dela - ver `comToken`.
-        apikey: integration.credentials?.apiKey ?? '',
+        apikey: process.env.EVOLUTION_API_KEY ?? '',
       },
       timeout: 30_000,
     });
+  }
+
+  /** `EVOLUTION_WEBHOOK_URL` explícita, ou `APP_SERVER` como fallback. */
+  private resolveWebhookUrl(): string {
+    if (process.env.EVOLUTION_WEBHOOK_URL) {
+      return process.env.EVOLUTION_WEBHOOK_URL;
+    }
+
+    const base = (process.env.APP_SERVER ?? '').replace(/\/+$/, '');
+
+    if (!base) {
+      throw new Error('Configure EVOLUTION_WEBHOOK_URL ou APP_SERVER.');
+    }
+
+    return `${base}/api/whatsapp/webhook`;
   }
 
   /**
@@ -668,7 +694,7 @@ export class EvolutionProvider implements WhatsappProvider {
           // Segredo próprio: o campo `apikey` do corpo do webhook vem nulo por padrão.
           headers: {
             'Content-Type': 'application/json',
-            'x-webhook-secret': this.integration.webhook_secret ?? '',
+            'x-webhook-secret': this.webhookSecret,
           },
         },
       });

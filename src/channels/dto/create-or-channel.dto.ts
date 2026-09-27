@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -7,6 +8,8 @@ import {
   MaxLength,
   ValidateIf,
 } from 'class-validator';
+
+import { TipoAnexoChannel } from '../entities/channels.entity';
 
 /**
  * Teto das mensagens automáticas.
@@ -17,23 +20,12 @@ import {
  */
 const LIMITE_MENSAGEM = 1000;
 
+const TIPOS_ANEXO: TipoAnexoChannel[] = ['image', 'video', 'audio', 'document'];
+
 export class CreateOrChannelDto {
   @IsString({ message: (opt) => `Campo ${opt.property} aceita somente formato string` })
   @IsNotEmpty({ message: (opt) => `Campo ${opt.property} é obrigatório` })
   name: string;
-
-  /**
-   * Integração que atende este canal. Opcional: sem ela, o canal cai na
-   * integração marcada como padrão - o que basta enquanto houver um servidor
-   * de provider só. Informar passa a importar quando coexistem vários
-   * (produção e homologação, ou um cliente com Evolution própria).
-   */
-  // `ValidateIf` em vez de `IsOptional`: o front manda `null` explicitamente
-  // para dizer "usar a integração padrão", e o `IsOptional` sozinho deixaria
-  // passar, mas o `IsInt` recusaria o nulo vindo no corpo.
-  @ValidateIf((_, valor) => valor !== null && valor !== undefined)
-  @IsInt({ message: 'Selecione uma integração válida' })
-  integration_id?: number | null;
 
   /**
    * Enviada sozinha quando um contato abre uma conversa nova.
@@ -48,6 +40,35 @@ export class CreateOrChannelDto {
   })
   mensagem_saudacao?: string | null;
 
+  /**
+   * O anexo é opcional, mas **indivisível**: sem a key não há o que enviar, e
+   * sem nome/mimetype/tipo o provider não sabe como tratar o arquivo. Por isso
+   * os quatro campos são exigidos juntos quando a key vem - mesma regra de
+   * `quick_replies`.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  saudacao_anexo_key?: string | null;
+
+  @ValidateIf((dto: CreateOrChannelDto) => Boolean(dto.saudacao_anexo_key))
+  @IsString()
+  @IsNotEmpty({ message: 'O anexo da saudação precisa de um nome de arquivo' })
+  @MaxLength(255)
+  saudacao_anexo_nome?: string | null;
+
+  @ValidateIf((dto: CreateOrChannelDto) => Boolean(dto.saudacao_anexo_key))
+  @IsString()
+  @IsNotEmpty({ message: 'O anexo da saudação precisa de um mimetype' })
+  @MaxLength(100)
+  saudacao_anexo_mimetype?: string | null;
+
+  @ValidateIf((dto: CreateOrChannelDto) => Boolean(dto.saudacao_anexo_key))
+  @IsIn(TIPOS_ANEXO, {
+    message: `O tipo do anexo da saudação deve ser um de: ${TIPOS_ANEXO.join(', ')}`,
+  })
+  saudacao_anexo_tipo?: TipoAnexoChannel | null;
+
   /** Enviada ao finalizar o atendimento. Mesmas regras da saudação. */
   @IsOptional()
   @IsString({ message: 'A mensagem de despedida precisa ser um texto' })
@@ -55,6 +76,30 @@ export class CreateOrChannelDto {
     message: `A mensagem de despedida deve ter no máximo ${LIMITE_MENSAGEM} caracteres`,
   })
   mensagem_despedida?: string | null;
+
+  /** Anexo da despedida - independente do de saudação, mesmas regras dele. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  despedida_anexo_key?: string | null;
+
+  @ValidateIf((dto: CreateOrChannelDto) => Boolean(dto.despedida_anexo_key))
+  @IsString()
+  @IsNotEmpty({ message: 'O anexo da despedida precisa de um nome de arquivo' })
+  @MaxLength(255)
+  despedida_anexo_nome?: string | null;
+
+  @ValidateIf((dto: CreateOrChannelDto) => Boolean(dto.despedida_anexo_key))
+  @IsString()
+  @IsNotEmpty({ message: 'O anexo da despedida precisa de um mimetype' })
+  @MaxLength(100)
+  despedida_anexo_mimetype?: string | null;
+
+  @ValidateIf((dto: CreateOrChannelDto) => Boolean(dto.despedida_anexo_key))
+  @IsIn(TIPOS_ANEXO, {
+    message: `O tipo do anexo da despedida deve ser um de: ${TIPOS_ANEXO.join(', ')}`,
+  })
+  despedida_anexo_tipo?: TipoAnexoChannel | null;
 
   /**
    * Os setores atendidos por este canal. Pode ser mais de um, como no

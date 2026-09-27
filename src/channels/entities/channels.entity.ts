@@ -14,8 +14,10 @@ import {
 import { ChannelStatus } from './channel-status.entity';
 import { SupportChats } from 'support-chats/entities/support-chats.entity';
 import { SupportChatMessages } from 'support-chats/messages/entities/support-chat-messages.entity';
-import { Integrations } from 'integrations/entities/integrations.entity';
 import { Departments } from '@/departments/entities/departments.entity';
+
+/** Tipos de anexo aceitos, no vocabulário que o provider entende. */
+export type TipoAnexoChannel = 'image' | 'video' | 'audio' | 'document';
 
 @Entity('channels')
 export class Channels {
@@ -35,10 +37,6 @@ export class Channels {
   @Column({ type: 'int', nullable: false })
   channel_status_id: number;
 
-  /** Integração usada por este canal. Nulo cai na integração padrão. */
-  @Column({ type: 'int', nullable: true })
-  integration_id: number | null;
-
   /** Token da própria instância, devolvido pela Evolution como `hash` no create. */
   @Column({ type: 'varchar', length: 255, nullable: true, select: false })
   instance_token: string | null;
@@ -56,9 +54,43 @@ export class Channels {
   @Column({ type: 'text', nullable: true })
   mensagem_saudacao: string | null;
 
+  /**
+   * A `key` do anexo da saudação no storage, **não a URL** - como
+   * `mensagem_saudacao` guarda o texto cru, sem as variáveis resolvidas.
+   *
+   * Fica em `channels/`, prefixo que o cron de retenção não varre: o arquivo é
+   * do cadastro e precisa durar. No envio, o backend copia para `chat/media/`
+   * e a mensagem referencia a cópia.
+   */
+  @Column({ type: 'varchar', length: 255, nullable: true, default: null })
+  saudacao_anexo_key: string | null;
+
+  /** O nome original do arquivo, que o WhatsApp exibe ao destinatário. */
+  @Column({ type: 'varchar', length: 255, nullable: true, default: null })
+  saudacao_anexo_nome: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true, default: null })
+  saudacao_anexo_mimetype: string | null;
+
+  @Column({ type: 'varchar', length: 10, nullable: true, default: null })
+  saudacao_anexo_tipo: TipoAnexoChannel | null;
+
   /** Enviada ao finalizar o atendimento. Mesmas regras da saudação. */
   @Column({ type: 'text', nullable: true })
   mensagem_despedida: string | null;
+
+  /** Anexo da despedida - independente do de saudação, mesmas regras dele. */
+  @Column({ type: 'varchar', length: 255, nullable: true, default: null })
+  despedida_anexo_key: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true, default: null })
+  despedida_anexo_nome: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true, default: null })
+  despedida_anexo_mimetype: string | null;
+
+  @Column({ type: 'varchar', length: 10, nullable: true, default: null })
+  despedida_anexo_tipo: TipoAnexoChannel | null;
 
   @Column({ type: 'timestamptz', nullable: true })
   connected_at: Date | null;
@@ -80,10 +112,6 @@ export class Channels {
   @ManyToOne(() => ChannelStatus, (channelStatus) => channelStatus.channels)
   @JoinColumn({ name: 'channel_status_id' })
   channelStatus: ChannelStatus;
-
-  @ManyToOne(() => Integrations, (integration) => integration.channels)
-  @JoinColumn({ name: 'integration_id' })
-  integration: Integrations;
 
   @OneToMany(() => SupportChats, (supportChat) => supportChat.channel)
   supportChats: SupportChats[];

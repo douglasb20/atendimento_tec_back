@@ -15,6 +15,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Permissions } from 'permissions/permissions.decorator';
 import { PermissionGuard } from 'permissions/permissions.guard';
 import { ChannelsService } from './channels.service';
+import { AssinarAnexoCanalDto } from './dto/assinar-anexo-canal.dto';
 import { CreateOrChannelDto } from './dto/create-or-channel.dto';
 
 @Controller('channels')
@@ -119,5 +120,14 @@ export class ChannelsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeChannel(@Param('channelId') channelId: number) {
     return this.channelsService.removeChannel(channelId);
+  }
+
+  /** Assinatura para subir o anexo da saudação ou da despedida. O prefixo é fixo no servidor. */
+  @Post('/assinar-anexo')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('channel:add', 'channel:update')
+  @HttpCode(HttpStatus.OK)
+  async assinarAnexo(@Body() assinarAnexoDto: AssinarAnexoCanalDto) {
+    return this.channelsService.assinarAnexo(assinarAnexoDto);
   }
 }

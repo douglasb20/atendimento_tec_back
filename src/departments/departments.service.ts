@@ -44,6 +44,7 @@ export class DepartmentsService {
       const salvo = await manager.save(Departments, {
         name,
         description: dto.description?.trim() || null,
+        color: dto.color || null,
       });
 
       this.logger.log(`Setor criado: ${salvo.name} (id ${salvo.id})`);
@@ -67,6 +68,7 @@ export class DepartmentsService {
         ...setor,
         ...(name && { name }),
         ...(dto.description !== undefined && { description: dto.description?.trim() || null }),
+        ...(dto.color !== undefined && { color: dto.color || null }),
       });
 
       this.logger.log(`Setor atualizado: id ${id}`);

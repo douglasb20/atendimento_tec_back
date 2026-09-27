@@ -7,6 +7,7 @@ import { ChannelStatus } from './entities/channel-status.entity';
 import { Channels } from './entities/channels.entity';
 
 import { DepartmentsModule } from '@/departments/departments.module';
+import { StorageModule } from '@/storage/storage.module';
 import { WhatsappModule } from 'whatsapp/whatsapp.module';
 import { ChannelsController } from './channels.controller';
 import { ChannelsListener } from './channels.listener';
@@ -18,6 +19,7 @@ import { ChannelsService } from './channels.service';
     TypeOrmModule.forFeature([SupportChats, SupportChatMessages, ChannelStatus, Channels]),
     forwardRef(() => WhatsappModule),
     DepartmentsModule,
+    StorageModule,
   ],
   controllers: [ChannelsController],
   providers: [ChannelsService, ChannelsRepository, ChannelsListener],

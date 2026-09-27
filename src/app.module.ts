@@ -26,7 +26,6 @@ import { ChannelsModule } from '@/channels/channels.module';
 import { ContactsModule } from '@/contacts/contacts.module';
 import { StorageModule } from '@/storage/storage.module';
 import { RedisCacheModule } from '@/redis-cache/redis-cache.module';
-import { IntegrationsModule } from '@/integrations/integrations.module';
 import { CustomFieldsModule } from '@/custom-fields/custom-fields.module';
 import { QuickRepliesModule } from '@/quick-replies/quick-replies.module';
 import { ServiceAlertsModule } from '@/service-alerts/service-alerts.module';
@@ -102,7 +101,6 @@ import { HealthModule } from '@/health/health.module';
     ContactsModule,
     StorageModule,
     RedisCacheModule,
-    IntegrationsModule,
     TagsModule,
     QuickRepliesModule,
     ServiceAlertsModule,
