@@ -100,7 +100,12 @@ export class UsersController {
 
   @Get()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('user:view')
+  // `support.chat:transfer`: o modal de transferir atendimento usa esta
+  // listagem só para montar o seletor de atendentes - sem o OR, um atendente
+  // sem `user:view` (a maioria) não conseguia transferir, mesmo com a
+  // permissão certa para a ação em si. Mesmo padrão já aplicado em
+  // `departments.controller.ts`.
+  @Permissions('user:view', 'support.chat:transfer')
   @HttpCode(HttpStatus.OK)
   async findAll() {
     return this.usersService.findAll();

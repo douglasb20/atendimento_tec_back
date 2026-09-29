@@ -51,6 +51,13 @@ export const CATALOGO = {
       'Ao abrir uma conversa, o atendimento anterior deste contato já vem carregado. Desligado, é preciso clicar em "Ver atendimentos anteriores" para ver o histórico.',
     padrao: false,
   },
+
+  mostrar_conteudo_mensagem_apagada: {
+    rotulo: 'Mostrar o conteúdo de mensagens apagadas',
+    descricao:
+      'Uma mensagem apagada pelo contato aparece com o texto original, marcada com um ícone. Desligado, mostra só "Mensagem apagada", sem o conteúdo.',
+    padrao: false,
+  },
 } as const satisfies Record<string, DefinicaoAjusteAtendimento>;
 
 export type ChaveAjusteAtendimento = keyof typeof CATALOGO;

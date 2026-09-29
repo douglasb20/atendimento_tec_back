@@ -230,15 +230,15 @@ export class MessagesService {
       messagePayload.protocolMessageKey.id,
     );
 
-    // O conteúdo é descartado junto: uma mensagem revogada não deve deixar
-    // rastro do texto original, nem no histórico nem na prévia da conversa.
+    // O conteúdo e o tipo originais ficam gravados - `is_deleted` é quem
+    // decide se aparecem na tela (ajuste global
+    // `mostrar_conteudo_mensagem_apagada`) e quem marca a prévia da conversa
+    // como "apagada" (`saveMessage` resolve o `lastMessage.type` a partir
+    // dele, não do `type` bruto). Antes o texto/mídia eram descartados aqui
+    // mesmo, sem essa opção, e o `type` virava `REVOKED` incondicionalmente.
     const updatedMessage = this.messagesRepository.create({
       ...messageToUpdate,
       is_deleted: true,
-      type: MessageTypes.REVOKED,
-      content: '',
-      media_url: null,
-      has_media: false,
     });
 
     return this.saveMessage(
@@ -638,7 +638,11 @@ export class MessagesService {
       if (support_chat && String(support_chat.id) === String(savedMessage.support_chat_id)) {
         savedMessageWithLastMessage.lastMessage = {
           id: savedMessage.message_id,
-          type: savedMessage.type,
+          // `is_deleted` decide a prévia, não o `type` bruto: a mensagem
+          // mantém o tipo original (imagem, áudio etc) para a bolha individual
+          // saber como renderizar o conteúdo quando o ajuste global mostra;
+          // a prévia da lista só precisa saber "apagada ou não".
+          type: savedMessage.is_deleted ? MessageTypes.REVOKED : savedMessage.type,
           content: savedMessage.content,
         };
       }
