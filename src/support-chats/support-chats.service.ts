@@ -252,7 +252,9 @@ export class SupportChatsService {
             supportChat,
             to: destino,
             content: mensagem ?? '',
-            type: anexo ? TIPO_INTERNO_POR_MIDIA[anexo.media_type as SendMediaType] : MessageTypes.TEXT,
+            type: anexo
+              ? TIPO_INTERNO_POR_MIDIA[anexo.media_type as SendMediaType]
+              : MessageTypes.TEXT,
             mediaUrl: anexo?.media_key,
             mediaType: anexo?.mimetype,
             fileName: anexo?.file_name,
@@ -674,8 +676,11 @@ export class SupportChatsService {
 
   // ====== Event Listeners Handles ======
   async onMessageCreate(payload: WhatsappWebhookPayload<MessagePayload>) {
-    let chatbotParaEnfileirar: { executionId: number; trigger: 'start' | 'resume'; resumeText?: string } | null =
-      null;
+    let chatbotParaEnfileirar: {
+      executionId: number;
+      trigger: 'start' | 'resume';
+      resumeText?: string;
+    } | null = null;
 
     const abertura = await runInTransaction(this.dataSource, async (manager) => {
       try {
@@ -795,7 +800,11 @@ export class SupportChatsService {
             supportChatMessages: this.messagesService.comUrlPublica(savedMessage),
           };
 
-          this.whatsappService.emitEvent('whatsapp:messages', supoportChatsWhitMessage);
+          await this.whatsappService.emitSupportChatMessage(
+            supportChat.user_id,
+            'whatsapp:messages',
+            supoportChatsWhitMessage,
+          );
         }
 
         // A saudação sai fora desta transação - ver abaixo. Só mensagem do
@@ -874,7 +883,10 @@ export class SupportChatsService {
     // humano), mesmo que ainda esteja `AGUARDANDO`.
     if (!conversaCriada) return null;
 
-    const chatbotEntrada = await this.chatbotsRepository.findEntradaAtivoDoCanal(channel.id, manager);
+    const chatbotEntrada = await this.chatbotsRepository.findEntradaAtivoDoCanal(
+      channel.id,
+      manager,
+    );
     if (!chatbotEntrada?.current_published_version_id) return null;
 
     const execucao = await this.chatbotFlowExecutionsService.iniciar(
@@ -969,7 +981,11 @@ export class SupportChatsService {
             supportChatMessages: this.messagesService.comUrlPublica(savedMessage),
           };
 
-          this.whatsappService.emitEvent('whatsapp:messages', supoportChatsWhitMessage);
+          await this.whatsappService.emitSupportChatMessage(
+            supportChat.user_id,
+            'whatsapp:messages',
+            supoportChatsWhitMessage,
+          );
         }
       } catch (err) {
         this.logger.error(`Erro ao processar mensagem edit: ${err.message}`);
@@ -1034,7 +1050,11 @@ export class SupportChatsService {
             supportChatMessages: this.messagesService.comUrlPublica(savedMessage),
           };
 
-          this.whatsappService.emitEvent('whatsapp:messages', supoportChatsWhitMessage);
+          await this.whatsappService.emitSupportChatMessage(
+            supportChat.user_id,
+            'whatsapp:messages',
+            supoportChatsWhitMessage,
+          );
         }
       } catch (err) {
         this.logger.error(`Erro ao processar mensagem: ${err.message}`);
@@ -1084,9 +1104,12 @@ export class SupportChatsService {
             // front renderiza direto, sem passar pela leitura HTTP.
             supportChatMessages: this.messagesService.comUrlPublica(savedMessage),
           };
-          this.whatsappService.emitEvent('whatsapp:messages', supoportChatsWhitMessage);
+          await this.whatsappService.emitSupportChatMessage(
+            supportChat.user_id,
+            'whatsapp:messages',
+            supoportChatsWhitMessage,
+          );
         }
-
       } catch (err) {
         this.logger.error(`Erro ao processar mensagem: ${err.message}`);
         throw err;
@@ -1203,7 +1226,12 @@ export class SupportChatsService {
       // existia (idempotência do `findOrOpenComSinal`) mantém o dono atual,
       // mesma regra de conflito que `iniciarAtendimento` já aplica.
       if (resultado.criada) {
-        await this.supportChatsRepository.assumir(resultado.supportChat.id, user_id, new Date(), manager);
+        await this.supportChatsRepository.assumir(
+          resultado.supportChat.id,
+          user_id,
+          new Date(),
+          manager,
+        );
       }
 
       return resultado;
@@ -1427,9 +1455,7 @@ export class SupportChatsService {
     }
 
     if (supportChat.support_chat_status_id === SupportChatStatusId.EM_ANDAMENTO) {
-      throw new BadRequestException(
-        'Este atendimento já foi iniciado; use a finalização normal',
-      );
+      throw new BadRequestException('Este atendimento já foi iniciado; use a finalização normal');
     }
 
     const afetadas = await runInTransaction(this.dataSource, (manager) =>
@@ -1531,12 +1557,7 @@ export class SupportChatsService {
     const motivo = dto.motivo?.trim() || null;
 
     const afetadas = await runInTransaction(this.dataSource, async (manager) => {
-      const linhas = await this.supportChatsRepository.transferir(
-        id,
-        user_id,
-        destinoId,
-        manager,
-      );
+      const linhas = await this.supportChatsRepository.transferir(id, user_id, destinoId, manager);
 
       // Só registra o evento se a troca de dono valeu: senão a conversa teria
       // no histórico uma transferência que não chegou a acontecer.
@@ -1637,21 +1658,24 @@ export class SupportChatsService {
     // (`findAllSupportChats`), agora aplicado também ao tempo real. Sem isto,
     // um atendimento assumido continuava visível para os outros atendentes até
     // o próximo reload, porque o broadcast geral não conhecia essa regra.
-    await this.whatsappService.emitSupportChatState(completo?.user_id ?? supportChat.user_id, 'whatsapp:chat_state', {
-      ...(completo ?? supportChat),
-      // Estes quatro vêm de quem chama, não da releitura: a prévia é calculada
-      // da mensagem recém-salva e o contador acabou de ser incrementado, ambos
-      // em memória. Quando o `manager` é passado a releitura já enxerga a
-      // transação, mas mantê-los custa nada e cobre o chamador que não passa.
-      last_message: supportChat.last_message,
-      last_message_type: supportChat.last_message_type,
-      last_message_id: supportChat.last_message_id,
-      unread_count: supportChat.unread_count ?? completo?.unread_count ?? 0,
-      // O `updated_at` do banco ainda é o anterior ao commit desta transação, e
-      // é por ele que a lista se ordena - sem isto a conversa com mensagem nova
-      // não sobe para o topo.
-      updated_at: new Date(),
-    });
-
+    await this.whatsappService.emitSupportChatState(
+      completo?.user_id ?? supportChat.user_id,
+      'whatsapp:chat_state',
+      {
+        ...(completo ?? supportChat),
+        // Estes quatro vêm de quem chama, não da releitura: a prévia é calculada
+        // da mensagem recém-salva e o contador acabou de ser incrementado, ambos
+        // em memória. Quando o `manager` é passado a releitura já enxerga a
+        // transação, mas mantê-los custa nada e cobre o chamador que não passa.
+        last_message: supportChat.last_message,
+        last_message_type: supportChat.last_message_type,
+        last_message_id: supportChat.last_message_id,
+        unread_count: supportChat.unread_count ?? completo?.unread_count ?? 0,
+        // O `updated_at` do banco ainda é o anterior ao commit desta transação, e
+        // é por ele que a lista se ordena - sem isto a conversa com mensagem nova
+        // não sobe para o topo.
+        updated_at: new Date(),
+      },
+    );
   }
 }

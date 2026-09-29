@@ -227,6 +227,25 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
+  /**
+   * Mesma checagem de `emitSupportChatState`, para eventos de mensagem
+   * (`whatsapp:messages`) - mensagem nova, edição, revogação e reação de uma
+   * conversa `EM_ANDAMENTO` de outro atendente. Sem isto, quem não pode ver a
+   * conversa (já filtrada de `chat_state`/lista) continuava recebendo
+   * notificação de som e alerta na tela por mensagens dela - uma notificação
+   * "fantasma", apontando para algo que sumiu da lista.
+   *
+   * Não emite `chat_removed` aqui: quem chama já dispara `chat_state` para a
+   * mesma conversa, e é lá que a remoção acontece.
+   */
+  async emitSupportChatMessage(dono: number | null | undefined, event: string, data: any) {
+    for (const info of this.clients.values()) {
+      if (await this.podeVerAtendimento(info.user, dono)) {
+        info.socket.emit(event, data);
+      }
+    }
+  }
+
   private async podeVerAtendimento(user: Users, dono: number | null | undefined): Promise<boolean> {
     if (!dono) return true;
     if (Number(user.is_superuser)) return true;

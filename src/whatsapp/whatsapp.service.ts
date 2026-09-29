@@ -53,7 +53,6 @@ export class WhatsappService {
   async processWebhook(body: EvolutionWebhookBody): Promise<void> {
     const { event, instance } = body;
 
-
     const dataType = this.resolveDataType(body);
 
     if (!dataType) {
@@ -111,7 +110,9 @@ export class WhatsappService {
     const remoteJid = exigeRemoteJid ? EvolutionMapper.extractRemoteJid(body.event, data) : null;
 
     if (exigeRemoteJid && !remoteJid) {
-      this.logger.warn(`Evento ${body.event} sem remoteJid descartado (instância ${body.instance})`);
+      this.logger.warn(
+        `Evento ${body.event} sem remoteJid descartado (instância ${body.instance})`,
+      );
       return null;
     }
 
@@ -225,6 +226,15 @@ export class WhatsappService {
     payload: unknown,
   ): Promise<void> {
     await this.whatsappGateway.emitSupportChatState(dono, event, payload);
+  }
+
+  /** Só chega a quem pode ver aquele atendimento - ver `emitSupportChatMessage`. */
+  async emitSupportChatMessage(
+    dono: number | null | undefined,
+    event: string,
+    payload: unknown,
+  ): Promise<void> {
+    await this.whatsappGateway.emitSupportChatMessage(dono, event, payload);
   }
 
   // == Chamadas ao provider ==
