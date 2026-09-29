@@ -268,6 +268,13 @@ export class ChannelsService {
    * `number`, quando informado, pede o código de pareamento (conectar por
    * telefone) em vez do QR - as duas modalidades coexistem na tela, e a
    * escolha é feita a cada tentativa de conexão, não persistida no canal.
+   *
+   * ⚠️ A Evolution só considera o `number` quando a instância está `close`
+   * (confirmado no código-fonte, `instance.controller.ts:connectToWhatsapp`):
+   * com uma sessão `connecting` já ativa (QR sendo renovado), ela ignora o
+   * parâmetro e devolve o QR que já existia. Por isso, pedir pairing code com
+   * uma sessão em andamento primeiro a derruba - transparente para quem clica,
+   * sem exigir que a pessoa desconecte manualmente antes.
    */
   async startSession(channelId: number, number?: string): Promise<void> {
     const channel = await this.findChannel(channelId);
@@ -280,6 +287,14 @@ export class ChannelsService {
       await this.channelsRepository.update(channel.id, { session_id: randomUUID().toUpperCase() });
       const reloaded = await this.channelsRepository.findOneBy({ id: channel.id });
       channel.session_id = reloaded!.session_id;
+    }
+
+    if (number && channel.channel_status_id === ChannelStatus.CONNECTING) {
+      await this.whatsappService.requestDisconnection(channel.session_id);
+      // A Evolution precisa de um instante para marcar a instância como
+      // `close` depois do logout - pedir a conexão em seguida, sem esperar,
+      // ainda a encontraria `connecting` e cairia na mesma limitação.
+      await new Promise((resolve) => setTimeout(resolve, 1500));
     }
 
     // O connect do provider já devolve o QR (ou o pairing code, se `number`
@@ -373,17 +388,34 @@ export class ChannelsService {
     });
   }
 
-  async handleQrCodeReceived(payload: WhatsappWebhookPayload<{ qr: string }>): Promise<void> {
+  /**
+   * `pairingCode` só chega por aqui, nunca na resposta síncrona do `connect`:
+   * a Evolution devolve o `connect` antes de o Baileys terminar de chamar
+   * `requestPairingCode` internamente (delay fixo de 2s, nem sempre
+   * suficiente) - o valor definitivo vem depois, neste mesmo webhook que já
+   * traz o QR renovado.
+   */
+  async handleQrCodeReceived(
+    payload: WhatsappWebhookPayload<{ qr: string | null; pairingCode?: string | null }>,
+  ): Promise<void> {
     const {
       sessionId,
-      data: { qr },
+      data: { qr, pairingCode },
     } = payload;
     const channel = await this.channelsRepository.findBySessionId(sessionId);
 
     return runInTransaction(this.dataSource, async (manager) => {
       try {
         await manager.update(Channels, channel.id, {
-          qr_code: qr,
+          qr_code: qr ?? null,
+          // Uma vez gerado, o pairing code fica fixo até a conexão mudar de
+          // estado de verdade (conectou/desconectou - outros handlers). O
+          // Baileys renova o QR periodicamente e não chama
+          // `requestPairingCode` a cada ciclo, então tanto um valor ausente
+          // quanto um valor novo neste webhook são ignorados depois que o
+          // canal já tem um código - trocá-lo no meio da tentativa invalidaria
+          // o que o atendente já está digitando no celular.
+          pairing_code: channel.pairing_code ?? (pairingCode ?? null),
           channel_status_id: ChannelStatus.CONNECTING,
         });
         this.handleChannelStatus(channel.id);

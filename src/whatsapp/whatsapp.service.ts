@@ -151,8 +151,10 @@ export class WhatsappService {
       }
 
       case DataTypeWhatsapp.QR_RECEIVED: {
-        const qr = EvolutionMapper.mapQrCode(data as never);
-        return qr ? EvolutionMapper.toInternalPayload(body, dataType, { qr }) : null;
+        const { code, pairingCode } = EvolutionMapper.mapQrCode(data as never);
+        return code || pairingCode
+          ? EvolutionMapper.toInternalPayload(body, dataType, { qr: code, pairingCode })
+          : null;
       }
 
       case DataTypeWhatsapp.UNREAD_COUNT: {

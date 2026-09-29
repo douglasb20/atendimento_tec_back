@@ -31,6 +31,12 @@ export class Contacts {
   @Column({ type: 'varchar', length: 90, nullable: true, default: null })
   last_name: string | null;
 
+  /** Nome definido manualmente pelo atendente - marcado, o webhook de
+   * mensagem recebida nunca mais sobrescreve `name`/`last_name` com o
+   * `pushName` do WhatsApp. Mesmo espírito de `avatar_is_manual`. */
+  @Column({ type: 'boolean', nullable: false, default: false })
+  name_is_manual: boolean;
+
   @Column({ type: 'text', nullable: false })
   avatar_url: string;
 

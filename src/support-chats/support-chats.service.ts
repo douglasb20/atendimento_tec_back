@@ -684,7 +684,15 @@ export class SupportChatsService {
         const phoneContact = data.message.id.remote;
 
         // O `pushName` vem como texto único; o cadastro guarda separado.
-        const { name, last_name } = separaNome(data?.message?._data?.notifyName || 'Cliente');
+        //
+        // Quando a mensagem é `fromMe` (eco de um envio nosso, sincronizado do
+        // celular), o WhatsApp manda o `notifyName` como literalmente "Você" -
+        // é o nome de exibição do dono da instância, não do contato. Sem essa
+        // distinção, a primeira mensagem enviada a um contato novo (antes de
+        // ele responder) gravava "Você" como nome permanente do cadastro.
+        const { name, last_name } = separaNome(
+          data.message.id?.fromMe ? 'Cliente' : data?.message?._data?.notifyName || 'Cliente',
+        );
 
         const contact = await this.contactsService.findOrCreateByRemoteJid(
           { sessionId, remote_jid: phoneContact, name, last_name },

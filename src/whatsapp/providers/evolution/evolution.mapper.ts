@@ -400,9 +400,18 @@ export class EvolutionMapper {
     } as Reaction;
   }
 
-  /** QR code: a Evolution aninha em `data.qrcode`. Devolve a string crua. */
-  static mapQrCode(data: EvolutionQrCodeData): string | null {
-    return data?.qrcode?.code ?? null;
+  /**
+   * QR code e código de pareamento: a Evolution aninha os dois em
+   * `data.qrcode`, e o pareamento só chega por aqui - a resposta síncrona do
+   * `connect` tem um delay fixo de 2s do lado da Evolution
+   * (`instance.controller.ts:connectToWhatsapp`) que nem sempre é suficiente
+   * para o Baileys já ter chamado `requestPairingCode` internamente.
+   */
+  static mapQrCode(data: EvolutionQrCodeData): { code: string | null; pairingCode: string | null } {
+    return {
+      code: data?.qrcode?.code ?? null,
+      pairingCode: data?.qrcode?.pairingCode ?? null,
+    };
   }
 
   /** Número do dono da sessão, apenas dígitos. */

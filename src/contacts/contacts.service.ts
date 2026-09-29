@@ -220,6 +220,12 @@ export class ContactsService {
           }),
           // Remoção explícita: volta a deixar o webhook preencher de novo.
           ...(updateContactDto.avatar_url === null && { avatar_is_manual: false }),
+          // Só o PATCH da tela de edição passa por aqui - o webhook grava o
+          // nome direto em `findOrCreateByRemoteJid`, sem passar por este
+          // DTO. Um `name` presente é sempre o atendente editando de
+          // propósito, e a partir daí o `pushName` do WhatsApp não deve mais
+          // sobrescrevê-lo.
+          ...(updateContactDto.name && { name_is_manual: true }),
         };
 
         const contact = await this.contactRepository.updateContact(
@@ -338,6 +344,25 @@ export class ContactsService {
         await manager.save(Contacts, contact);
         this.logger.log(`Foto de perfil preenchida para o contato ${contact.id}`);
       }
+    }
+
+    // Contato criado a partir de uma mensagem nossa (antes de ele responder)
+    // nasce como "Cliente" - mesmo espírito do avatar: preenche o nome de
+    // verdade assim que ele chegar, mas só até o atendente editar o cadastro
+    // manualmente (`name_is_manual`), que bloqueia de vez. `name === 'Cliente'`
+    // no lado de quem chama é sempre o próprio placeholder (mensagem `fromMe`
+    // sem contato real) - nunca sobrescreve com ele.
+    if (
+      name &&
+      name !== 'Cliente' &&
+      !contact.name_is_manual &&
+      contact.name === 'Cliente' &&
+      !contact.last_name
+    ) {
+      contact.name = name;
+      contact.last_name = last_name ?? null;
+      await manager.save(Contacts, contact);
+      this.logger.log(`Nome preenchido para o contato ${contact.id} (${name})`);
     }
 
     return contact;
