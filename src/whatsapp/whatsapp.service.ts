@@ -218,6 +218,15 @@ export class WhatsappService {
     this.whatsappGateway.emitEvent(event, payload);
   }
 
+  /** Só chega a quem pode ver aquele atendimento - ver `emitSupportChatState`. */
+  async emitSupportChatState(
+    dono: number | null | undefined,
+    event: string,
+    payload: unknown,
+  ): Promise<void> {
+    await this.whatsappGateway.emitSupportChatState(dono, event, payload);
+  }
+
   // == Chamadas ao provider ==
 
   async requestConnection(sessionId: string, number?: string): Promise<ProviderConnectionResult> {

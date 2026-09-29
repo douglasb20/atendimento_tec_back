@@ -16,6 +16,7 @@ import { COOKIE_ACCESS } from 'core/cookies-de-sessao';
 import { origensPermitidas } from 'core/origens-permitidas';
 import { JwtPayload } from '@types';
 import { EstadoPresenca, PresencaService } from '@/presenca/presenca.service';
+import { PermissionService } from '@/permissions/permission.service';
 import { Users } from '@/users/entities/users.entity';
 
 type ClientInfo = {
@@ -38,6 +39,7 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
   constructor(
     private readonly authService: AuthService,
     private readonly presencaService: PresencaService,
+    private readonly permissionService: PermissionService,
   ) {}
 
   @WebSocketServer()
@@ -192,6 +194,45 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   emitEvent(event: string, data: any) {
     this.server.emit(event, data); // envia pra todos conectados
+  }
+
+  /**
+   * Emite o estado de uma conversa só para quem tem permissão de vê-la; quem
+   * perdeu o acesso recebe `whatsapp:chat_removed` no lugar, para tirá-la da
+   * lista.
+   *
+   * `whatsapp:chat_state` sempre foi broadcast geral (`emitEvent`), e a
+   * permissão `support.chat:view_others` (que restringe um atendente a ver só
+   * os próprios atendimentos `EM_ANDAMENTO`) só era aplicada na consulta REST
+   * inicial - por isso o filtro "funcionava" só até o próximo reload: quando
+   * outro atendente assumia um atendimento, o socket avisava geral, e quem não
+   * deveria ver aquela conversa a via do mesmo jeito até recarregar a página.
+   *
+   * Só parar de emitir não bastava: a conversa já estava na lista de quem a
+   * via (carregada enquanto ainda estava em fila, sem dono, visível a todos).
+   * Sem um evento próprio de remoção, ela ficava presa lá para sempre - nada
+   * no front tira uma conversa da lista a não ser ela ser finalizada.
+   *
+   * `dono` é o `user_id` da conversa (ou `null`/`undefined` para uma que ainda
+   * está em fila, sem dono - essa sempre pode ser vista por todos, é o mesmo
+   * critério do filtro em `SupportChatsRepository.findAllSupportChats`).
+   */
+  async emitSupportChatState(dono: number | null | undefined, event: string, data: any) {
+    for (const info of this.clients.values()) {
+      if (await this.podeVerAtendimento(info.user, dono)) {
+        info.socket.emit(event, data);
+      } else {
+        info.socket.emit('whatsapp:chat_removed', { id: data?.id });
+      }
+    }
+  }
+
+  private async podeVerAtendimento(user: Users, dono: number | null | undefined): Promise<boolean> {
+    if (!dono) return true;
+    if (Number(user.is_superuser)) return true;
+    if (Number(user.id) === Number(dono)) return true;
+
+    return this.permissionService.hasPermission(user.id, ['support.chat:view_others']);
   }
 
   emitToClient(clientId: string, event: string, data: any) {

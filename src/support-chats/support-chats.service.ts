@@ -1631,7 +1631,13 @@ export class SupportChatsService {
     // que o navegador não resolve.
     this.traduzAvatares(completo);
 
-    this.whatsappService.emitEvent('whatsapp:chat_state', {
+    // O dono decide quem recebe: sem ele (conversa em fila), todo mundo pode
+    // ver; com ele, só o próprio dono, o superusuário e quem tem
+    // `support.chat:view_others` - mesmo critério da consulta REST
+    // (`findAllSupportChats`), agora aplicado também ao tempo real. Sem isto,
+    // um atendimento assumido continuava visível para os outros atendentes até
+    // o próximo reload, porque o broadcast geral não conhecia essa regra.
+    await this.whatsappService.emitSupportChatState(completo?.user_id ?? supportChat.user_id, 'whatsapp:chat_state', {
       ...(completo ?? supportChat),
       // Estes quatro vêm de quem chama, não da releitura: a prévia é calculada
       // da mensagem recém-salva e o contador acabou de ser incrementado, ambos
