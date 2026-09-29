@@ -22,8 +22,15 @@ export interface WhatsappProvider {
   /**
    * Garante que a sessão exista e esteja conectando/conectada.
    * Cria a sessão no provider quando ainda não existe.
+   *
+   * `number`, quando informado, pede o código de pareamento (conectar por
+   * telefone, sem QR) em vez do QR code - a Evolution repassa ao Baileys,
+   * que gera o par QR/pairing code conforme o parâmetro está presente.
    */
-  requestConnection(session: ProviderSessionRef): Promise<ProviderConnectionResult>;
+  requestConnection(
+    session: ProviderSessionRef,
+    number?: string,
+  ): Promise<ProviderConnectionResult>;
 
   /** Devolve o QR code corrente, ou null quando já conectado. */
   requestQrCode(session: ProviderSessionRef): Promise<string | null>;
@@ -163,6 +170,8 @@ export type ProviderConnectionResult = {
   state: ProviderConnectionState;
   /** String crua do QR, quando o provider já a devolve no connect. */
   qrCode?: string | null;
+  /** Código de pareamento (`XXXX-XXXX`), quando pedido via `number`. */
+  pairingCode?: string | null;
   /** Token da instância recém-criada, a ser persistido pelo chamador. */
   instanceToken?: string | null;
 };

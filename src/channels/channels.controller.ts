@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -39,7 +40,10 @@ export class ChannelsController {
   }
 
   /**
-   * Abre a sessão e devolve o QR code para parear.
+   * Abre a sessão e devolve o QR code para parear - ou, com `number`
+   * informado (dígitos, com código do país, sem `+`), o código de
+   * pareamento para conectar por telefone. As duas modalidades coexistem:
+   * a escolha é feita a cada tentativa, não persistida no canal.
    *
    * ⚠️ `channel:config`, não `channel:view`: até a migration `1789550000000`
    * esta rota exigia só `view`, e quem podia enxergar a lista de canais
@@ -49,8 +53,8 @@ export class ChannelsController {
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('channel:config')
   @HttpCode(HttpStatus.OK)
-  async startSession(@Param('channelId') channelId: number) {
-    return this.channelsService.startSession(channelId);
+  async startSession(@Param('channelId') channelId: number, @Query('number') number?: string) {
+    return this.channelsService.startSession(channelId, number);
   }
 
   /**

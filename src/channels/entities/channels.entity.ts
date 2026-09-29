@@ -45,6 +45,14 @@ export class Channels {
   qr_code: string | null;
 
   /**
+   * Código de pareamento (`XXXX-XXXX`), para conectar por número de telefone
+   * sem escanear QR. Mesmo caráter efêmero de `qr_code` - só um dos dois faz
+   * sentido por vez, e o outro fica nulo enquanto este vale.
+   */
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  pairing_code: string | null;
+
+  /**
    * Enviada sozinha quando um contato abre uma conversa nova.
    *
    * ⚠️ Nulo ou vazio = não envia. Aceita as variáveis `{{nome}}`,

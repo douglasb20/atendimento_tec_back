@@ -264,7 +264,12 @@ export class ChannelsService {
     }
   }
 
-  async startSession(channelId: number): Promise<void> {
+  /**
+   * `number`, quando informado, pede o código de pareamento (conectar por
+   * telefone) em vez do QR - as duas modalidades coexistem na tela, e a
+   * escolha é feita a cada tentativa de conexão, não persistida no canal.
+   */
+  async startSession(channelId: number, number?: string): Promise<void> {
     const channel = await this.findChannel(channelId);
     if (!channel) {
       throw new NotFoundException('Canal não localizado com este id');
@@ -277,13 +282,14 @@ export class ChannelsService {
       channel.session_id = reloaded!.session_id;
     }
 
-    // O connect do provider já devolve o QR quando a sessão não está conectada,
-    // então uma chamada basta.
-    const result = await this.whatsappService.requestConnection(channel.session_id);
+    // O connect do provider já devolve o QR (ou o pairing code, se `number`
+    // foi informado) quando a sessão não está conectada - uma chamada basta.
+    const result = await this.whatsappService.requestConnection(channel.session_id, number);
 
-    if (result.qrCode) {
+    if (result.qrCode || result.pairingCode) {
       await this.channelsRepository.update(channel.id, {
-        qr_code: result.qrCode,
+        qr_code: result.qrCode ?? null,
+        pairing_code: result.pairingCode ?? null,
         channel_status_id: ChannelStatus.CONNECTING,
       });
       this.handleChannelStatus(channel.id);
@@ -293,6 +299,7 @@ export class ChannelsService {
     if (result.state === 'connected') {
       await this.channelsRepository.update(channel.id, {
         qr_code: null,
+        pairing_code: null,
         connected_at: channel.connected_at ?? new Date(),
         disconnected_at: null,
         channel_status_id: ChannelStatus.CONNECTED,
@@ -394,6 +401,7 @@ export class ChannelsService {
     try {
       await this.channelsRepository.update(channel.id, {
         qr_code: null,
+        pairing_code: null,
         connected_at: new Date(),
         disconnected_at: null,
         channel_status_id: ChannelStatus.CONNECTED,
@@ -425,6 +433,7 @@ export class ChannelsService {
 
       await this.channelsRepository.update(channel.id, {
         qr_code: null,
+        pairing_code: null,
         connected_at: channel.connected_at ?? new Date(),
         disconnected_at: null,
         channel_status_id: ChannelStatus.CONNECTED,
@@ -477,7 +486,12 @@ export class ChannelsService {
       channel_status_id: statusReal,
       ...(conectou
         ? { connected_at: channel.connected_at ?? new Date(), disconnected_at: null }
-        : { disconnected_at: new Date(), connected_at: null, qr_code: null }),
+        : {
+            disconnected_at: new Date(),
+            connected_at: null,
+            qr_code: null,
+            pairing_code: null,
+          }),
     });
 
     this.handleChannelStatus(channel.id);
@@ -497,6 +511,7 @@ export class ChannelsService {
     try {
       await this.channelsRepository.update(channel.id, {
         qr_code: null,
+        pairing_code: null,
         disconnected_at: new Date(),
         connected_at: null,
         channel_status_id: ChannelStatus.DISCONNECTED,

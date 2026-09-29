@@ -108,8 +108,19 @@ export class WhatsappService {
       DataTypeWhatsapp.MESSAGE_REVOKED_EVERYONE,
     ].includes(dataType);
 
-    if (exigeRemoteJid && !EvolutionMapper.extractRemoteJid(body.event, data)) {
+    const remoteJid = exigeRemoteJid ? EvolutionMapper.extractRemoteJid(body.event, data) : null;
+
+    if (exigeRemoteJid && !remoteJid) {
       this.logger.warn(`Evento ${body.event} sem remoteJid descartado (instância ${body.instance})`);
+      return null;
+    }
+
+    // Mensagem de grupo (`@g.us`): o sistema não tem tratamento de grupo -
+    // "contato" é sempre uma pessoa, e o id do grupo (até 18 dígitos) não cabe
+    // no `contacts.phone` nem faz sentido como telefone. Descartada aqui, e
+    // não mais adiante, para nem abrir conversa nem tentar criar o contato.
+    if (exigeRemoteJid && remoteJid?.endsWith('@g.us')) {
+      this.logger.debug(`Evento ${body.event} de grupo descartado (${remoteJid})`);
       return null;
     }
 
@@ -207,12 +218,15 @@ export class WhatsappService {
 
   // == Chamadas ao provider ==
 
-  async requestConnection(sessionId: string): Promise<ProviderConnectionResult> {
+  async requestConnection(sessionId: string, number?: string): Promise<ProviderConnectionResult> {
     // Com o token: reconectar uma instância que já existe deve usar o token
     // dela, e `findBySessionId` não traz a coluna (`select: false`) - o canal
     // chegaria sem ele e a chamada cairia na chave global.
     const channel = await this.channelsRepository.findBySessionIdWithToken(sessionId);
-    const result = await this.evolutionProvider.requestConnection(this.sessaoDoCanal(channel));
+    const result = await this.evolutionProvider.requestConnection(
+      this.sessaoDoCanal(channel),
+      number,
+    );
 
     // A Evolution devolve o token da instância apenas na criação.
     if (result.instanceToken) {

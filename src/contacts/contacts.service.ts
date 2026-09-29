@@ -297,7 +297,10 @@ export class ContactsService {
     );
 
     if (!contact) {
-      const phone = await this.whatsappService.getFormattedNumber(sessionId, remote_jid);
+      // Vazio para `@lid` (identificador interno, não é telefone) - `null`
+      // em vez de string vazia, para a tela distinguir "sem telefone" de um
+      // campo zerado por engano.
+      const phone = (await this.whatsappService.getFormattedNumber(sessionId, remote_jid)) || null;
       const profilePicUrl = await this.whatsappService.getProfilePicUrl(sessionId, remote_jid);
       contact = manager.create(Contacts, {
         remote_jid,

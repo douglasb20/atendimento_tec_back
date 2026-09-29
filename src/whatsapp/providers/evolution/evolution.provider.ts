@@ -146,19 +146,22 @@ export class EvolutionProvider implements WhatsappProvider {
     return { headers: { apikey: session.instanceToken } };
   }
 
-  async requestConnection(session: ProviderSessionRef): Promise<ProviderConnectionResult> {
+  async requestConnection(
+    session: ProviderSessionRef,
+    number?: string,
+  ): Promise<ProviderConnectionResult> {
     const state = await this.fetchConnectionState(session);
 
     // Instância ainda não existe na Evolution: cria já com o webhook configurado.
     if (state === null) {
-      return this.createInstance(session);
+      return this.createInstance(session, number);
     }
 
     if (state === 'open') {
       return { state: 'connected' };
     }
 
-    return this.connectInstance(session);
+    return this.connectInstance(session, number);
   }
 
   async requestQrCode(session: ProviderSessionRef): Promise<string | null> {
@@ -318,6 +321,13 @@ export class EvolutionProvider implements WhatsappProvider {
   }
 
   async getFormattedNumber(_session: ProviderSessionRef, remoteJid: string): Promise<string> {
+    // `@lid` é um identificador interno de privacidade do WhatsApp, não o
+    // telefone da pessoa - os dígitos que `toNumber` extrairia dali pareceriam
+    // um número válido sem ser, e podem colidir com o telefone real de outro
+    // contato. Sem o JID `@s.whatsapp.net` correspondente, não há telefone a
+    // extrair: string vazia, que o chamador grava como `phone: null`.
+    if (remoteJid?.endsWith('@lid')) return '';
+
     // O JID já carrega o número; não é preciso ir à rede.
     return this.toNumber(remoteJid);
   }
@@ -679,12 +689,18 @@ export class EvolutionProvider implements WhatsappProvider {
     }
   }
 
-  private async createInstance(session: ProviderSessionRef): Promise<ProviderConnectionResult> {
+  private async createInstance(
+    session: ProviderSessionRef,
+    number?: string,
+  ): Promise<ProviderConnectionResult> {
     try {
       const { data } = await this.http.post<EvolutionInstanceCreateResponse>('/instance/create', {
         instanceName: session.sessionId,
         qrcode: true,
         integration: 'WHATSAPP-BAILEYS',
+        // Presente, a Evolution soma o código de pareamento à resposta -
+        // repassa ao Baileys, que gera os dois ao mesmo tempo internamente.
+        ...(number && { number }),
         webhook: {
           enabled: true,
           url: this.webhookUrl,
@@ -704,13 +720,14 @@ export class EvolutionProvider implements WhatsappProvider {
       return {
         state: 'connecting',
         qrCode: data?.qrcode?.code ?? null,
+        pairingCode: data?.qrcode?.pairingCode ?? null,
         instanceToken: data?.hash ?? null,
       };
     } catch (error) {
       // 403 = nome já existe; nesse caso basta conectar.
       if (this.statusOf(error) === 403) {
         this.logger.warn(`Instância ${session.sessionId} já existe; conectando.`);
-        return this.connectInstance(session);
+        return this.connectInstance(session, number);
       }
       this.fail('Falha ao criar a instância do WhatsApp', error);
     }
@@ -719,12 +736,19 @@ export class EvolutionProvider implements WhatsappProvider {
   /**
    * Conecta e normaliza o retorno, que é polimórfico: pode trazer o estado, o
    * objeto de QR cru, ou um erro - sempre com HTTP 200.
+   *
+   * `number`, quando informado, vai como query param - é o que faz a
+   * Evolution pedir o código de pareamento ao Baileys em vez do QR puro.
    */
-  private async connectInstance(session: ProviderSessionRef): Promise<ProviderConnectionResult> {
+  private async connectInstance(
+    session: ProviderSessionRef,
+    number?: string,
+  ): Promise<ProviderConnectionResult> {
     try {
+      const config = this.comToken(session) ?? {};
       const { data } = await this.http.get<EvolutionConnectResponse>(
         `/instance/connect/${session.sessionId}`,
-        this.comToken(session),
+        { ...config, params: { ...(number && { number }) } },
       );
 
       if (data?.error) {
@@ -740,7 +764,7 @@ export class EvolutionProvider implements WhatsappProvider {
       }
 
       const qrCode = data?.code ?? data?.qrcode?.code ?? null;
-      return { state: 'connecting', qrCode };
+      return { state: 'connecting', qrCode, pairingCode: data?.pairingCode ?? null };
     } catch (error) {
       this.fail('Falha ao conectar a sessão do WhatsApp', error);
     }
