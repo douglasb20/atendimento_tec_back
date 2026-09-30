@@ -33,6 +33,16 @@ export class SupportChatMessages {
   })
   from_me: boolean;
 
+  /**
+   * Mensagem gerada pelo sistema (saudação, despedida, aviso de serviço, aviso
+   * de inatividade, efeito de chatbot), não digitada por um atendente - mesmo
+   * assim `from_me = true`, já que sai do nosso número. Sem coluna própria, a
+   * tela e a auditoria não tinham como diferenciar as duas origens: ambas
+   * apareciam como se o atendente da conversa tivesse escrito.
+   */
+  @Column({ name: 'is_automatic', type: 'boolean', default: false })
+  is_automatic: boolean;
+
   @Column({ name: 'content', type: 'text', nullable: true })
   content: string | null;
 

@@ -516,6 +516,10 @@ export class MessagesService {
       fileName?: string;
       quotedMsgId?: string;
       sentAt?: Date;
+      /** Gerada pelo sistema (saudação, despedida, aviso), não digitada pelo
+       * atendente. Default `false`: a maior parte do que passa por aqui é
+       * resposta manual no suporte. */
+      isAutomatic?: boolean;
     },
     manager: EntityManager,
   ): Promise<MessageWithLastMessage> {
@@ -527,6 +531,7 @@ export class MessagesService {
       ack: MessageAck.ACK_PENDING,
       type: dados.type,
       from_me: true,
+      is_automatic: dados.isAutomatic ?? false,
       content: dados.content ?? '',
       has_media: Boolean(dados.mediaUrl),
       media_url: dados.mediaUrl ?? null,

@@ -100,6 +100,33 @@ export class Channels {
   @Column({ type: 'varchar', length: 10, nullable: true, default: null })
   despedida_anexo_tipo: TipoAnexoChannel | null;
 
+  /** Liga a resolução automática por inatividade - desligado, os campos
+   * abaixo ficam preenchidos mas inertes; o cron
+   * (`InactivityResolutionService`) ignora o canal inteiro. */
+  @Column({ type: 'boolean', nullable: false, default: false })
+  inatividade_ativa: boolean;
+
+  /** Minutos sem mensagem de nenhum dos dois lados até finalizar sozinho. */
+  @Column({ type: 'int', nullable: true })
+  inatividade_resolver_em_minutos: number | null;
+
+  /** Minutos antes de `inatividade_resolver_em_minutos` em que o aviso é
+   * enviado ao cliente - precisa ser menor que aquele. */
+  @Column({ type: 'int', nullable: true })
+  inatividade_avisar_em_minutos: number | null;
+
+  /** Mensagem enviada ao cliente quando a conversa se aproxima da resolução
+   * por inatividade. Mesmas variáveis de `mensagem_despedida`, sem anexo. */
+  @Column({ type: 'text', nullable: true })
+  inatividade_mensagem_aviso: string | null;
+
+  /** Ao finalizar por inatividade, envia também `mensagem_despedida` -
+   * opt-in: o cliente já foi avisado antes (ou nem isso, se o atraso
+   * descoberto já passava do prazo de resolver), e uma segunda mensagem
+   * automática pode soar redundante num encerramento por abandono. */
+  @Column({ type: 'boolean', nullable: false, default: false })
+  inatividade_enviar_despedida: boolean;
+
   @Column({ type: 'timestamptz', nullable: true })
   connected_at: Date | null;
 

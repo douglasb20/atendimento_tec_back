@@ -1,11 +1,14 @@
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
+  Min,
   ValidateIf,
 } from 'class-validator';
 
@@ -100,6 +103,48 @@ export class CreateOrChannelDto {
     message: `O tipo do anexo da despedida deve ser um de: ${TIPOS_ANEXO.join(', ')}`,
   })
   despedida_anexo_tipo?: TipoAnexoChannel | null;
+
+  /** Liga a resolução automática por inatividade - os três campos abaixo só
+   * têm efeito com este ligado. */
+  @IsOptional()
+  @IsBoolean({ message: 'inatividade_ativa deve ser verdadeiro ou falso' })
+  inatividade_ativa?: boolean;
+
+  /** Minutos sem mensagem de nenhum dos dois lados até finalizar sozinho.
+   * Teto de 90 é só trava de UI/API, sem config própria. */
+  @ValidateIf((dto: CreateOrChannelDto) => dto.inatividade_ativa === true)
+  @IsInt({ message: 'Informe os minutos para resolver por inatividade' })
+  @Min(1, { message: 'O tempo para resolver deve ser de ao menos 1 minuto' })
+  @Max(90, { message: 'O tempo para resolver deve ser de no máximo 90 minutos' })
+  inatividade_resolver_em_minutos?: number | null;
+
+  /**
+   * Minutos antes de `inatividade_resolver_em_minutos` em que o aviso é
+   * enviado - precisa ser menor que ele. Essa comparação entre os dois
+   * campos é validada no service (`ChannelsService`), não aqui: o
+   * `class-validator` não tem um jeito direto de comparar dois campos do
+   * mesmo DTO sem um validador customizado, e o projeto não tem precedente
+   * disso - mais simples validar onde já se decide o resto da regra de
+   * negócio.
+   */
+  @ValidateIf((dto: CreateOrChannelDto) => dto.inatividade_ativa === true)
+  @IsInt({ message: 'Informe os minutos para avisar antes da resolução' })
+  @Min(1, { message: 'O tempo para avisar deve ser de ao menos 1 minuto' })
+  inatividade_avisar_em_minutos?: number | null;
+
+  /** Enviada ao cliente ao se aproximar da resolução por inatividade. Mesmas
+   * variáveis de `mensagem_despedida`, sem anexo. */
+  @IsOptional()
+  @IsString({ message: 'A mensagem de aviso precisa ser um texto' })
+  @MaxLength(LIMITE_MENSAGEM, {
+    message: `A mensagem de aviso deve ter no máximo ${LIMITE_MENSAGEM} caracteres`,
+  })
+  inatividade_mensagem_aviso?: string | null;
+
+  /** Ao finalizar por inatividade, envia também `mensagem_despedida` - opt-in. */
+  @IsOptional()
+  @IsBoolean({ message: 'inatividade_enviar_despedida deve ser verdadeiro ou falso' })
+  inatividade_enviar_despedida?: boolean;
 
   /**
    * Os setores atendidos por este canal. Pode ser mais de um, como no

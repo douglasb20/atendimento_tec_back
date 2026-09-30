@@ -100,6 +100,17 @@ export class SupportChats {
   })
   observation_user: string | null;
 
+  /** Marca que o aviso de inatividade já foi enviado nesta janela - zerado
+   * quando o relógio reseta (mensagem nova depois do aviso), para permitir
+   * avisar de novo numa inatividade futura. Nulo = ainda não avisou. */
+  @Column({
+    name: 'inatividade_avisada_em',
+    type: 'timestamptz',
+    nullable: true,
+    default: null,
+  })
+  inatividade_avisada_em: Date | null;
+
   // == Relationships ==
 
   @ManyToOne(() => Contacts, (contact) => contact.supportChats)

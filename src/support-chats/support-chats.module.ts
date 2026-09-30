@@ -19,6 +19,7 @@ import { SupportChatsController } from './support-chats.controller';
 import { SupportChatEventsRepository } from './support-chat-events.repository';
 import { SupportChatsRepository } from './support-chats.repository';
 import { SupportChatsService } from './support-chats.service';
+import { InactivityResolutionService } from './inactivity-resolution.service';
 import { StorageModule } from '@/storage/storage.module';
 import { RedisCacheModule } from '@/redis-cache/redis-cache.module';
 import { ServiceAlertsModule } from '@/service-alerts/service-alerts.module';
@@ -59,6 +60,7 @@ import { AttendanceSettingsModule } from '@/attendance-settings/attendance-setti
     SupportChatsRepository,
     SupportChatEventsRepository,
     ProtocolCountersRepository,
+    InactivityResolutionService,
   ],
   exports: [SupportChatsService],
 })

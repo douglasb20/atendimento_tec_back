@@ -439,6 +439,158 @@ export class SupportChatsRepository extends Repository<SupportChats> {
   }
 
   /**
+   * Mesmo corpo de `finalizar`, mas sem exigir dono nem cliente associado -
+   * ação automática do `InactivityResolutionService`, não do atendente.
+   */
+  async finalizarPorInatividade(id: number, finished_at: Date, manager: EntityManager): Promise<number> {
+    const resultado = await manager
+      .createQueryBuilder()
+      .update(SupportChats)
+      .set({
+        finished_at,
+        is_waiting: false,
+        unread_count: 0,
+        support_chat_status_id: SupportChatStatusId.FINALIZADO_POR_INATIVIDADE,
+      })
+      .where('id = :id AND support_chat_status_id = :emAndamento', {
+        id,
+        emAndamento: SupportChatStatusId.EM_ANDAMENTO,
+      })
+      .execute();
+
+    return resultado.affected ?? 0;
+  }
+
+  /**
+   * Conversas `EM_ANDAMENTO` de um canal, com os minutos desde a última
+   * interação manual (de qualquer lado - atendente ou cliente) depois de
+   * aceito.
+   *
+   * ⚠️ **O relógio só começa a contar depois de `answered_at`, e só com
+   * mensagem manual (`is_automatic = false`).** Sem os dois filtros: (1) o
+   * cliente podia esperar bastante tempo na fila antes de alguém aceitar, e
+   * essa espera contava como inatividade - uma conversa aceita bem depois de
+   * aberta já nascia quase estourando o prazo de resolver, achado em produção
+   * (finalizada minutos depois de aceita, sem nunca avisar); (2) a própria
+   * saudação/aviso automático da abertura contava como "primeira interação",
+   * disparando o relógio antes de qualquer troca de verdade.
+   *
+   * ⚠️ O próprio aviso de inatividade é enviado como mensagem (`saveOutgoing`,
+   * `isAutomatic: true`) - por isso `is_automatic = false` também evita que o
+   * aviso reset o relógio que ele mesmo deveria travar (sem isso, o cron
+   * reenviava o aviso a cada ciclo, sem nunca alcançar `resolver_em_minutos`).
+   * Com `inatividade_avisada_em` preenchida, o `GREATEST` de `minutos_inativa`
+   * faz os minutos contarem a partir do aviso, não da última mensagem manual
+   * anterior a ele - **mas só serve para decidir se pode reenviar o aviso**.
+   *
+   * `ultima_mensagem_em` (bruta, sem o `GREATEST`) vai junto - é o que o
+   * chamador usa tanto para decidir se o relógio do aviso pode ser resetado
+   * (comparar contra `minutos_inativa`, que já inclui o piso do aviso,
+   * reintroduzia o loop de reenvio: o tempo decorrido *desde o aviso* sempre
+   * cruza a marca "abaixo do minuto de aviso" pouco depois de avisar - só uma
+   * mensagem com `datetime` **posterior** ao aviso é reset de verdade,
+   * achado em produção) quanto para a decisão de **finalizar**
+   * (`minutos_desde_ultima_mensagem`, abaixo) - usar o piso do aviso também
+   * ali fazia o prazo de "resolver em X min" reiniciar a contar a partir do
+   * aviso, e não da última mensagem manual real: um canal com "resolver em
+   * 5min" acabava demorando 5min *a mais*, sempre que um aviso saía no meio
+   * (achado em produção: mensagem às 01:57, aviso certo às 02:01, mas
+   * finalizado só às 02:07 - 10min depois da mensagem, não os 5 configurados).
+   *
+   * Os dois campos de minutos vêm `null` tanto para uma conversa ainda sem
+   * nenhuma mensagem manual depois de aceita quanto para uma sem
+   * `answered_at` (não deveria ocorrer em `EM_ANDAMENTO`, mas a query não
+   * assume isso) - o chamador (`InactivityResolutionService`) trata os dois
+   * casos como "não inativa ainda".
+   */
+  async buscarInativosPorCanal(channelId: number): Promise<
+    {
+      id: number;
+      inatividade_avisada_em: Date | null;
+      ultima_mensagem_em: Date | null;
+      minutos_inativa: number | null;
+      /** Minutos desde a última mensagem manual, sem o piso do aviso - é o
+       * que decide FINALIZAR, para o prazo de "resolver em X min" continuar
+       * contado a partir da última interação real, não do aviso. */
+      minutos_desde_ultima_mensagem: number | null;
+    }[]
+  > {
+    // Só conta a partir da 1ª mensagem manual (de qualquer lado) depois de
+    // aceito - decisão de produto: o cliente pode esperar bastante na fila
+    // antes de alguém assumir, e isso não pode contar como inatividade. Sem o
+    // filtro por `answered_at`, uma conversa aceita bem depois de aberta
+    // "herdava" o relógio contado desde a mensagem original, e podia nascer
+    // já quase estourando o prazo de resolver - encontrado em produção, uma
+    // conversa finalizada minutos depois de aceita sem nunca ter avisado.
+    // `is_automatic = false` também é obrigatório aqui: sem ele, a própria
+    // saudação/aviso automático da abertura seria "a primeira mensagem",
+    // disparando o relógio antes de qualquer interação de verdade.
+    const linhas = await this.createQueryBuilder('sc')
+      .select('sc.id', 'id')
+      .addSelect('sc.inatividade_avisada_em', 'inatividade_avisada_em')
+      .addSelect(
+        (sub) =>
+          sub
+            .select('MAX(m.datetime)')
+            .from('support_chat_messages', 'm')
+            .where('m.support_chat_id = sc.id')
+            .andWhere('m.is_automatic = false')
+            .andWhere('m.datetime > sc.answered_at'),
+        'ultima_mensagem_em',
+      )
+      .addSelect(
+        (sub) =>
+          sub
+            .select(
+              `EXTRACT(EPOCH FROM (NOW() - GREATEST(MAX(m.datetime), sc.inatividade_avisada_em))) / 60`,
+            )
+            .from('support_chat_messages', 'm')
+            .where('m.support_chat_id = sc.id')
+            .andWhere('m.is_automatic = false')
+            .andWhere('m.datetime > sc.answered_at'),
+        'minutos_inativa',
+      )
+      .addSelect(
+        (sub) =>
+          sub
+            .select(`EXTRACT(EPOCH FROM (NOW() - MAX(m.datetime))) / 60`)
+            .from('support_chat_messages', 'm')
+            .where('m.support_chat_id = sc.id')
+            .andWhere('m.is_automatic = false')
+            .andWhere('m.datetime > sc.answered_at'),
+        'minutos_desde_ultima_mensagem',
+      )
+      .where('sc.channel_id = :channelId', { channelId })
+      .andWhere('sc.support_chat_status_id = :emAndamento', {
+        emAndamento: SupportChatStatusId.EM_ANDAMENTO,
+      })
+      .andWhere('sc.answered_at IS NOT NULL')
+      .getRawMany();
+
+    return linhas.map((linha) => ({
+      id: Number(linha.id),
+      inatividade_avisada_em: linha.inatividade_avisada_em,
+      ultima_mensagem_em: linha.ultima_mensagem_em,
+      minutos_inativa: linha.minutos_inativa != null ? Number(linha.minutos_inativa) : null,
+      minutos_desde_ultima_mensagem:
+        linha.minutos_desde_ultima_mensagem != null
+          ? Number(linha.minutos_desde_ultima_mensagem)
+          : null,
+    }));
+  }
+
+  /** Zera a marca de aviso - o relógio da inatividade resetou (mensagem nova
+   * depois do aviso já enviado). */
+  async limpaAvisoInatividade(id: number): Promise<void> {
+    await this.update(id, { inatividade_avisada_em: null });
+  }
+
+  /** Marca que o aviso de inatividade foi enviado agora. */
+  async marcaAvisoInatividade(id: number, avisada_em: Date): Promise<void> {
+    await this.update(id, { inatividade_avisada_em: avisada_em });
+  }
+
+  /**
    * Grava o status direto, sem as regras de `finalizar`/`iniciarAtendimento` -
    * usado pelo motor de chatbot para marcar a "fila do bot" (`EM_FILA`) ao
    * assumir uma conversa nova, e para devolvê-la quando o bot redireciona.

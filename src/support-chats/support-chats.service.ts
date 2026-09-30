@@ -259,6 +259,7 @@ export class SupportChatsService {
             mediaType: anexo?.mimetype,
             fileName: anexo?.file_name,
             sentAt: enviadoEm,
+            isAutomatic: true,
           },
           manager,
         ),
@@ -1420,6 +1421,53 @@ export class SupportChatsService {
     }
 
     return this.recarregaEEmiteEstado(id);
+  }
+
+  /**
+   * Encerra sozinho um atendimento parado, por conta do
+   * `InactivityResolutionService`. Mesmo espírito de `finalizarAtendimento`,
+   * mas sem as travas pensadas para a ação manual do atendente (dono,
+   * cliente associado) - o cron não tem um usuário para checar, e recusar a
+   * finalização automática por falta de cliente deixaria a conversa presa
+   * para sempre.
+   *
+   * A despedida só sai com `inatividade_enviar_despedida` ligado - opt-in,
+   * porque o cliente já foi avisado (ou nem isso, se o atraso descoberto ao
+   * religar o cron já passava do prazo de resolver) e uma segunda mensagem
+   * automática pode soar redundante ou fora de contexto num encerramento por
+   * abandono.
+   */
+  async finalizarPorInatividade(supportChat: SupportChats): Promise<void> {
+    if (supportChat.channel?.inatividade_enviar_despedida) {
+      await this.enviaMensagemAutomatica(
+        supportChat,
+        supportChat.channel?.mensagem_despedida,
+        supportChat.channel?.id
+          ? () => this.channelsService.copiaAnexoDespedidaParaEnvio(supportChat.channel.id)
+          : undefined,
+      );
+    }
+
+    const afetadas = await runInTransaction(this.dataSource, (manager) =>
+      this.supportChatsRepository.finalizarPorInatividade(supportChat.id, new Date(), manager),
+    );
+
+    if (!afetadas) {
+      // Alguém finalizou/assumiu entre a consulta do cron e este ponto -
+      // silencioso de propósito, o cron roda de novo no próximo minuto.
+      return;
+    }
+
+    await this.recarregaEEmiteEstado(supportChat.id);
+  }
+
+  /**
+   * Avisa o cliente que a conversa vai encerrar por inatividade, e marca o
+   * aviso para o cron não repeti-lo a cada tick.
+   */
+  async enviarAvisoInatividade(supportChat: SupportChats, texto: string): Promise<void> {
+    await this.enviaMensagemAutomatica(supportChat, texto);
+    await this.supportChatsRepository.marcaAvisoInatividade(supportChat.id, new Date());
   }
 
   /**

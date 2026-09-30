@@ -77,4 +77,8 @@ export enum SupportChatStatusId {
   EM_FILA = 3,
   FINALIZADO_SEM_RESPOSTA = 4,
   FINALIZADO = 5,
+  /** Encerrado sozinho pela resolução automática por inatividade
+   *  (`InactivityResolutionService`), distinto de `FINALIZADO_SEM_RESPOSTA` -
+   *  aquele nunca é atribuído por código nenhum. */
+  FINALIZADO_POR_INATIVIDADE = 6,
 }

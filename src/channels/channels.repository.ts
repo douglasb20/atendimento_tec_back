@@ -17,6 +17,14 @@ export class ChannelsRepository extends Repository<Channels> {
     });
   }
 
+  /** Canais com a resolução automática por inatividade ligada - varredura do
+   * `InactivityResolutionService`, a cada tick do cron. */
+  async findComInatividadeAtiva() {
+    return this.find({
+      where: { inatividade_ativa: true, deleted_at: null },
+    });
+  }
+
   /**
    * Um canal conectado, para operações que não partem de uma conversa.
    *

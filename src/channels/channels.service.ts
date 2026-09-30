@@ -36,7 +36,35 @@ export class ChannelsService {
     return channel;
   }
 
+  /**
+   * O `class-validator` não compara dois campos do mesmo DTO sem um
+   * validador customizado (sem precedente no projeto) - mais simples validar
+   * aqui, onde o resto da regra de negócio da inatividade já é decidido.
+   */
+  private validaInatividade(dto: CreateOrChannelDto): void {
+    if (
+      dto.inatividade_ativa &&
+      dto.inatividade_avisar_em_minutos != null &&
+      dto.inatividade_resolver_em_minutos != null &&
+      dto.inatividade_avisar_em_minutos >= dto.inatividade_resolver_em_minutos
+    ) {
+      throw new BadRequestException(
+        'O tempo para avisar deve ser menor que o tempo para resolver',
+      );
+    }
+
+    // Sem a mensagem, o cliente é surpreendido pelo encerramento sem
+    // nenhum aviso prévio - mesma regra já checada no front, reforçada aqui
+    // para quem chama a API direto.
+    if (dto.inatividade_ativa && !dto.inatividade_mensagem_aviso?.trim()) {
+      throw new BadRequestException(
+        'Informe a mensagem de aviso para ativar a resolução automática',
+      );
+    }
+  }
+
   async createChannel(createChannelDto: CreateOrChannelDto): Promise<Channels> {
+    this.validaInatividade(createChannelDto);
     const { department_ids, ...dadosDoCanal } = createChannelDto;
 
     const channel = this.channelsRepository.create({
@@ -55,6 +83,7 @@ export class ChannelsService {
   }
 
   async updateChannel(channelId: number, createChannelDto: CreateOrChannelDto): Promise<Channels> {
+    this.validaInatividade(createChannelDto);
     const channel = await this.findChannel(channelId);
     const { department_ids, ...dadosDoCanal } = createChannelDto;
 
