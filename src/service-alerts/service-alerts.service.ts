@@ -42,7 +42,12 @@ export class ServiceAlertsService {
           `${salvo.channels?.length ? salvo.channels.length + ' canal(is)' : 'todos os canais'}`,
       );
 
-      return this.serviceAlertsRepository.findById(salvo.id);
+      // Pelo `manager`: o repository usa outra conexão, que não enxerga a
+      // linha ainda não commitada e respondia "Aviso N não encontrado".
+      return manager.findOne(ServiceAlerts, {
+        where: { id: salvo.id },
+        relations: ['channels'],
+      });
     });
   }
 
@@ -70,7 +75,8 @@ export class ServiceAlertsService {
 
       this.logger.log(`Aviso atualizado: "${atual.titulo}" (id ${id}), ativo=${atual.ativo}`);
 
-      return this.serviceAlertsRepository.findById(id);
+      // Pelo `manager`, como em `create`: devolve os canais já regravados.
+      return manager.findOne(ServiceAlerts, { where: { id }, relations: ['channels'] });
     });
   }
 
