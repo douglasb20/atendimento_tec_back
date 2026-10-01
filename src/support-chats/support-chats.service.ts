@@ -18,6 +18,7 @@ import {
   MessageEditPayload,
   MessagePayload,
   MessageTypes,
+  MessageWithLastMessage,
   SupportChatStatusId,
   ReactionPayload,
   WhatsappWebhookPayload,
@@ -244,8 +245,8 @@ export class SupportChatsService {
           })
         : await this.whatsappService.sendMessage(supportChat.channel.session_id, destino, mensagem);
 
-      await runInTransaction(this.dataSource, (manager) =>
-        this.messagesService.saveOutgoing(
+      const salva = await runInTransaction(this.dataSource, async (manager) => {
+        const gravada = await this.messagesService.saveOutgoing(
           {
             messageId: enviada.messageId,
             channel: supportChat.channel,
@@ -262,8 +263,11 @@ export class SupportChatsService {
             isAutomatic: true,
           },
           manager,
-        ),
-      );
+        );
+        await this.gravaPreviaDoEnvio(supportChat, gravada, manager);
+        return gravada;
+      });
+      await this.emitePreviaDoEnvio(supportChat, salva);
 
       this.logger.log(`Mensagem automática enviada na conversa ${supportChat.id}`);
     } catch (err) {
@@ -418,6 +422,42 @@ export class SupportChatsService {
   }
 
   /**
+   * Atualiza a prévia da lista com a mensagem que ACABAMOS de enviar.
+   *
+   * O eco dessa mensagem volta pelo webhook, mas ali ele é descartado como
+   * "já gravada" (para não abrir conversa fantasma) - e com ele ia embora a
+   * atualização da prévia. Sem esta chamada, a lista seguia mostrando a última
+   * mensagem do cliente depois de o atendente responder.
+   *
+   * `saveOutgoing` só preenche `lastMessage` quando a conversa final da
+   * mensagem é a que quem chama passou; o mesmo critério vale aqui.
+   */
+  private async gravaPreviaDoEnvio(
+    supportChat: SupportChats,
+    salva: MessageWithLastMessage,
+    manager: EntityManager,
+  ) {
+    if (!salva.lastMessage) return;
+    await this.supportChatsRepository.updateLastMessage(supportChat.id, salva.lastMessage, manager);
+  }
+
+  /** Avisa a lista em tempo real. Fora da transação: já commitada, a releitura
+   * enxerga o estado final, e uma falha de socket não desfaz o envio gravado. */
+  private async emitePreviaDoEnvio(supportChat: SupportChats, salva: MessageWithLastMessage) {
+    if (!salva.lastMessage) return;
+    try {
+      await this.whatsappChatStateEmit({
+        ...supportChat,
+        last_message: salva.lastMessage.content,
+        last_message_type: salva.lastMessage.type,
+        last_message_id: salva.lastMessage.id,
+      });
+    } catch (err) {
+      this.logger.warn(`Prévia da conversa ${supportChat.id} não emitida: ${err.message}`);
+    }
+  }
+
+  /**
    * Persiste a mensagem recém-enviada, sem deixar a falha derrubar o envio: o
    * provider já aceitou, e o webhook ainda vai gravá-la de todo modo.
    */
@@ -434,12 +474,15 @@ export class SupportChatsService {
     sentAt: Date;
   }) {
     try {
-      await runInTransaction(this.dataSource, (manager) =>
-        this.messagesService.saveOutgoing(
+      const salva = await runInTransaction(this.dataSource, async (manager) => {
+        const gravada = await this.messagesService.saveOutgoing(
           { ...dados, channel: dados.supportChat.channel },
           manager,
-        ),
-      );
+        );
+        await this.gravaPreviaDoEnvio(dados.supportChat, gravada, manager);
+        return gravada;
+      });
+      await this.emitePreviaDoEnvio(dados.supportChat, salva);
     } catch (err) {
       this.logger.warn(`Não foi possível registrar o envio ${dados.messageId}: ${err.message}`);
     }
