@@ -280,17 +280,28 @@ export class ContactsService {
     {
       sessionId,
       remote_jid,
+      remote_jid_alt,
       name,
       last_name,
     }: {
       sessionId: string;
       remote_jid: string;
+      /** Outro identificador do mesmo contato, quando o evento traz (`remoteJidAlt`). */
+      remote_jid_alt?: string | null;
       name?: string;
       last_name?: string | null;
     },
     manager: EntityManager,
   ): Promise<Contacts> {
-    let contact = await manager.findOneBy(Contacts, { remote_jid });
+    // Casa por qualquer um dos identificadores conhecidos, nas duas colunas: o
+    // evento pode vir em `@lid` de quem foi cadastrado pelo telefone, e vice-versa.
+    // Mais antigo primeiro, para um eventual par duplicado cair no original.
+    const ids = [remote_jid, remote_jid_alt].filter((id): id is string => Boolean(id));
+    let contact = await manager.findOne(Contacts, {
+      where: ids.flatMap((id) => [{ remote_jid: id }, { lid: id }]),
+      order: { id: 'ASC' },
+    });
+    const lidRecebido = ids.find((id) => id.endsWith('@lid')) ?? null;
 
     // Diagnóstico do avatar genérico: sem isto não dá para distinguir "contato
     // novo", "já tinha foto" e "tem o campo vazio e vai reconsultar" - os três
@@ -310,6 +321,8 @@ export class ContactsService {
       const profilePicUrl = await this.whatsappService.getProfilePicUrl(sessionId, remote_jid);
       contact = manager.create(Contacts, {
         remote_jid,
+        // Só vale como segundo identificador quando `remote_jid` é o telefone.
+        lid: remote_jid.endsWith('@lid') ? null : lidRecebido,
         name,
         last_name,
         phone,
@@ -320,6 +333,18 @@ export class ContactsService {
 
       await manager.save(Contacts, contact);
       return contact;
+    }
+
+    // Aprende o `@lid` de um contato cadastrado pelo telefone, para o próximo
+    // evento em `@lid` casar. Não sobrescreve um LID já gravado, e não grava um
+    // que já pertença a outro contato (o índice único derrubaria a transação).
+    if (lidRecebido && !contact.lid && !contact.remote_jid.endsWith('@lid')) {
+      const emUso = await manager.existsBy(Contacts, { lid: lidRecebido });
+      if (!emUso) {
+        contact.lid = lidRecebido;
+        await manager.save(Contacts, contact);
+        this.logger.log(`LID ${lidRecebido} associado ao contato ${contact.id}`);
+      }
     }
 
     // Contato já existente sem foto: tenta de novo.
@@ -366,6 +391,71 @@ export class ContactsService {
     }
 
     return contact;
+  }
+
+  /**
+   * Une dois cadastros do mesmo contato (ex.: o criado pelo telefone e o que
+   * nasceu de uma mensagem em `@lid`). Tudo do duplicado passa para o principal
+   * e o duplicado é apagado de vez - não é o `status = 0` do "excluir", porque
+   * o `remote_jid` dele continuaria casando com os eventos.
+   *
+   * O JID do duplicado, se for `@lid`, vira o `lid` do principal: é isso que faz
+   * as próximas mensagens caírem no cadastro certo. O principal só herda o que
+   * não tem (cliente, telefone, foto, campos personalizados).
+   *
+   * Pode sobrar mais de uma conversa aberta no mesmo canal depois da união; o
+   * atendente finaliza a que não interessa.
+   */
+  async mesclarContatos(principal_id: number, duplicado_id: number): Promise<Contacts> {
+    if (principal_id === duplicado_id) {
+      throw new BadRequestException('Escolha dois contatos diferentes para mesclar');
+    }
+
+    return runInTransaction(this.dataSource, async (manager) => {
+      const principal = await manager.findOneBy(Contacts, { id: principal_id });
+      const duplicado = await manager.findOneBy(Contacts, { id: duplicado_id });
+      if (!principal || !duplicado) {
+        throw new BadRequestException('Contato não localizado com este id');
+      }
+
+      // Valores da duplicata que o principal já tem ficam de fora (chave composta).
+      await manager.query(
+        `DELETE FROM contact_custom_values d USING contact_custom_values p
+          WHERE d.contact_id = $1 AND p.contact_id = $2 AND p.custom_field_id = d.custom_field_id`,
+        [duplicado_id, principal_id],
+      );
+      await manager.query(`UPDATE contact_custom_values SET contact_id = $1 WHERE contact_id = $2`, [
+        principal_id,
+        duplicado_id,
+      ]);
+      for (const tabela of ['support_chats', 'supports', 'chatbot_flow_executions']) {
+        await manager.query(`UPDATE ${tabela} SET contact_id = $1 WHERE contact_id = $2`, [
+          principal_id,
+          duplicado_id,
+        ]);
+      }
+
+      const lidDuplicado = duplicado.remote_jid.endsWith('@lid')
+        ? duplicado.remote_jid
+        : duplicado.lid;
+      const principalEhLid = principal.remote_jid.endsWith('@lid');
+
+      // Apaga antes de gravar o LID no principal: o índice único não aceita os dois.
+      await manager.delete(Contacts, { id: duplicado_id });
+
+      if (!principalEhLid && !principal.lid && lidDuplicado) principal.lid = lidDuplicado;
+      principal.client_id ??= duplicado.client_id;
+      principal.phone ??= duplicado.phone;
+      if (!principal.avatar_url && duplicado.avatar_url) {
+        principal.avatar_url = duplicado.avatar_url;
+        principal.is_avatar_external = duplicado.is_avatar_external;
+        principal.avatar_is_manual = duplicado.avatar_is_manual;
+      }
+      await manager.save(Contacts, principal);
+
+      this.logger.log(`Contato ${duplicado_id} mesclado em ${principal_id}`);
+      return this.traduzAvatar(principal);
+    });
   }
 
   /**

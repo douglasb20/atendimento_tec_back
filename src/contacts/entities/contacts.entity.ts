@@ -71,6 +71,15 @@ export class Contacts {
   @Column({ type: 'varchar', length: 60, nullable: false })
   remote_jid: string;
 
+  /**
+   * Segundo identificador do mesmo contato: o `@lid`, quando `remote_jid` é o
+   * telefone (ou o contrário não se aplica - se `remote_jid` já é `@lid`, fica
+   * nulo). O WhatsApp entrega eventos ora de um, ora de outro; guardar os dois
+   * evita abrir um segundo contato para a mesma pessoa. Único quando preenchido.
+   */
+  @Column({ type: 'varchar', length: 60, nullable: true, default: null })
+  lid: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 

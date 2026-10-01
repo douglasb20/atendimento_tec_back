@@ -66,6 +66,17 @@ export class ContactsController {
     );
   }
 
+  @Post('/contact/:contact_id/mesclar/:duplicado_id')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('contact:update')
+  @HttpCode(HttpStatus.OK)
+  async mesclarContatos(
+    @Param('contact_id', ParseIntPipe) contact_id: number,
+    @Param('duplicado_id', ParseIntPipe) duplicado_id: number,
+  ) {
+    return this.contactsService.mesclarContatos(contact_id, duplicado_id);
+  }
+
   @Get('/contact')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('contact:view_by_client')

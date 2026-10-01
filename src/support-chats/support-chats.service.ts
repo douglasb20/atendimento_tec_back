@@ -744,7 +744,14 @@ export class SupportChatsService {
         );
 
         const contact = await this.contactsService.findOrCreateByRemoteJid(
-          { sessionId, remote_jid: phoneContact, name, last_name },
+          {
+            sessionId,
+            remote_jid: phoneContact,
+            remote_jid_alt: (data.message.rawData as { key?: { remoteJidAlt?: string } })?.key
+              ?.remoteJidAlt,
+            name,
+            last_name,
+          },
           manager,
         );
 
