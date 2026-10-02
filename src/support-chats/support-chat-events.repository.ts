@@ -35,6 +35,20 @@ export class SupportChatEventsRepository extends Repository<SupportChatEvents> {
     );
   }
 
+  /** Grava a pausa ou a retomada, na mesma transação da mudança de estado. */
+  async registraPausa(
+    support_chat_id: number,
+    user_id: number,
+    tipo: SupportChatEventType.PAUSA | SupportChatEventType.RETOMADA,
+    manager: EntityManager,
+  ): Promise<SupportChatEvents> {
+    const repo = manager.getRepository(SupportChatEvents);
+
+    return repo.save(
+      repo.create({ support_chat_id, tipo, user_origem_id: user_id, user_destino_id: null }),
+    );
+  }
+
   /**
    * Eventos da conversa, em ordem, com os nomes de quem transferiu e de quem
    * recebeu - é o que a bolha na tela mostra.

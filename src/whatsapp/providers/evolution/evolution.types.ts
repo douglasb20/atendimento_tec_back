@@ -90,12 +90,15 @@ export type EvolutionMessageKey = {
   participant?: string;
   remoteJidAlt?: string;
   participantAlt?: string;
+  /** Marca do Baileys na visualização única: o evento chega sem `message`. */
+  isViewOnce?: boolean;
 };
 
 /** ContextInfo do Baileys - carrega a mensagem citada e as menções. */
 export type EvolutionContextInfo = {
   stanzaId?: string;
   participant?: string;
+  isForwarded?: boolean;
   quotedMessage?: EvolutionMessageContent;
   mentionedJid?: string[];
   expiration?: number;
@@ -115,11 +118,20 @@ export type EvolutionMessageContent = {
   ptvMessage?: EvolutionMediaContent;
   contactMessage?: { displayName?: string; vcard?: string };
   contactsArrayMessage?: { contacts?: { displayName?: string; vcard?: string }[] };
-  locationMessage?: { degreesLatitude?: number; degreesLongitude?: number; name?: string };
+  locationMessage?: {
+    degreesLatitude?: number;
+    degreesLongitude?: number;
+    name?: string;
+    address?: string;
+  };
   reactionMessage?: { key?: EvolutionMessageKey; text?: string };
   protocolMessage?: { key?: EvolutionMessageKey; type?: string };
   editedMessage?: unknown;
   templateMessage?: EvolutionTemplateMessage;
+  /** Mensagem interativa; o botão `payment_info` carrega a chave Pix estática. */
+  interactiveMessage?: {
+    nativeFlowMessage?: { buttons?: { name?: string; buttonParamsJson?: string }[] };
+  };
   buttonsMessage?: EvolutionButtonsMessage;
   listMessage?: EvolutionListMessage;
   /** Adicionado pela Evolution quando o webhook está com base64 habilitado. */

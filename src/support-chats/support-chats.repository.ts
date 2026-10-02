@@ -344,11 +344,55 @@ export class SupportChatsRepository extends Repository<SupportChats> {
         support_chat_status_id: user_destino_id
           ? SupportChatStatusId.EM_ANDAMENTO
           : SupportChatStatusId.AGUARDANDO,
+        // Transferir encerra a pausa (permitida enquanto pausado): quem recebe
+        // - ou quem reassume da espera - pega o atendimento ativo, e a pausa
+        // que acabou entra no acumulado, sem contar no cronômetro.
+        paused_total_seconds: () =>
+          'paused_total_seconds + COALESCE(FLOOR(EXTRACT(EPOCH FROM (NOW() - paused_at)))::int, 0)',
+        paused_at: null,
       })
       .where('id = :id AND support_chat_status_id = :emAndamento AND user_id = :user_origem_id', {
         id,
         emAndamento: SupportChatStatusId.EM_ANDAMENTO,
         user_origem_id,
+      })
+      .execute();
+
+    return resultado.affected ?? 0;
+  }
+
+  /**
+   * Pausa: grava `paused_at`. O WHERE exige dono, `EM_ANDAMENTO` e não pausada -
+   * duas chamadas simultâneas não pausam duas vezes, e a segunda vira conflito.
+   */
+  async pausar(id: number, user_id: number, em: Date, manager: EntityManager): Promise<number> {
+    const resultado = await manager
+      .createQueryBuilder()
+      .update(SupportChats)
+      .set({ paused_at: em })
+      .where(
+        'id = :id AND support_chat_status_id = :emAndamento AND user_id = :user_id AND paused_at IS NULL',
+        { id, emAndamento: SupportChatStatusId.EM_ANDAMENTO, user_id },
+      )
+      .execute();
+
+    return resultado.affected ?? 0;
+  }
+
+  /** Retoma: soma a pausa que acabou ao acumulado e limpa `paused_at`. */
+  async retomar(id: number, em: Date, manager: EntityManager): Promise<number> {
+    const resultado = await manager
+      .createQueryBuilder()
+      .update(SupportChats)
+      .set({
+        paused_total_seconds: () =>
+          'paused_total_seconds + FLOOR(EXTRACT(EPOCH FROM (CAST(:retomado_em AS timestamptz) - paused_at)))::int',
+        paused_at: null,
+      })
+      .setParameter('retomado_em', em)
+      .where('id = :id AND support_chat_status_id = :emAndamento AND paused_at IS NOT NULL', {
+        id,
+        emAndamento: SupportChatStatusId.EM_ANDAMENTO,
       })
       .execute();
 
@@ -565,6 +609,9 @@ export class SupportChatsRepository extends Repository<SupportChats> {
         emAndamento: SupportChatStatusId.EM_ANDAMENTO,
       })
       .andWhere('sc.answered_at IS NOT NULL')
+      // Pausado não é abandonado: o atendente parou de propósito, e a
+      // resolução automática não pode encerrar o que ele vai retomar.
+      .andWhere('sc.paused_at IS NULL')
       .getRawMany();
 
     return linhas.map((linha) => ({

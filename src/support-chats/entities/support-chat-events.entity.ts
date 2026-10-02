@@ -2,9 +2,13 @@ import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 't
 import { Users } from 'users/entities/users.entity';
 import { SupportChats } from './support-chats.entity';
 
-/** Tipos de evento do atendimento. Por ora só a transferência. */
+/** Tipos de evento do atendimento. Em pausa/retomada, `user_origem_id` é quem
+ * pausou/retomou e `user_destino_id` fica nulo (sem o sentido de "devolvido"
+ * que tem na transferência). */
 export enum SupportChatEventType {
   TRANSFERENCIA = 'transferencia',
+  PAUSA = 'pausa',
+  RETOMADA = 'retomada',
 }
 
 /**

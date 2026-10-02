@@ -80,6 +80,10 @@ export class SupportChatMessages {
   @Column({ name: 'has_quoted', type: 'boolean', default: false })
   has_quoted: boolean;
 
+  /** Mensagem encaminhada (recebida com `isForwarded`); só identificação visual. */
+  @Column({ name: 'is_forwarded', type: 'boolean', default: false })
+  is_forwarded: boolean;
+
   @Column({ name: 'quoted_msg_id', type: 'varchar', length: 50, nullable: true })
   quoted_msg_id: string | null;
 

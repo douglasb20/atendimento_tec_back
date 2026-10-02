@@ -261,6 +261,31 @@ export class SupportChatsController {
     return this.supportChatsService.iniciarAtendimento(id, req.user['id']);
   }
 
+  /** Permissão própria: `support.chat:pause` vale para pausar e retomar. */
+  @Post('/:id/pausar')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:pause')
+  @HttpCode(HttpStatus.OK)
+  async pausarAtendimento(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
+    return this.supportChatsService.pausarAtendimento(
+      id,
+      req.user['id'],
+      Boolean(req.user['is_superuser']),
+    );
+  }
+
+  @Post('/:id/retomar')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:pause')
+  @HttpCode(HttpStatus.OK)
+  async retomarAtendimento(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
+    return this.supportChatsService.retomarAtendimento(
+      id,
+      req.user['id'],
+      Boolean(req.user['is_superuser']),
+    );
+  }
+
   @Post('/:id/finalizar')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('support.chat:update')

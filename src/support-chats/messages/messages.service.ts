@@ -39,6 +39,10 @@ export class MessagesService {
     let savedMessage: MessageWithLastMessage;
     switch (messagePayload.type) {
       case MessageTypes.TEXT:
+      // Chave Pix: o conteúdo é o JSON da chave, que a tela transforma em cartão.
+      case MessageTypes.PAYMENT:
+      // Visualização única: só o aviso (texto) é gravado.
+      case MessageTypes.VIEW_ONCE:
         savedMessage = await this.processTextMessage(
           channel,
           support_chat,
@@ -64,6 +68,25 @@ export class MessagesService {
         break;
       case MessageTypes.VOICE:
         savedMessage = await this.processVoiceMessage(
+          channel,
+          support_chat,
+          messagePayload,
+          manager,
+        );
+        break;
+      case MessageTypes.LOCATION:
+        savedMessage = await this.processLocationMessage(
+          channel,
+          support_chat,
+          messagePayload,
+          manager,
+        );
+        break;
+      case MessageTypes.AUDIO:
+        // Áudio que não é mensagem de voz (`ptt: false`): arquivo de áudio ou
+        // voz encaminhada. Sem este caso caía no default e era gravado como
+        // texto vazio, sem a mídia.
+        savedMessage = await this.processAudioMessage(
           channel,
           support_chat,
           messagePayload,
@@ -333,6 +356,91 @@ export class MessagesService {
       has_media: messagePayload.hasMedia,
       media_url: keyWithExtension,
       media_type: mimeType,
+      media_size: mediaSize,
+      file_name: fileName,
+    });
+
+    const savedMessage = await this.saveMessage(messageToSave, manager, support_chat);
+    savedMessage.media_url = presignedUrl;
+    return savedMessage;
+  }
+
+  /**
+   * Localização: o conteúdo é texto ("lat,lng" + nome/endereço), e a miniatura
+   * do mapa que o próprio WhatsApp envia (`jpegThumbnail`, já no payload - não
+   * há download) vai para o storage, como o WhatsApp oficial mostra. Sem
+   * miniatura, ou se o envio falhar, a mensagem segue só como texto.
+   */
+  async processLocationMessage(
+    channel: Channels,
+    support_chat: SupportChats,
+    messagePayload: MessageData,
+    manager: EntityManager,
+  ): Promise<MessageWithLastMessage> {
+    const formatatedMessage = this.formatateMessageContent(messagePayload, channel, support_chat);
+    let midia: { media_url: string; media_type: string; media_size: number } | null = null;
+
+    try {
+      const bruto = (
+        messagePayload.rawData as {
+          message?: { locationMessage?: { jpegThumbnail?: unknown } };
+        }
+      )?.message?.locationMessage?.jpegThumbnail;
+
+      // O Buffer chega serializado: `{ "0": 255, "1": 216, ... }` (ou base64).
+      const miniatura =
+        typeof bruto === 'string'
+          ? Buffer.from(bruto, 'base64')
+          : bruto && typeof bruto === 'object'
+            ? Buffer.from(Object.values(bruto as Record<string, number>))
+            : null;
+
+      if (miniatura?.length) {
+        const key = `chat/locations/${randomUUID()}.jpg`;
+        await this.storageService.uploadBuffer(miniatura, key, 'image/jpeg');
+        midia = { media_url: key, media_type: 'image/jpeg', media_size: miniatura.length };
+      }
+    } catch (err) {
+      this.logger.warn(`Miniatura da localização não gravada: ${err.message}`);
+    }
+
+    const messageToSave = this.messagesRepository.create({
+      ...formatatedMessage,
+      ...(midia && { has_media: true, ...midia }),
+    });
+
+    const savedMessage = await this.saveMessage(messageToSave, manager, support_chat);
+    if (midia) savedMessage.media_url = this.storageService.getPublicUrl(midia.media_url);
+    return savedMessage;
+  }
+
+  /** Áudio comum/encaminhado: mesmo fluxo da voz, mas com nome de arquivo, que
+   * a bolha exibe quando existe. */
+  async processAudioMessage(
+    channel: Channels,
+    support_chat: SupportChats,
+    messagePayload: MessageData,
+    manager: EntityManager,
+  ): Promise<MessageWithLastMessage> {
+    this.logger.log('Processing audio message...');
+
+    const key = `chat/audios/${randomUUID()}`;
+    const { presignedUrl, mimeType, mediaSize, keyWithExtension, fileName } =
+      await this.processUploadMedia(
+        channel.session_id,
+        messagePayload.id.remote,
+        messagePayload.id.id,
+        key,
+      );
+
+    messagePayload.body = toMMSS(messagePayload.duration || 0);
+    const formatatedMessage = this.formatateMessageContent(messagePayload, channel, support_chat);
+
+    const messageToSave = this.messagesRepository.create({
+      ...formatatedMessage,
+      has_media: messagePayload.hasMedia,
+      media_url: keyWithExtension,
+      media_type: mimeType.split(';')[0],
       media_size: mediaSize,
       file_name: fileName,
     });
@@ -862,6 +970,7 @@ export class MessagesService {
       to: messagePayload.to,
       device_type: messagePayload.deviceType ?? null,
       has_quoted: messagePayload.hasQuotedMsg,
+      is_forwarded: Boolean(messagePayload.isForwarded),
       quoted_msg_id: messagePayload.hasQuotedMsg
         ? (messagePayload._data?.quotedStanzaID ?? null)
         : null,

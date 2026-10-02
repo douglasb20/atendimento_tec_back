@@ -35,6 +35,8 @@ export enum MessageTypes {
   TEXT = 'chat',
   AUDIO = 'audio',
   VOICE = 'ptt',
+  /** Visualização única: só o aviso é guardado, nunca o conteúdo. */
+  VIEW_ONCE = 'view_once',
   IMAGE = 'image',
   VIDEO = 'video',
   DOCUMENT = 'document',

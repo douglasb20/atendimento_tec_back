@@ -100,6 +100,15 @@ export class SupportChats {
   })
   observation_user: string | null;
 
+  /** Instante em que o atendimento foi pausado; nulo = não está pausado. A
+   * conversa continua `EM_ANDAMENTO` (ver a migration `AddPausaToSupportChats`). */
+  @Column({ name: 'paused_at', type: 'timestamptz', nullable: true, default: null })
+  paused_at: Date | null;
+
+  /** Soma das pausas já encerradas, para o cronômetro descontá-las. */
+  @Column({ name: 'paused_total_seconds', type: 'int', default: 0 })
+  paused_total_seconds: number;
+
   /** Marca que o aviso de inatividade já foi enviado nesta janela - zerado
    * quando o relógio reseta (mensagem nova depois do aviso), para permitir
    * avisar de novo numa inatividade futura. Nulo = ainda não avisou. */

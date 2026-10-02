@@ -174,7 +174,7 @@ export class EvolutionMapper {
     const { key, message, messageType, messageTimestamp, pushName, status, source } = data;
     const contextInfo = data.contextInfo ?? this.extractContextInfo(message);
     const mediaContent = this.extractMediaContent(message);
-    const type = this.mapMessageType(messageType, message);
+    const type = this.mapMessageType(messageType, message, key?.isViewOnce);
     const remoteJid = key?.remoteJid ?? '';
 
     return {
@@ -187,7 +187,7 @@ export class EvolutionMapper {
       isEphemeral: Boolean(contextInfo?.expiration),
       from: key?.fromMe ? '' : remoteJid,
       fromMe: key?.fromMe ?? false,
-      hasMedia: Boolean(mediaContent),
+      hasMedia: Boolean(mediaContent) && type !== MessageTypes.VIEW_ONCE,
       hasQuotedMsg: Boolean(contextInfo?.stanzaId),
       hasReaction: false,
       duration: String(message?.audioMessage?.seconds ?? mediaContent?.seconds ?? ''),
@@ -197,7 +197,10 @@ export class EvolutionMapper {
         id: key?.id ?? '',
         _serialized: `${key?.fromMe ? 'true' : 'false'}_${remoteJid}_${key?.id ?? ''}`,
       },
-      isForwarded: false,
+      // O `isForwarded` pode vir no contextInfo do topo ou no da mídia.
+      isForwarded: Boolean(
+        contextInfo?.isForwarded || this.extractContextInfo(message)?.isForwarded,
+      ),
       forwardingScore: 0,
       isStarred: false,
       location: undefined,
@@ -437,11 +440,18 @@ export class EvolutionMapper {
    * `messageType` é desconhecido, cai em UNKNOWN em vez de deixar undefined -
    * o switch de `saveIncoming` não tem branch default.
    */
-  static mapMessageType(messageType: string, message?: EvolutionMessageContent): MessageTypes {
+  static mapMessageType(
+    messageType: string,
+    message?: EvolutionMessageContent,
+    marcadaViewOnce = false,
+  ): MessageTypes {
     if (message?.audioMessage) {
       return message.audioMessage.ptt ? MessageTypes.VOICE : MessageTypes.AUDIO;
     }
+    // Sem `message`, a marca `key.isViewOnce` é a única pista do Baileys.
+    if (marcadaViewOnce || this.ehVisualizacaoUnica(message)) return MessageTypes.VIEW_ONCE;
     if (message?.contactsArrayMessage) return MessageTypes.CONTACT_CARD_MULTI;
+    if (this.extractPix(message)) return MessageTypes.PAYMENT;
 
     return MESSAGE_TYPE_MAP[messageType] ?? MessageTypes.UNKNOWN;
   }
@@ -460,6 +470,62 @@ export class EvolutionMapper {
     }
     if (fallback !== undefined) return fallback;
     return fromMe ? MessageAck.ACK_SERVER : MessageAck.ACK_DEVICE;
+  }
+
+  /**
+   * Visualização única: o conteúdo vem embrulhado em `viewOnceMessage*`, ou já
+   * desembrulhado com `viewOnce: true` na mídia. O conteúdo nunca é guardado -
+   * a mídia some depois de vista, e só o aviso fica na conversa.
+   */
+  private static ehVisualizacaoUnica(message?: EvolutionMessageContent): boolean {
+    if (!message || typeof message !== 'object') return false;
+    const m = message as Record<string, unknown>;
+
+    if (m.viewOnceMessage || m.viewOnceMessageV2 || m.viewOnceMessageV2Extension) return true;
+
+    return ['imageMessage', 'videoMessage', 'audioMessage'].some(
+      (tipo) => (m[tipo] as { viewOnce?: boolean } | undefined)?.viewOnce === true,
+    );
+  }
+
+  /**
+   * Chave Pix compartilhada pelo "Pagamento" do WhatsApp: chega como
+   * `interactiveMessage` com o botão `payment_info`. O conteúdo vira JSON
+   * (`merchant_name`, `key`, `key_type`, `valor`, `referencia`) para a tela
+   * montar o cartão; `null` se a mensagem não for isso.
+   */
+  private static extractPix(message?: EvolutionMessageContent): {
+    merchant_name: string | null;
+    key: string;
+    key_type: string | null;
+    valor: number | null;
+    referencia: string | null;
+  } | null {
+    const botao = message?.interactiveMessage?.nativeFlowMessage?.buttons?.find(
+      (b) => b.name === 'payment_info',
+    );
+    if (!botao?.buttonParamsJson) return null;
+
+    try {
+      const params = JSON.parse(botao.buttonParamsJson);
+      const pix = params?.payment_settings?.find(
+        (p: { type?: string }) => p.type === 'pix_static_code',
+      )?.pix_static_code;
+      if (!pix?.key) return null;
+
+      const total = params?.total_amount;
+      const valor = total?.value && total?.offset ? total.value / total.offset : null;
+
+      return {
+        merchant_name: pix.merchant_name ?? null,
+        key: pix.key,
+        key_type: pix.key_type ?? null,
+        valor: valor || null,
+        referencia: params?.reference_id ?? null,
+      };
+    } catch {
+      return null;
+    }
   }
 
   /** Primeiro nó de mídia presente no conteúdo. */
@@ -492,17 +558,28 @@ export class EvolutionMapper {
     type: MessageTypes,
     mediaContent: EvolutionMediaContent | null,
   ): string {
+    // Antes do `!message`: a visualização única chega justamente sem conteúdo.
+    if (type === MessageTypes.VIEW_ONCE) {
+      return 'Mensagem de visualização única. Abra o WhatsApp no celular para ver.';
+    }
     if (!message) return '';
 
     if (message.conversation) return message.conversation;
+    const pix = this.extractPix(message);
+    if (pix) return JSON.stringify(pix);
     const comOpcoes = this.extractOpcoes(message);
     if (comOpcoes !== null) return comOpcoes;
     if (type === MessageTypes.CONTACT_CARD || type === MessageTypes.CONTACT_CARD_MULTI) {
       return JSON.stringify(this.extractVCards(message));
     }
     if (message.locationMessage) {
-      const { degreesLatitude, degreesLongitude, name } = message.locationMessage;
-      return name ?? `${degreesLatitude ?? ''},${degreesLongitude ?? ''}`;
+      // Primeira linha sempre as coordenadas (o front as lê dali para montar o
+      // link do mapa); nome e endereço, quando o local é um lugar nomeado,
+      // vêm nas linhas seguintes.
+      const { degreesLatitude, degreesLongitude, name, address } = message.locationMessage;
+      return [`${degreesLatitude ?? ''},${degreesLongitude ?? ''}`, name, address]
+        .filter(Boolean)
+        .join('\n');
     }
     if (message.speechToText) return message.speechToText;
 

@@ -37,7 +37,7 @@ import { FinalizarAtendimentoDto } from './dto/finalizar-atendimento.dto';
 import { FinalizarSemAtendimentoDto } from './dto/finalizar-sem-atendimento.dto';
 import { TransferirAtendimentoDto } from './dto/transferir-atendimento.dto';
 import { CreateSupportChatDto } from './dto/create-support-chat.dto';
-import { SupportChatEvents } from './entities/support-chat-events.entity';
+import { SupportChatEvents, SupportChatEventType } from './entities/support-chat-events.entity';
 import { SupportChatEventsRepository } from './support-chat-events.repository';
 import { montaMensagemAutomatica } from './mensagens-automaticas';
 import { UserRepository } from '@/users/users.repository';
@@ -305,6 +305,10 @@ export class SupportChatsService {
 
     if (Number(supportChat.user_id) !== Number(user_id)) {
       throw new ForbiddenException('Este atendimento está com outro atendente');
+    }
+
+    if (supportChat.paused_at) {
+      throw new BadRequestException('Atendimento pausado: retome-o para responder');
     }
 
     return supportChat;
@@ -1395,6 +1399,108 @@ export class SupportChatsService {
   }
 
   /**
+   * Pausa o atendimento: o cronômetro para e o atendente não responde até
+   * retomar. A conversa continua `EM_ANDAMENTO`, com o mesmo dono; o cliente
+   * segue podendo escrever, e a mensagem só incrementa as não lidas.
+   * Idempotente para quem já pausou (duplo clique não é erro).
+   */
+  async pausarAtendimento(
+    id: number,
+    user_id: number,
+    podeAgirEmQualquer = false,
+  ): Promise<SupportChats> {
+    const supportChat = await this.carregaParaPausa(id, user_id, podeAgirEmQualquer);
+    if (supportChat.paused_at) return this.recarregaEEmiteEstado(id);
+
+    const afetadas = await runInTransaction(this.dataSource, async (manager) => {
+      const linhas = await this.supportChatsRepository.pausar(
+        id,
+        supportChat.user_id,
+        new Date(),
+        manager,
+      );
+      if (linhas) {
+        await this.supportChatEventsRepository.registraPausa(
+          id,
+          user_id,
+          SupportChatEventType.PAUSA,
+          manager,
+        );
+      }
+      return linhas;
+    });
+    if (!afetadas) {
+      throw new ConflictException('O atendimento mudou de estado durante a pausa');
+    }
+
+    return this.recarregaComEventos(id);
+  }
+
+  /** Retoma o atendimento pausado: o cronômetro volta de onde parou. */
+  async retomarAtendimento(
+    id: number,
+    user_id: number,
+    podeAgirEmQualquer = false,
+  ): Promise<SupportChats> {
+    const supportChat = await this.carregaParaPausa(id, user_id, podeAgirEmQualquer);
+    if (!supportChat.paused_at) return this.recarregaEEmiteEstado(id);
+
+    const afetadas = await runInTransaction(this.dataSource, async (manager) => {
+      const linhas = await this.supportChatsRepository.retomar(id, new Date(), manager);
+      if (linhas) {
+        await this.supportChatEventsRepository.registraPausa(
+          id,
+          user_id,
+          SupportChatEventType.RETOMADA,
+          manager,
+        );
+      }
+      return linhas;
+    });
+    if (!afetadas) {
+      throw new ConflictException('O atendimento mudou de estado durante a retomada');
+    }
+
+    return this.recarregaComEventos(id);
+  }
+
+  /**
+   * Estado emitido e devolvido com os eventos junto: eles só chegam ao abrir a
+   * conversa, então sem isto a linha "pausou/retomou" só apareceria depois de
+   * reabri-la. O socket leva o estado sem eventos (os outros clientes não os
+   * exibem ao vivo, como já é com a transferência).
+   */
+  private async recarregaComEventos(id: number): Promise<SupportChats> {
+    const atualizado = await this.recarregaEEmiteEstado(id);
+    return Object.assign(atualizado, {
+      supportChatEvents: await this.supportChatEventsRepository.findPorConversa(id),
+    });
+  }
+
+  /** Validação comum de pausar/retomar: existe, em andamento e é do usuário
+   * (o master age em qualquer atendimento, como em finalizar/transferir). */
+  private async carregaParaPausa(
+    id: number,
+    user_id: number,
+    podeAgirEmQualquer: boolean,
+  ): Promise<SupportChats> {
+    const supportChat = await this.supportChatsRepository.findParaEstado(id);
+    if (!supportChat) {
+      throw new NotFoundException('Chat de suporte não encontrado');
+    }
+    if (supportChat.supportChatStatus?.is_final) {
+      throw new BadRequestException('Este atendimento já foi finalizado');
+    }
+    if (supportChat.support_chat_status_id !== SupportChatStatusId.EM_ANDAMENTO) {
+      throw new BadRequestException('Só é possível pausar um atendimento em andamento');
+    }
+    if (!podeAgirEmQualquer && Number(supportChat.user_id) !== Number(user_id)) {
+      throw new ForbiddenException('Somente quem assumiu o atendimento pode pausá-lo');
+    }
+    return supportChat;
+  }
+
+  /**
    * Encerra o atendimento.
    *
    * Exige cliente associado: o atendimento encerrado alimenta o histórico do
@@ -1418,6 +1524,10 @@ export class SupportChatsService {
 
     if (supportChat.support_chat_status_id !== SupportChatStatusId.EM_ANDAMENTO) {
       throw new BadRequestException('Inicie o atendimento antes de finalizá-lo');
+    }
+
+    if (supportChat.paused_at) {
+      throw new BadRequestException('Retome o atendimento pausado antes de finalizá-lo');
     }
 
     // O master (`is_superuser`) encerra atendimento de qualquer atendente -
