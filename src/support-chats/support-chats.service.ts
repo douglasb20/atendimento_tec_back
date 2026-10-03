@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { comDdiBrasil, ContactsService } from '@/contacts/contacts.service';
 import { ContactsRepository } from '@/contacts/contacts.repository';
 import { WhatsappService } from '@/whatsapp/whatsapp.service';
+import { ProviderChamada } from '@/whatsapp/providers/whatsapp-provider.interface';
 import {
   MessageEditPayload,
   MessagePayload,
@@ -722,6 +723,155 @@ export class SupportChatsService {
     }
   }
 
+  /**
+   * Chamada recebida (`call` da Evolution, status `offer`).
+   *
+   * Só registra em conversa **já aberta**: chamada de número desconhecido não
+   * abre atendimento nem gera protocolo - se a pessoa quiser atendimento,
+   * manda mensagem. Sem conversa aberta, a rejeição ainda acontece (é a
+   * Evolution quem rejeita, pelo setting), apenas não há onde registrar.
+   *
+   * A mensagem de rejeição é enviada **por nós**, e não pela Evolution, para
+   * poder ser gravada oculta: ela chega ao cliente mas não aparece na
+   * conversa - o atendente vê só o evento "chamada rejeitada". Automação não é
+   * diálogo, e repetir o texto a cada ligação poluiria o histórico.
+   */
+  async onIncomingCall(payload: WhatsappWebhookPayload<{ chamada: ProviderChamada }>) {
+    const { sessionId, data } = payload;
+    const chamada = data?.chamada;
+    if (!chamada) return;
+
+    const channel = await this.channelsRepository.findBySessionId(sessionId);
+    if (!channel) return;
+
+    const contact = await this.contatoDaChamada(sessionId, chamada.remoteJid);
+
+    if (!contact) {
+      this.logger.log(`Chamada de ${chamada.remoteJid} sem contato cadastrado; ignorada.`);
+      return;
+    }
+
+    const supportChat = await this.supportChatsRepository.buscaAberta(contact.id, channel.id);
+    if (!supportChat) {
+      this.logger.log(`Chamada de ${contact.id} sem conversa aberta; ignorada.`);
+      return;
+    }
+
+    const rejeitada = Boolean(channel.rejeitar_chamadas);
+
+    await runInTransaction(this.dataSource, (manager) =>
+      this.supportChatEventsRepository.registraChamada(
+        supportChat.id,
+        rejeitada,
+        chamada.isVideo,
+        manager,
+      ),
+    );
+
+    // Enviada depois de registrar o evento: a ordem na conversa fica "houve
+    // chamada" e não o contrário, e uma falha no envio não impede o registro.
+    if (rejeitada && channel.rejeitar_chamadas_enviar_mensagem) {
+      await this.enviaMensagemDeRejeicao(supportChat, channel.rejeitar_chamadas_mensagem);
+    }
+
+    await this.recarregaComEventos(supportChat.id);
+
+    this.logger.log(
+      `Chamada ${rejeitada ? 'rejeitada' : 'recebida'} na conversa ${supportChat.id}`,
+    );
+  }
+
+  /**
+   * Acha o contato de uma chamada.
+   *
+   * ⚠️ O evento `call` chega **só com o `@lid`**, sem o telefone - diferente
+   * das mensagens, em que a Evolution já troca pelo `remoteJidAlt`. E o `@lid`
+   * não contém o número: seus dígitos são de outro espaço de numeração, então
+   * não há como derivar o telefone dele localmente.
+   *
+   * Por isso: tenta pelos dois identificadores que já temos e, falhando, pede
+   * a tradução ao provider. Resolvido, o `lid` é gravado no contato - a
+   * próxima chamada acha direto, sem ida à rede.
+   */
+  private async contatoDaChamada(sessionId: string, remoteJid: string): Promise<Contacts | null> {
+    const conhecido = await this.contactsRepository.findOne({
+      where: [{ remote_jid: remoteJid }, { lid: remoteJid }],
+      order: { id: 'ASC' },
+    });
+    if (conhecido || !remoteJid.endsWith('@lid')) return conhecido;
+
+    const jidComTelefone = await this.whatsappService.resolveLid(sessionId, remoteJid);
+    if (!jidComTelefone) return null;
+
+    const contact = await this.contactsRepository.findOne({
+      where: { remote_jid: jidComTelefone },
+      order: { id: 'ASC' },
+    });
+    if (!contact) return null;
+
+    // Aprende o LID, como `findOrCreateByRemoteJid` já faz no recebimento de
+    // mensagem. Não sobrescreve nem rouba um LID já associado a outro contato
+    // (o índice único derrubaria a transação).
+    if (!contact.lid) {
+      const emUso = await this.contactsRepository.existsBy({ lid: remoteJid });
+      if (!emUso) {
+        contact.lid = remoteJid;
+        await this.contactsRepository.save(contact);
+        this.logger.log(`LID ${remoteJid} associado ao contato ${contact.id} (via chamada)`);
+      }
+    }
+
+    return contact;
+  }
+
+  /**
+   * Envia o texto de rejeição e o grava **oculto** (`is_system_hidden`).
+   *
+   * `saveOutgoing` normal, com `isAutomatic` - o que muda é a marca gravada
+   * logo depois, que faz a bolha não aparecer para o atendente. A
+   * prévia da conversa também não é atualizada: a última mensagem continua
+   * sendo a última troca de verdade.
+   */
+  private async enviaMensagemDeRejeicao(
+    supportChat: SupportChats,
+    texto: string | null,
+  ): Promise<void> {
+    const mensagem = montaMensagemAutomatica(texto, supportChat);
+    const destino = supportChat.contact?.remote_jid;
+    if (!mensagem || !destino) return;
+
+    try {
+      const enviadoEm = new Date();
+      const enviada = await this.whatsappService.sendMessage(
+        supportChat.channel.session_id,
+        destino,
+        mensagem,
+      );
+
+      await runInTransaction(this.dataSource, async (manager) => {
+        await this.messagesService.saveOutgoing(
+          {
+            messageId: enviada.messageId,
+            channel: supportChat.channel,
+            supportChat,
+            to: destino,
+            content: mensagem,
+            type: MessageTypes.TEXT,
+            sentAt: enviadoEm,
+            isAutomatic: true,
+            // Já na gravação, não num update depois: o eco do webhook chega em
+            // milissegundos, e com a marca aplicada só depois a tela recebia a
+            // bolha antes de ela existir.
+            isSystemHidden: true,
+          },
+          manager,
+        );
+      });
+    } catch (err) {
+      this.logger.warn(`Falha ao enviar a mensagem de rejeição de chamada: ${err.message}`);
+    }
+  }
+
   // ====== Event Listeners Handles ======
   async onMessageCreate(payload: WhatsappWebhookPayload<MessagePayload>) {
     let chatbotParaEnfileirar: {
@@ -810,6 +960,14 @@ export class SupportChatsService {
             savedMessage.content,
             manager,
           );
+        }
+
+        // Mensagem que o sistema escondeu (rejeição de chamada): não conta
+        // como não lida, não atualiza a prévia e **não vai para a tela** - o
+        // eco chega aqui segundos depois do envio, e sem este desvio a bolha
+        // aparecia na conversa mesmo marcada como oculta no banco.
+        if (savedMessage?.is_system_hidden) {
+          return null;
         }
 
         if (savedMessage) {
@@ -973,7 +1131,10 @@ export class SupportChatsService {
         // sessão, por exemplo) simplesmente não tem o que atualizar.
         const savedMessage = await this.messagesService.saveMessageAck(data.message, manager);
 
-        if (savedMessage) {
+        // Mensagem oculta pelo sistema (rejeição de chamada) não vai para a
+        // tela em evento nenhum: o front insere a mensagem que vem no ack, e
+        // só esse evento já bastava para a bolha aparecer.
+        if (savedMessage && !savedMessage.is_system_hidden) {
           // O front substitui a mensagem inteira ao receber o ack, então a
           // key precisa virar URL aqui também - senão o ack apagaria a imagem
           // que o evento anterior já tinha exibido.
@@ -1013,7 +1174,7 @@ export class SupportChatsService {
           manager,
         );
 
-        if (savedMessage) {
+        if (savedMessage && !savedMessage.is_system_hidden) {
           await this.supportChatsRepository.updateLastMessage(
             supportChat.id,
             savedMessage?.lastMessage,
@@ -1078,7 +1239,7 @@ export class SupportChatsService {
           manager,
         );
 
-        if (savedMessage) {
+        if (savedMessage && !savedMessage.is_system_hidden) {
           // `lastMessage` só vem preenchido quando a mensagem afetada era a
           // última da conversa; nas demais, a prévia do chat não muda.
           if (savedMessage.lastMessage) {
@@ -1152,7 +1313,7 @@ export class SupportChatsService {
           manager,
         );
 
-        if (savedMessage) {
+        if (savedMessage && !savedMessage.is_system_hidden) {
           const supoportChatsWhitMessage = {
             ...supportChat,
             // A key vira URL pública aqui: o que sai pelo socket é o que o
@@ -1471,10 +1632,9 @@ export class SupportChatsService {
    * exibem ao vivo, como já é com a transferência).
    */
   private async recarregaComEventos(id: number): Promise<SupportChats> {
-    const atualizado = await this.recarregaEEmiteEstado(id);
-    return Object.assign(atualizado, {
-      supportChatEvents: await this.supportChatEventsRepository.findPorConversa(id),
-    });
+    const eventos = await this.supportChatEventsRepository.findPorConversa(id);
+    const atualizado = await this.recarregaEEmiteEstado(id, { supportChatEvents: eventos });
+    return Object.assign(atualizado, { supportChatEvents: eventos });
   }
 
   /** Validação comum de pausar/retomar: existe, em andamento e é do usuário
@@ -1831,9 +1991,12 @@ export class SupportChatsService {
     return chat;
   }
 
-  private async recarregaEEmiteEstado(id: number): Promise<SupportChats> {
+  private async recarregaEEmiteEstado(
+    id: number,
+    extras?: Partial<SupportChats>,
+  ): Promise<SupportChats> {
     const atualizado = await this.supportChatsRepository.findParaEstado(id);
-    await this.whatsappChatStateEmit(atualizado);
+    await this.whatsappChatStateEmit(Object.assign(atualizado, extras));
 
     // A tradução precisa acontecer aqui tambem, e nao so no emit: aquele
     // metodo faz releitura propria e muta *o objeto dele*, outra instancia.
@@ -1883,6 +2046,13 @@ export class SupportChatsService {
         // é por ele que a lista se ordena - sem isto a conversa com mensagem nova
         // não sobe para o topo.
         updated_at: new Date(),
+        // A releitura (`findParaEstado`) não carrega os eventos: quem os tem é
+        // o chamador, que acabou de gravá-los. Sem isto, a linha de "chamada
+        // rejeitada" só apareceria ao reabrir a conversa - diferente da pausa,
+        // em que a resposta HTTP da ação já os devolvia.
+        ...(supportChat.supportChatEvents && {
+          supportChatEvents: supportChat.supportChatEvents,
+        }),
       },
     );
   }

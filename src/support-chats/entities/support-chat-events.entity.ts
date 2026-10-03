@@ -9,6 +9,8 @@ export enum SupportChatEventType {
   TRANSFERENCIA = 'transferencia',
   PAUSA = 'pausa',
   RETOMADA = 'retomada',
+  /** Chamada recebida. `motivo` guarda se foi rejeitada e se era vídeo. */
+  CHAMADA = 'chamada',
 }
 
 /**

@@ -60,6 +60,14 @@ export class WhatsappService {
       return;
     }
 
+    // Mensagem de controle do protocolo, sem conteúdo para exibir: chega
+    // junto de ações como editar/apagar feitas no celular e, sem este
+    // descarte, virava uma bolha vazia na conversa (tipo `unknown`).
+    if (dataType === DataTypeWhatsapp.MESSAGE_CREATE && this.ehMensagemDeControle(body)) {
+      this.logger.debug(`Mensagem de controle ignorada (instância ${instance}).`);
+      return;
+    }
+
     const payload = this.normalizePayload(body, dataType);
     if (!payload) {
       this.logger.debug(`Evento ${event} sem dados aproveitáveis; ignorado.`);
@@ -72,6 +80,23 @@ export class WhatsappService {
 
     await queue.add(`${prefix}-${instance}`, payload, { jobId: key });
     this.logger.log(`Evento enfileirado: ${event} -> ${dataType} (job ${key})`);
+  }
+
+  /**
+   * Mensagem sem nada a exibir: só nós de controle do protocolo.
+   *
+   * `secretEncryptedMessage` é o caso visto em produção - payload cifrado que
+   * acompanha ações feitas no celular (editar, apagar, enquete) e que nem o
+   * Baileys decifra. `messageContextInfo` sozinho é só metadado.
+   */
+  private ehMensagemDeControle(body: EvolutionWebhookBody): boolean {
+    const message = (body.data as { message?: Record<string, unknown> } | undefined)?.message;
+    if (!message || typeof message !== 'object') return false;
+
+    const soControle = ['messageContextInfo', 'secretEncryptedMessage', 'deviceSentMessage'];
+    const chaves = Object.keys(message);
+
+    return chaves.length > 0 && chaves.every((chave) => soControle.includes(chave));
   }
 
   /** Descobre o tipo interno; `connection.update` depende do estado recebido. */
@@ -149,6 +174,15 @@ export class WhatsappService {
       case DataTypeWhatsapp.MESSAGE_REACTION: {
         const reaction = EvolutionMapper.mapReaction(data as never);
         return reaction ? EvolutionMapper.toInternalPayload(body, dataType, { reaction }) : null;
+      }
+
+      case DataTypeWhatsapp.INCOMING_CALL: {
+        const chamada = EvolutionMapper.mapCall(data);
+        // Só a oferta interessa: `terminate` chega logo depois da nossa própria
+        // rejeição e duplicaria o aviso na conversa. Grupo não tem atendimento.
+        if (!chamada || chamada.status !== 'offer' || chamada.isGroup) return null;
+
+        return EvolutionMapper.toInternalPayload(body, dataType, { chamada });
       }
 
       case DataTypeWhatsapp.QR_RECEIVED: {
@@ -256,7 +290,42 @@ export class WhatsappService {
       });
     }
 
+    // Toda conexão reaplica as preferências: é o único momento garantido em
+    // que a instância existe no provider. Também reenvia a assinatura de
+    // eventos do webhook, que só é aplicada na criação da instância - sem
+    // isto, canal antigo nunca receberia o evento de chamada.
+    await this.aplicarPreferencias(sessionId, {
+      ...(result.instanceToken && { instanceToken: result.instanceToken }),
+    });
+
     return result;
+  }
+
+  /**
+   * Reaplica no provider as preferências do canal (rejeição de chamadas) e a
+   * assinatura do webhook. Chamada ao conectar e ao salvar o cadastro.
+   *
+   * Falha aqui não propaga: o cadastro já foi salvo e a conexão já aconteceu;
+   * a preferência volta a ser tentada na próxima conexão.
+   */
+  async aplicarPreferencias(
+    sessionId: string,
+    extras?: { instanceToken?: string },
+  ): Promise<void> {
+    try {
+      const channel = await this.channelsRepository.findBySessionIdWithToken(sessionId);
+      if (!channel) return;
+
+      await this.evolutionProvider.aplicarPreferencias(
+        {
+          ...this.sessaoDoCanal(channel),
+          ...(extras?.instanceToken && { instanceToken: extras.instanceToken }),
+        },
+        { rejeitarChamadas: Boolean(channel.rejeitar_chamadas) },
+      );
+    } catch (error) {
+      this.logger.warn(`Falha ao aplicar preferências do canal ${sessionId}: ${error.message}`);
+    }
   }
 
   async requestQrCode(sessionId: string): Promise<string | null> {
@@ -307,6 +376,17 @@ export class WhatsappService {
    * ou quando o número é inválido. O cadastro segue sem o JID nesses casos:
    * indisponibilidade de terceiro não pode travar o registro de um contato.
    */
+  /** `@lid` → JID com telefone, pelo canal informado. `null` se não souber. */
+  async resolveLid(sessionId: string, lid: string): Promise<string | null> {
+    try {
+      const { provider, session } = await this.resolve(sessionId);
+      return provider.resolveLid(session, lid);
+    } catch (erro) {
+      this.logger.warn(`Falha ao resolver o LID ${lid}: ${erro.message}`);
+      return null;
+    }
+  }
+
   async verificaNumero(numero: string): Promise<ProviderNumeroVerificado | null> {
     const channel = await this.channelsRepository.findQualquerConectado();
 

@@ -75,12 +75,31 @@ export type EvolutionWebhookBody<T = unknown> = {
  */
 export type EvolutionEditedData = {
   key?: EvolutionMessageKey;
+  /**
+   * Editar a legenda de uma mídia traz o nó da própria mídia
+   * (`imageMessage`, `videoMessage`...), com a legenda nova em `caption` -
+   * não só os dois campos de texto.
+   */
   editedMessage?: {
     extendedTextMessage?: { text?: string };
     conversation?: string;
-  };
+  } & EvolutionMessageContent;
   timestampMs?: number;
   type?: number;
+};
+
+/**
+ * `call` - chamada recebida. O Baileys emite `offer` ao tocar e `terminate` ao
+ * encerrar; só o primeiro interessa, o segundo chegaria logo depois da nossa
+ * própria rejeição e duplicaria o aviso.
+ */
+export type EvolutionCallData = {
+  id?: string;
+  from?: string;
+  status?: 'offer' | 'ringing' | 'timeout' | 'reject' | 'accept' | 'terminate';
+  isVideo?: boolean;
+  isGroup?: boolean;
+  date?: string;
 };
 
 export type EvolutionMessageKey = {

@@ -32,6 +32,32 @@ export interface WhatsappProvider {
     number?: string,
   ): Promise<ProviderConnectionResult>;
 
+  /**
+   * Aplica no provider as preferências do canal que ele precisa conhecer -
+   * hoje só a rejeição automática de chamadas.
+   *
+   * Reenvia também a assinatura de eventos do webhook: a lista só é enviada
+   * no `/instance/create`, então instância criada antes de um evento novo
+   * entrar na lista nunca o receberia (ver `SUBSCRIBED_EVENTS`).
+   *
+   * ⚠️ A mensagem de rejeição **não** vai para o provider: quem a envia é o
+   * back, para gravá-la oculta e manter a conversa limpa.
+   */
+  aplicarPreferencias(
+    session: ProviderSessionRef,
+    preferencias: ProviderPreferenciasCanal,
+  ): Promise<void>;
+
+  /**
+   * Traduz um `@lid` para o JID com telefone (`...@s.whatsapp.net`).
+   *
+   * O `@lid` é o identificador de privacidade do WhatsApp e **não** carrega o
+   * número: os dígitos dele pertencem a outro espaço de numeração. Alguns
+   * eventos (a chamada, por exemplo) chegam só com ele, e sem esta tradução
+   * não há como achar o contato. `null` quando o provider não souber.
+   */
+  resolveLid(session: ProviderSessionRef, lid: string): Promise<string | null>;
+
   /** Devolve o QR code corrente, ou null quando já conectado. */
   requestQrCode(session: ProviderSessionRef): Promise<string | null>;
 
@@ -159,6 +185,23 @@ export type ProviderSessionRef = {
   instanceToken?: string | null;
   /** Id do canal, usado para persistir dados devolvidos pelo provider. */
   channelId?: number;
+};
+
+/** Chamada recebida, normalizada a partir do evento do provider. */
+export type ProviderChamada = {
+  callId: string;
+  /** JID de quem ligou - pode vir em `@lid`, como qualquer evento. */
+  remoteJid: string;
+  status: string;
+  isVideo: boolean;
+  isGroup: boolean;
+  recebidaEm: Date;
+};
+
+/** Preferências do canal que o provider precisa conhecer. */
+export type ProviderPreferenciasCanal = {
+  /** Rejeita toda chamada recebida, sem tocar no aparelho. */
+  rejeitarChamadas: boolean;
 };
 
 export type ProviderConnectionState = 'connecting' | 'connected' | 'disconnected' | 'refused';

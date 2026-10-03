@@ -9,6 +9,7 @@ import {
 import {
   EvolutionEditedData,
   EvolutionMessageKey,
+  EvolutionCallData,
   EvolutionChatData,
   EvolutionConnectionData,
   EvolutionContextInfo,
@@ -22,6 +23,7 @@ import {
   EvolutionUpsertData,
   EvolutionWebhookBody,
 } from './evolution.types';
+import { ProviderChamada } from '../whatsapp-provider.interface';
 
 /**
  * Traduz o formato da Evolution API (Baileys) para o vocabulário interno.
@@ -99,6 +101,8 @@ export class EvolutionMapper {
         return DataTypeWhatsapp.MESSAGE_REVOKED_EVERYONE;
       case EvolutionEvent.QRCODE_UPDATED:
         return DataTypeWhatsapp.QR_RECEIVED;
+      case EvolutionEvent.CALL:
+        return DataTypeWhatsapp.INCOMING_CALL;
       case EvolutionEvent.CONTACTS_UPDATE:
       case EvolutionEvent.CONTACTS_UPSERT:
         return DataTypeWhatsapp.CONTACT_CHANGED;
@@ -155,6 +159,10 @@ export class EvolutionMapper {
         const del = data as EvolutionDeleteData & { key?: { remoteJid?: string } };
         return del.remoteJid ?? del.key?.remoteJid ?? null;
       }
+      case EvolutionEvent.CALL: {
+        const call = Array.isArray(data) ? data[0] : (data as EvolutionCallData);
+        return call?.from ?? null;
+      }
       case EvolutionEvent.CHATS_UPDATE: {
         const chat = Array.isArray(data) ? data[0] : (data as EvolutionChatData);
         return chat?.remoteJid ?? chat?.id ?? null;
@@ -162,6 +170,26 @@ export class EvolutionMapper {
       default:
         return null;
     }
+  }
+
+  /**
+   * `call` → dados da chamada, já normalizados.
+   *
+   * A Evolution às vezes entrega o objeto, às vezes um array de um elemento -
+   * mesmo comportamento de `chats.update`.
+   */
+  static mapCall(data: unknown): ProviderChamada | null {
+    const call = (Array.isArray(data) ? data[0] : data) as EvolutionCallData;
+    if (!call?.from) return null;
+
+    return {
+      callId: call.id ?? '',
+      remoteJid: call.from,
+      status: call.status ?? 'offer',
+      isVideo: Boolean(call.isVideo),
+      isGroup: Boolean(call.isGroup),
+      recebidaEm: call.date ? new Date(call.date) : new Date(),
+    };
   }
 
   /**
@@ -280,11 +308,21 @@ export class EvolutionMapper {
    *   `editedMessage.extendedTextMessage.text` e sem os campos de contexto.
    */
   static mapEdited(data: EvolutionUpsertData & EvolutionEditedData): MessageData {
+    // Editar a legenda de uma mídia traz o nó dela (`imageMessage` etc.) com a
+    // legenda nova em `caption` - não os campos de texto. Sem ler daqui, a
+    // edição caía no `mapUpsert`, que não acha nada e devolve `body` vazio:
+    // a legenda era apagada da mensagem.
+    const midiaEditada = data.editedMessage
+      ? this.extractMediaContent(data.editedMessage as EvolutionMessageContent)
+      : null;
+
     const textoEditado =
-      data.editedMessage?.extendedTextMessage?.text ?? data.editedMessage?.conversation ?? null;
+      data.editedMessage?.extendedTextMessage?.text ??
+      data.editedMessage?.conversation ??
+      (midiaEditada ? (midiaEditada.caption ?? '') : null);
 
     // Sem `editedMessage` é o formato de upsert, que o mapa padrão resolve.
-    if (!textoEditado) {
+    if (textoEditado === null) {
       return this.mapUpsert(data);
     }
 
@@ -299,14 +337,23 @@ export class EvolutionMapper {
         _serialized: `${chave.fromMe ?? true}_${remoteJid}_${chave.id ?? ''}`,
       },
       body: textoEditado,
-      type: MessageTypes.TEXT,
+      // O tipo real da mídia, não `TEXT`: a mensagem editada continua sendo a
+      // imagem/vídeo que era, e o `saveMessage` grava este campo.
+      type: midiaEditada
+        ? this.mapMessageType(
+            // A chave do nó (`imageMessage`, `videoMessage`...) é o que o mapa
+            // de tipos espera - sem ela o tipo sairia `unknown`.
+            Object.keys(data.editedMessage ?? {}).find((k) => k in MESSAGE_TYPE_MAP) ?? '',
+            data.editedMessage as EvolutionMessageContent,
+          )
+        : MessageTypes.TEXT,
       // `timestampMs` vem em milissegundos, ao contrário do `messageTimestamp`
       // do upsert, que é em segundos.
       timestamp: Math.floor((data.timestampMs ?? Date.now()) / 1000),
       from: remoteJid,
       to: remoteJid,
       fromMe: chave.fromMe ?? true,
-      hasMedia: false,
+      hasMedia: Boolean(midiaEditada),
       links: [],
       rawData: data as unknown as object,
       _data: { notifyName: '' },

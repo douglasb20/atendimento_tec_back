@@ -74,6 +74,9 @@ export class SupportChatsRepository extends Repository<SupportChats> {
   }
 
   async findSupportChatsById(id: number): Promise<SupportChats> {
+    // ⚠️ O filtro de `is_system_hidden` **não** entra no `where`: no TypeORM,
+    // condição sobre relação vira `INNER JOIN` e a conversa inteira sumiria
+    // quando todas as suas mensagens estivessem ocultas. Filtrado depois.
     let supportChat = await this.findOne({
       where: { id },
       order: { supportChatMessages: { datetime: 'ASC' } },
@@ -93,6 +96,14 @@ export class SupportChatsRepository extends Repository<SupportChats> {
         'supportChatStatus',
       ],
     });
+
+    // Mensagem que o sistema enviou e nunca deve aparecer (rejeição de
+    // chamada): sai aqui, sem marcador na tela.
+    if (supportChat?.supportChatMessages) {
+      supportChat.supportChatMessages = supportChat.supportChatMessages.filter(
+        (mensagem) => !mensagem.is_system_hidden,
+      );
+    }
 
     return supportChat;
   }
@@ -211,7 +222,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
   }
 
   /** A conversa ainda não finalizada deste contato neste canal, se houver. */
-  private async buscaAberta(contact_id: number, channel_id: number): Promise<SupportChats | null> {
+  async buscaAberta(contact_id: number, channel_id: number): Promise<SupportChats | null> {
     return this.createQueryBuilder('sc')
       .innerJoin('support_chat_status', 'scs', 'scs.id = sc.support_chat_status_id')
       .leftJoinAndSelect('sc.contact', 'c')

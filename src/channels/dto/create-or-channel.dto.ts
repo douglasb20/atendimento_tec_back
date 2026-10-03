@@ -104,6 +104,26 @@ export class CreateOrChannelDto {
   })
   despedida_anexo_tipo?: TipoAnexoChannel | null;
 
+  /** Rejeita automaticamente toda chamada recebida neste canal. */
+  @IsOptional()
+  @IsBoolean({ message: 'rejeitar_chamadas deve ser verdadeiro ou falso' })
+  rejeitar_chamadas?: boolean;
+
+  /** Envia a mensagem ao rejeitar. Só tem efeito com `rejeitar_chamadas`. */
+  @IsOptional()
+  @IsBoolean({ message: 'rejeitar_chamadas_enviar_mensagem deve ser verdadeiro ou falso' })
+  rejeitar_chamadas_enviar_mensagem?: boolean;
+
+  /** Texto enviado ao rejeitar a chamada. Obrigatório quando o envio está
+   * ligado - sem ele nada seria enviado, e a preferência ficaria mentindo. */
+  @ValidateIf((dto: CreateOrChannelDto) => dto.rejeitar_chamadas_enviar_mensagem === true)
+  @IsString({ message: 'A mensagem de rejeição precisa ser um texto' })
+  @IsNotEmpty({ message: 'Informe a mensagem de rejeição de chamada' })
+  @MaxLength(LIMITE_MENSAGEM, {
+    message: `A mensagem de rejeição deve ter no máximo ${LIMITE_MENSAGEM} caracteres`,
+  })
+  rejeitar_chamadas_mensagem?: string | null;
+
   /** Liga a resolução automática por inatividade - os três campos abaixo só
    * têm efeito com este ligado. */
   @IsOptional()

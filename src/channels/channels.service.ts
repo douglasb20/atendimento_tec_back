@@ -107,6 +107,13 @@ export class ChannelsService {
       );
     }
 
+    // A rejeição de chamadas vive no provider (setting da instância): sem
+    // reaplicar aqui, a mudança só valeria na próxima reconexão do canal.
+    // Não bloqueia o salvamento - o método já engole a própria falha.
+    if (channelUpdated.session_id) {
+      await this.whatsappService.aplicarPreferencias(channelUpdated.session_id);
+    }
+
     return channel;
   }
 

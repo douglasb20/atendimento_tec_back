@@ -100,6 +100,27 @@ export class Channels {
   @Column({ type: 'varchar', length: 10, nullable: true, default: null })
   despedida_anexo_tipo: TipoAnexoChannel | null;
 
+  /** Rejeita automaticamente toda chamada (voz ou vídeo) recebida neste
+   * canal. Quem rejeita é a Evolution (setting `rejectCall`, aplicado ao
+   * conectar); desligado, o celular toca normalmente e a conversa só registra
+   * o aviso de que houve chamada. */
+  @Column({ type: 'boolean', nullable: false, default: false })
+  rejeitar_chamadas: boolean;
+
+  /** Envia `rejeitar_chamadas_mensagem` ao rejeitar. Só vale com
+   * `rejeitar_chamadas` ligado. */
+  @Column({ type: 'boolean', nullable: false, default: false })
+  rejeitar_chamadas_enviar_mensagem: boolean;
+
+  /** Texto enviado ao cliente quando a chamada é rejeitada.
+   *
+   * ⚠️ Quem envia é o **back**, não a Evolution (o `msgCall` dela fica sempre
+   * vazio): a mensagem é gravada com `hidden_at`, então chega ao cliente mas
+   * não aparece na conversa - o atendente vê só o evento "chamada rejeitada".
+   */
+  @Column({ type: 'text', nullable: true })
+  rejeitar_chamadas_mensagem: string | null;
+
   /** Liga a resolução automática por inatividade - desligado, os campos
    * abaixo ficam preenchidos mas inertes; o cron
    * (`InactivityResolutionService`) ignora o canal inteiro. */

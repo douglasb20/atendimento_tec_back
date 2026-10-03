@@ -50,6 +50,33 @@ export class SupportChatEventsRepository extends Repository<SupportChatEvents> {
   }
 
   /**
+   * Registra a chamada recebida.
+   *
+   * Sem usuário: quem "fez" o evento foi o contato, e a rejeição é do canal,
+   * não de um atendente. O `motivo` carrega a variação em texto curto
+   * (`rejeitada:video`), que a tela traduz - evita duas colunas booleanas
+   * numa tabela genérica de eventos.
+   */
+  async registraChamada(
+    support_chat_id: number,
+    rejeitada: boolean,
+    ehVideo: boolean,
+    manager: EntityManager,
+  ): Promise<SupportChatEvents> {
+    const repo = manager.getRepository(SupportChatEvents);
+
+    return repo.save(
+      repo.create({
+        support_chat_id,
+        tipo: SupportChatEventType.CHAMADA,
+        user_origem_id: null,
+        user_destino_id: null,
+        motivo: `${rejeitada ? 'rejeitada' : 'recebida'}:${ehVideo ? 'video' : 'voz'}`,
+      }),
+    );
+  }
+
+  /**
    * Eventos da conversa, em ordem, com os nomes de quem transferiu e de quem
    * recebeu - é o que a bolha na tela mostra.
    */

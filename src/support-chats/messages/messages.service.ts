@@ -628,6 +628,10 @@ export class MessagesService {
        * atendente. Default `false`: a maior parte do que passa por aqui é
        * resposta manual no suporte. */
       isAutomatic?: boolean;
+      /** Enviada pelo sistema e nunca exibida (rejeição de chamada). Marcada
+       * já na gravação, e não num update depois: o eco do webhook chega em
+       * milissegundos e a tela receberia a bolha antes da marca existir. */
+      isSystemHidden?: boolean;
     },
     manager: EntityManager,
   ): Promise<MessageWithLastMessage> {
@@ -640,6 +644,7 @@ export class MessagesService {
       type: dados.type,
       from_me: true,
       is_automatic: dados.isAutomatic ?? false,
+      is_system_hidden: dados.isSystemHidden ?? false,
       content: dados.content ?? '',
       has_media: Boolean(dados.mediaUrl),
       media_url: dados.mediaUrl ?? null,
@@ -723,6 +728,9 @@ export class MessagesService {
         // O webhook não traz o nome nem o tamanho do arquivo que nós enviamos -
         // sem isto, o espalhamento acima sobrescreveria com null o que a linha
         // provisória guardou, e o documento voltaria a aparecer sem nome.
+        // Mensagem que o sistema escondeu (rejeição de chamada) continua
+        // escondida: o eco do webhook não carrega essa marca, que é nossa.
+        message.is_system_hidden ||= existente.is_system_hidden;
         message.file_name ??= existente.file_name;
         message.media_size ||= existente.media_size;
 

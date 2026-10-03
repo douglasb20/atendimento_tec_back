@@ -16,6 +16,7 @@ import {
   ProviderNumeroVerificado,
   ProviderSentMessage,
   ProviderMessageRef,
+  ProviderPreferenciasCanal,
   ProviderSessionRef,
   ProviderTesteConexao,
   WhatsappProvider,
@@ -52,6 +53,9 @@ const SUBSCRIBED_EVENTS = [
   'SEND_MESSAGE',
   'CONTACTS_UPDATE',
   'CHATS_UPDATE',
+  // Chamada recebida (`offer`/`terminate`) - alimenta o aviso na conversa e o
+  // envio da mensagem de rejeição.
+  'CALL',
 ];
 
 /** Tipos internos de mídia → `mediatype` da Evolution. */
@@ -162,6 +166,99 @@ export class EvolutionProvider implements WhatsappProvider {
     }
 
     return this.connectInstance(session, number);
+  }
+
+  /**
+   * Grava os settings da instância e reenvia a assinatura do webhook.
+   *
+   * `msgCall` vai **sempre vazio**: a Evolution a enviaria por conta própria e
+   * o eco voltaria pelo webhook como mensagem nossa, aparecendo na conversa.
+   * Quem envia é o back, que a grava oculta.
+   *
+   * O webhook é reenviado aqui porque `SUBSCRIBED_EVENTS` só é aplicado na
+   * criação da instância: sem isto, canal criado antes do evento `CALL` entrar
+   * na lista nunca receberia chamada nenhuma.
+   */
+  async aplicarPreferencias(
+    session: ProviderSessionRef,
+    preferencias: ProviderPreferenciasCanal,
+  ): Promise<void> {
+    const config = this.comToken(session);
+
+    try {
+      await this.http.post(
+        `/settings/set/${session.sessionId}`,
+        {
+          rejectCall: Boolean(preferencias.rejeitarChamadas),
+          msgCall: '',
+          groupsIgnore: false,
+          alwaysOnline: false,
+          readMessages: false,
+          readStatus: false,
+          syncFullHistory: false,
+        },
+        config,
+      );
+    } catch (error) {
+      // Preferência não aplicada não impede o canal de operar: o cadastro já
+      // foi salvo, e a rejeição volta a ser tentada na próxima conexão.
+      this.logger.warn(
+        `Não foi possível aplicar as preferências em ${session.sessionId}: ${this.messageOf(error)}`,
+      );
+    }
+
+    try {
+      await this.http.post(
+        `/webhook/set/${session.sessionId}`,
+        {
+          webhook: {
+            enabled: true,
+            url: this.webhookUrl,
+            byEvents: false,
+            base64: false,
+            events: SUBSCRIBED_EVENTS,
+            headers: {
+              'Content-Type': 'application/json',
+              'x-webhook-secret': this.webhookSecret,
+            },
+          },
+        },
+        config,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Não foi possível reconfigurar o webhook de ${session.sessionId}: ${this.messageOf(error)}`,
+      );
+    }
+  }
+
+  /**
+   * `@lid` → JID com telefone, via `/chat/whatsappNumbers`.
+   *
+   * A rota aceita o `@lid` **inteiro** e devolve o `jid` verdadeiro - por isso
+   * não passa pelo `toNumber`, que descartaria o sufixo e mandaria dígitos que
+   * pertencem a outro espaço de numeração (achariam outro número, ou nenhum).
+   */
+  async resolveLid(session: ProviderSessionRef, lid: string): Promise<string | null> {
+    if (!lid?.endsWith('@lid')) return null;
+
+    try {
+      const { data } = await this.http.post<EvolutionNumeroVerificadoResponse[]>(
+        `/chat/whatsappNumbers/${session.sessionId}`,
+        { numbers: [lid] },
+        this.comToken(session),
+      );
+
+      const item = Array.isArray(data) ? data[0] : null;
+      const jid = item?.exists ? (item.jid ?? null) : null;
+
+      // Só serve se a resposta trouxer o JID com telefone: a Evolution devolve
+      // o próprio `@lid` quando não conhece a correspondência.
+      return jid && !jid.endsWith('@lid') ? jid : null;
+    } catch (error) {
+      this.logger.warn(`Não foi possível resolver o LID ${lid}: ${this.messageOf(error)}`);
+      return null;
+    }
   }
 
   async requestQrCode(session: ProviderSessionRef): Promise<string | null> {

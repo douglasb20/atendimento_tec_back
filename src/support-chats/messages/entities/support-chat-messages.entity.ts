@@ -116,6 +116,14 @@ export class SupportChatMessages {
   @Column({ name: 'hidden_at', type: 'timestamptz', nullable: true })
   hidden_at: Date | null;
 
+  /**
+   * Enviada pelo sistema e **nunca** exibida na conversa (hoje só a rejeição
+   * automática de chamada). Some da consulta, sem marcador na tela - distinto
+   * de `hidden_at`, que deixa o aviso "Mensagem removida do sistema".
+   */
+  @Column({ name: 'is_system_hidden', type: 'boolean', default: false })
+  is_system_hidden: boolean;
+
   @Column({
     name: 'is_edited',
     type: 'boolean',

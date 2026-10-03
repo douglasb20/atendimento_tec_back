@@ -1,5 +1,6 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { SupportChatMessages } from '../messages/entities/support-chat-messages.entity';
+import { SupportChatEvents } from './support-chat-events.entity';
 import { SupportChatStatus } from './support-chat-status.entity';
 import { Users } from 'users/entities/users.entity';
 import { Channels } from 'channels/entities/channels.entity';
@@ -128,6 +129,16 @@ export class SupportChats {
 
   @OneToMany(() => SupportChatMessages, (supportChatMessages) => supportChatMessages.supportChats)
   supportChatMessages: SupportChatMessages[];
+
+  /**
+   * Eventos do atendimento (transferência, pausa, chamada).
+   *
+   * Sem `@OneToMany` mapeado para `SupportChatEvents`: a relação inversa não
+   * existe lá e ninguém carrega esta por `relations` - os eventos são sempre
+   * buscados à parte (`SupportChatEventsRepository.findPorConversa`) e
+   * anexados ao objeto. Declarada só para esse anexo ser tipado.
+   */
+  supportChatEvents?: SupportChatEvents[];
 
   @ManyToOne(() => SupportChatStatus, (supportChatStatus) => supportChatStatus.supportChats)
   @JoinColumn({ name: 'support_chat_status_id' })
