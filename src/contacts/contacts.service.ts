@@ -76,10 +76,12 @@ export class ContactsService {
 
   async getAllContacts() {
     // `camposPersonalizados` vem junto: a listagem os exibe, e buscá-los
-    // depois seria uma consulta por linha.
+    // depois seria uma consulta por linha. `client` pelo mesmo motivo - a
+    // busca de contato (novo atendimento, por exemplo) procura também pelo
+    // nome do cliente, que é como o atendente costuma se lembrar de quem é.
     const contatos = await this.contactRepository.find({
       where: { status: 1 },
-      relations: ['camposPersonalizados'],
+      relations: ['camposPersonalizados', 'client'],
       order: { name: 'ASC', last_name: 'ASC' },
     });
 
