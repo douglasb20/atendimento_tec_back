@@ -37,6 +37,7 @@ import { AttendanceSettingsModule } from '@/attendance-settings/attendance-setti
 import { PresencaModule } from '@/presenca/presenca.module';
 import { InternalChatsModule } from '@/internal-chats/internal-chats.module';
 import { UserConfigModule } from '@/user-config/user-config.module';
+import { DashboardModule } from '@/dashboard/dashboard.module';
 import { DepartmentsModule } from '@/departments/departments.module';
 import { ChatbotsModule } from '@/chatbots/chatbots.module';
 import { ChatbotEngineModule } from '@/chatbot-engine/chatbot-engine.module';
@@ -112,6 +113,7 @@ import { HealthModule } from '@/health/health.module';
     PresencaModule,
     InternalChatsModule,
     UserConfigModule,
+    DashboardModule,
     DepartmentsModule,
     ChatbotsModule,
     ChatbotEngineModule,
