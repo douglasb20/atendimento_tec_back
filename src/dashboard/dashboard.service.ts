@@ -41,13 +41,6 @@ export type PontoHora = {
   total: number;
 };
 
-/** Finalizado por qualquer caminho - manual, sem resposta ou por inatividade. */
-const STATUS_FINALIZADOS = [
-  SupportChatStatusId.FINALIZADO,
-  SupportChatStatusId.FINALIZADO_SEM_RESPOSTA,
-  SupportChatStatusId.FINALIZADO_POR_INATIVIDADE,
-];
-
 @Injectable()
 export class DashboardService {
   constructor(
@@ -82,7 +75,10 @@ export class DashboardService {
   private contarFinalizados(): Promise<number> {
     return this.supportChatsRepository
       .createQueryBuilder('chat')
-      .where('chat.support_chat_status_id IN (:...status)', { status: STATUS_FINALIZADOS })
+      .innerJoin('support_chat_status', 'st', 'st.id = chat.support_chat_status_id')
+      // Pela flag, não por uma lista de ids: um status final novo entra na
+      // conta sozinho, sem precisar lembrar de alterar o dashboard.
+      .where('st.is_final = true')
       .getCount();
   }
 
@@ -115,7 +111,8 @@ export class DashboardService {
         'AVG(GREATEST(EXTRACT(EPOCH FROM (chat.finished_at - chat.created_at)) - chat.paused_total_seconds, 0))',
         'media',
       )
-      .where('chat.support_chat_status_id IN (:...status)', { status: STATUS_FINALIZADOS })
+      .innerJoin('support_chat_status', 'st', 'st.id = chat.support_chat_status_id')
+      .where('st.is_final = true')
       .andWhere('chat.finished_at IS NOT NULL')
       .getRawOne<{ media: string | null }>();
 
@@ -138,14 +135,16 @@ export class DashboardService {
              (NOW() AT TIME ZONE $1)::date,
              INTERVAL '1 day') AS dia
       LEFT JOIN (
-        SELECT (finished_at AT TIME ZONE $1)::date AS d, COUNT(*) AS total
-        FROM support_chats
-        WHERE support_chat_status_id = ANY($2) AND finished_at IS NOT NULL
+        SELECT (sc.finished_at AT TIME ZONE $1)::date AS d, COUNT(*) AS total
+        FROM support_chats sc
+        JOIN support_chat_status st ON st.id = sc.support_chat_status_id
+        -- Pela flag, não por uma lista de ids: ver contarFinalizados.
+        WHERE st.is_final = true AND sc.finished_at IS NOT NULL
         GROUP BY d
       ) c ON c.d = dia::date
       ORDER BY dia
       `,
-      [FUSO_EXIBICAO, STATUS_FINALIZADOS],
+      [FUSO_EXIBICAO],
     );
 
     return linhas as PontoSerie[];
