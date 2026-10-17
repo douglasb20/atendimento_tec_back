@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { SupportChatStatusId } from '@/@types';
 import { Contacts } from '@/contacts/entities/contacts.entity';
 import { SupportChats } from '@/support-chats/entities/support-chats.entity';
+import { FUSO_EXIBICAO } from '@/core/fuso-exibicao';
 
 /** Os quatro números dos cards da home. */
 export type ResumoDashboard = {
@@ -22,17 +23,7 @@ export type PontoSerie = {
   total: number;
 };
 
-/**
- * O fuso em que o dia é contado.
- *
- * O banco guarda em UTC (`timestamptz`) e roda com `timezone = UTC`: sem
- * converter, um atendimento encerrado às 22h de Brasília cairia no dia
- * seguinte no gráfico.
- *
- * Fixo por ora - quando houver configuração global de fuso, é daqui que ela
- * entra (ver a tela de configurações planejada).
- */
-const FUSO_EXIBICAO = 'America/Sao_Paulo';
+
 
 /** Uma hora do dia, na distribuição de movimento. */
 export type PontoHora = {

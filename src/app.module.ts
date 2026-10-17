@@ -38,6 +38,7 @@ import { PresencaModule } from '@/presenca/presenca.module';
 import { InternalChatsModule } from '@/internal-chats/internal-chats.module';
 import { UserConfigModule } from '@/user-config/user-config.module';
 import { DashboardModule } from '@/dashboard/dashboard.module';
+import { ReportsModule } from '@/reports/reports.module';
 import { DepartmentsModule } from '@/departments/departments.module';
 import { ChatbotsModule } from '@/chatbots/chatbots.module';
 import { ChatbotEngineModule } from '@/chatbot-engine/chatbot-engine.module';
@@ -114,6 +115,7 @@ import { HealthModule } from '@/health/health.module';
     InternalChatsModule,
     UserConfigModule,
     DashboardModule,
+    ReportsModule,
     DepartmentsModule,
     ChatbotsModule,
     ChatbotEngineModule,

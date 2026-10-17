@@ -1,0 +1,13 @@
+@host = http://localhost:3001/api
+
+### Relatório de atendimentos - sem filtro (tudo, menos os 9999 de teste)
+GET {{host}}/reports/attendance
+Cookie: {{token}}
+
+### Com período
+GET {{host}}/reports/attendance?de=2026-10-01&ate=2026-10-16
+Cookie: {{token}}
+
+### Por atendente
+GET {{host}}/reports/attendance?user_id=1
+Cookie: {{token}}

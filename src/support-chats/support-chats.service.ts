@@ -1751,18 +1751,30 @@ export class SupportChatsService {
    * finalização automática por falta de cliente deixaria a conversa presa
    * para sempre.
    *
-   * A despedida só sai com `inatividade_enviar_despedida` ligado - opt-in,
-   * porque o cliente já foi avisado (ou nem isso, se o atraso descoberto ao
-   * religar o cron já passava do prazo de resolver) e uma segunda mensagem
-   * automática pode soar redundante ou fora de contexto num encerramento por
-   * abandono.
+   * A mensagem de encerramento só sai com `inatividade_enviar_despedida`
+   * ligado - opt-in, porque o cliente já foi avisado (ou nem isso, se o
+   * atraso descoberto ao religar o cron já passava do prazo de resolver) e
+   * uma segunda mensagem automática pode soar redundante ou fora de contexto
+   * num encerramento por abandono.
+   *
+   * Qual texto sai é `inatividade_usar_mensagem_propria` que decide - o
+   * switch, não o texto estar preenchido:
+   * - **ligado**: `inatividade_mensagem_finalizacao`, **sem anexo** - texto
+   *   próprio é mensagem própria, e o anexo da despedida (uma pesquisa de
+   *   satisfação, no caso típico) não faz sentido para quem abandonou o
+   *   atendimento;
+   * - **desligado**: a `mensagem_despedida`, com o anexo dela.
    */
   async finalizarPorInatividade(supportChat: SupportChats): Promise<void> {
     if (supportChat.channel?.inatividade_enviar_despedida) {
+      const usaTextoProprio = supportChat.channel?.inatividade_usar_mensagem_propria;
+
       await this.enviaMensagemAutomatica(
         supportChat,
-        supportChat.channel?.mensagem_despedida,
-        supportChat.channel?.id
+        usaTextoProprio
+          ? supportChat.channel?.inatividade_mensagem_finalizacao
+          : supportChat.channel?.mensagem_despedida,
+        !usaTextoProprio && supportChat.channel?.id
           ? () => this.channelsService.copiaAnexoDespedidaParaEnvio(supportChat.channel.id)
           : undefined,
       );

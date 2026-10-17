@@ -141,12 +141,39 @@ export class Channels {
   @Column({ type: 'text', nullable: true })
   inatividade_mensagem_aviso: string | null;
 
-  /** Ao finalizar por inatividade, envia também `mensagem_despedida` -
+  /** Ao finalizar por inatividade, envia também uma mensagem de encerramento -
    * opt-in: o cliente já foi avisado antes (ou nem isso, se o atraso
    * descoberto já passava do prazo de resolver), e uma segunda mensagem
-   * automática pode soar redundante num encerramento por abandono. */
+   * automática pode soar redundante num encerramento por abandono.
+   *
+   * Qual texto sai é o que `inatividade_mensagem_finalizacao` decide. */
   @Column({ type: 'boolean', nullable: false, default: false })
   inatividade_enviar_despedida: boolean;
+
+  /**
+   * Qual texto sai no encerramento por inatividade:
+   * `false` (padrão) usa `mensagem_despedida`, **com o anexo dela**;
+   * `true` usa `inatividade_mensagem_finalizacao`, **sem anexo** - um PDF de
+   * pesquisa de satisfação não faz sentido para quem abandonou o atendimento.
+   *
+   * É um campo próprio, e não "o texto está vazio?", de propósito: a escolha
+   * precisa estar gravada, não deduzida. Com a regra implícita, quem
+   * reconfigurasse o canal meses depois apagaria o texto achando que
+   * desligava a mensagem e ligaria a despedida padrão sem perceber.
+   */
+  @Column({ type: 'boolean', nullable: false, default: false })
+  inatividade_usar_mensagem_propria: boolean;
+
+  /**
+   * Texto do encerramento por inatividade. Só tem efeito com
+   * `inatividade_usar_mensagem_propria` ligado, e aí é **obrigatório** - a
+   * validação está em `ChannelsService`, junto das outras regras do canal.
+   *
+   * Mesmas variáveis de `mensagem_despedida`; `{{protocolo}}` já está gravado
+   * na conversa neste ponto, então sai preenchido.
+   */
+  @Column({ type: 'text', nullable: true })
+  inatividade_mensagem_finalizacao: string | null;
 
   @Column({ type: 'timestamptz', nullable: true })
   connected_at: Date | null;

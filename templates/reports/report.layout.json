@@ -1,0 +1,88 @@
+{
+  "_comment": [
+    "Layout padrão de TODOS os relatórios em PDF: página, cabeçalho, cores,",
+    "tipografia e tabela. É o equivalente ao .jrxml do Jasper - descreve a",
+    "aparência, não os dados; quem desenha é o ReportPdfService.",
+    "",
+    "Editar aqui muda todos os relatórios de uma vez, sem recompilar nada.",
+    "O corpo de cada relatório (colunas, totais) fica no <nome>.report.json.",
+    "",
+    "pdfmake não usa HTML/CSS - as medidas são em pontos (1pt = 1/72 pol)."
+  ],
+
+  "page": {
+    "size": "A4",
+    "orientation": "landscape",
+    "_comment_orientation": "paisagem: em retrato as 9 colunas truncariam nomes de contato e de situação",
+    "margins": { "left": 34, "top": 76, "right": 34, "bottom": 44 },
+    "_comment_margins": "o topo abre espaço para o cabeçalho, desenhado fora do fluxo para repetir em toda página"
+  },
+
+  "colors": {
+    "brand": "#000459",
+    "_comment_brand": "o azul-marinho da logo da Automatec, extraído do próprio PNG",
+    "text": "#1a1a1a",
+    "textMuted": "#6b7280",
+    "line": "#e5e7eb",
+    "stripe": "#f8fafc",
+    "empty": "#9ca3af"
+  },
+
+  "fonts": {
+    "family": "Roboto",
+    "body": 8,
+    "default": 8.5,
+    "reportTitle": 14,
+    "tableHeader": 7.5,
+    "footer": 7.5,
+    "totalLabel": 7
+  },
+
+  "header": {
+    "_comment": [
+      "O cabeçalho de TODOS os relatórios, repetido em toda página - sem ele,",
+      "a segunda folha de um relatório impresso não diz do que se trata.",
+      "",
+      "Para o corpo de cada relatório, ver o <nome>.report.json."
+    ],
+
+    "showLogo": true,
+    "logo": "logo.png",
+    "_comment_logo": "relativo a esta pasta. Ausente do disco, cai no `fallbackText` - faltar a marca não é motivo para negar o relatório",
+    "logoHeight": 30,
+    "logoWidth": 100,
+    "logoAlign": "left",
+    "_comment_logoAlign": "left | center | right. Em center, o título vai para baixo da logo",
+    "fallbackText": "Automatec Sistemas",
+
+    "showTitle": true,
+    "titleAlign": "right",
+    "_comment_titleAlign": "left | center | right. O lado oposto ao da logo é o arranjo natural",
+
+    "showPeriod": true,
+    "_comment_showPeriod": "a linha '30/09/2026 a 16/10/2026' sob o título",
+
+    "subtitle": "",
+    "_comment_subtitle": "texto fixo abaixo do título, em todos os relatórios. Vazio não aparece",
+
+    "showRule": true,
+    "ruleWidth": 1.6,
+    "ruleLength": 775,
+    "_comment_ruleLength": "em pontos; 775 cobre a largura útil do A4 paisagem com as margens padrão",
+
+    "marginTop": 20
+  },
+
+  "filters": {
+    "columns": 3,
+    "_comment": "os filtros aplicados vão no PDF porque ele circula por e-mail: sem isso ninguém sabe se o relatório é de um atendente ou de todos",
+    "marginBottom": 10
+  },
+
+  "table": {
+    "padding": { "top": 4, "bottom": 4, "left": 5, "right": 5 },
+    "lineWidth": 0.5,
+    "lineWidthBeforeTotal": 1.4,
+    "_comment_stripe": "linhas alternadas em cinza claro; o cabeçalho tem fundo próprio na cor da marca"
+  }
+}

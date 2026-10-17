@@ -61,6 +61,21 @@ export class ChannelsService {
         'Informe a mensagem de aviso para ativar a resolução automática',
       );
     }
+
+    // Escolheu a despedida padrão para o encerramento, mas não há despedida
+    // cadastrada: o canal ficaria com o switch de avisar ligado e nada sendo
+    // enviado. Das duas opções da tela, nenhuma se cumpriria - é o tipo de
+    // combinação que só apareceria no silêncio do encerramento, meses depois.
+    if (
+      dto.inatividade_ativa &&
+      dto.inatividade_enviar_despedida &&
+      !dto.inatividade_usar_mensagem_propria &&
+      !dto.mensagem_despedida?.trim()
+    ) {
+      throw new BadRequestException(
+        'Para avisar ao finalizar por inatividade, cadastre a mensagem de despedida ou use uma mensagem própria',
+      );
+    }
   }
 
   async createChannel(createChannelDto: CreateOrChannelDto): Promise<Channels> {
@@ -369,7 +384,29 @@ export class ChannelsService {
       return; // nada a fazer
     }
 
-    await this.whatsappService.requestDisconnection(channel.session_id);
+    const { jaEstavaSemConexao } = await this.whatsappService.requestDisconnection(
+      channel.session_id,
+    );
+
+    // Normalmente quem marca o canal como desconectado é o webhook
+    // `connection.update`, que chega logo depois do logout. Mas quando o
+    // socket já estava morto (aparelho removido pelo celular, pareamento
+    // derrubado) esse evento **não** vem - e o canal ficaria "Conectado" para
+    // sempre, com um botão de desconectar que nunca resolve.
+    if (jaEstavaSemConexao) {
+      this.logger.warn(
+        `Canal ${channel.id} já estava sem conexão; status sincronizado na mão.`,
+      );
+      await this.channelsRepository.update(channel.id, {
+        qr_code: null,
+        pairing_code: null,
+        disconnected_at: new Date(),
+        connected_at: null,
+        channel_status_id: ChannelStatus.DISCONNECTED,
+        phone_number: null,
+      });
+      this.handleChannelStatus(channel.id);
+    }
   }
 
   /**

@@ -62,7 +62,16 @@ export interface WhatsappProvider {
   requestQrCode(session: ProviderSessionRef): Promise<string | null>;
 
   /** Encerra a sessão sem apagá-la no provider. */
-  requestDisconnection(session: ProviderSessionRef): Promise<void>;
+  /**
+   * Encerra a sessão no provider.
+   *
+   * Devolve `jaEstavaSemConexao: true` quando não havia o que encerrar - o
+   * socket já tinha caído por fora (aparelho removido no celular, pareamento
+   * derrubado). O pedido se cumpre do mesmo jeito, mas quem chama precisa
+   * saber: nesse caso o provider **não** emite o evento de desconexão, e o
+   * status do canal ficaria desatualizado.
+   */
+  requestDisconnection(session: ProviderSessionRef): Promise<ProviderDesconexao>;
 
   /**
    * Derruba e reconecta a sessão, sem perder o pareamento.
@@ -178,6 +187,12 @@ export interface WhatsappProvider {
 }
 
 /** Identifica a sessão no provider e traz o que é necessário para autenticar. */
+/** O resultado de encerrar uma sessão. */
+export type ProviderDesconexao = {
+  /** `true` quando o socket já estava morto antes do pedido. */
+  jaEstavaSemConexao: boolean;
+};
+
 export type ProviderSessionRef = {
   /** `session_id` do canal - na Evolution corresponde ao `instanceName`. */
   sessionId: string;

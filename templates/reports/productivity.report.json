@@ -1,0 +1,145 @@
+{
+  "_comment": [
+    "Relatório de Produtividade por Atendente: uma linha por atendente, não",
+    "por atendimento - ver attendance.report.json para os comentários gerais",
+    "sobre como editar este arquivo."
+  ],
+
+  "title": "Relatório de Produtividade",
+  "fileName": "produtividade",
+  "_comment_fileName": "vira produtividade_2026_10_17.pdf / .xlsx",
+
+  "pdf": {
+    "columns": [
+      { "title": "Atendente", "field": "atendente", "width": "*" },
+      { "title": "Total", "field": "total", "width": 50, "align": "right" },
+      { "title": "Finalizados", "field": "finalizados", "width": 68, "align": "right" },
+      { "title": "Em aberto", "field": "em_aberto", "width": 62, "align": "right" },
+      {
+        "title": "Mensagens",
+        "field": "mensagens_enviadas",
+        "width": 68,
+        "align": "right",
+        "_comment": "digitadas pelo atendente nos atendimentos da linha; exclui as automáticas"
+      },
+      {
+        "title": "Tempo total",
+        "field": "duracao_total_segundos",
+        "width": 76,
+        "align": "right",
+        "format": "duration",
+        "_comment": "soma das durações da linha, já descontada a pausa - não é média"
+      },
+      {
+        "title": "Espera média",
+        "field": "espera_media_segundos",
+        "width": 72,
+        "align": "right",
+        "format": "duration"
+      },
+      {
+        "title": "Duração média",
+        "field": "duracao_media_segundos",
+        "width": 76,
+        "align": "right",
+        "format": "duration"
+      }
+    ],
+
+    "total": {
+      "_comment": "o rodapé da tabela; 'summaryColumns' é quantas colunas o texto da esquerda ocupa",
+      "summaryColumns": 1,
+      "label": "Total geral",
+      "_comment_averages": [
+        "Cada número sob a coluna correspondente, em vez de um texto solto à",
+        "esquerda; sem 'label' porque o título da própria coluna já diz o que",
+        "é.",
+        "",
+        "'Espera média'/'Duração média' somam o que está escrito NAQUELA",
+        "coluna (soma_esperas_medias_segundos/soma_duracoes_medias_segundos) -",
+        "não é o tempo total de atendimento (duracao_total_segundos, usado em",
+        "'Tempo total'): com mais de um atendente os dois números divergem,",
+        "porque somar médias de atendentes diferentes não é o mesmo que somar",
+        "todos os atendimentos."
+      ],
+      "averages": [
+        { "column": "Total", "field": "total", "format": "number" },
+        { "column": "Finalizados", "field": "finalizados", "format": "number" },
+        { "column": "Em aberto", "field": "em_aberto", "format": "number" },
+        { "column": "Mensagens", "field": "mensagens_enviadas", "format": "number" },
+        { "column": "Tempo total", "field": "duracao_total_segundos" },
+        { "column": "Espera média", "field": "soma_esperas_medias_segundos" },
+        { "column": "Duração média", "field": "soma_duracoes_medias_segundos" }
+      ]
+    }
+  },
+
+  "excel": {
+    "_comment": [
+      "Sem 'width': a largura é calculada pelo conteúdo real de cada coluna -",
+      "ver ReportExcelService.",
+      "",
+      "Sem as colunas '(segundos)' de Tempo total/Espera média/Duração média:",
+      "aqui a unidade já é o atendente (uma linha por atendente, não por",
+      "atendimento), então o valor numérico cru não tem uso de fórmula como",
+      "teria no relatório de atendimentos - fica só o texto legível."
+    ],
+    "columns": [
+      { "title": "Atendente", "field": "atendente" },
+      { "title": "Total", "field": "total", "type": "number", "format": "0" },
+      {
+        "title": "Finalizados",
+        "field": "finalizados",
+        "type": "number",
+        "format": "0"
+      },
+      { "title": "Em aberto", "field": "em_aberto", "type": "number", "format": "0" },
+      {
+        "title": "Mensagens enviadas",
+        "field": "mensagens_enviadas",
+        "type": "number",
+        "format": "0"
+      },
+      {
+        "title": "Tempo total",
+        "field": "duracao_total_segundos",
+        "format": "duration",
+        "align": "right",
+        "_comment": "texto ('3h 35min'), não número - sem 'align' o Excel alinharia à esquerda, igual a 'Atendente'"
+      },
+      {
+        "title": "Espera média",
+        "field": "espera_media_segundos",
+        "format": "duration",
+        "align": "right"
+      },
+      {
+        "title": "Duração média",
+        "field": "duracao_media_segundos",
+        "format": "duration",
+        "align": "right"
+      }
+    ],
+
+    "_comment_total": [
+      "A linha de totais no fim da planilha - igual ao resumo do PDF, mas",
+      "tudo numa linha só.",
+      "",
+      "'Espera média'/'Duração média' somam o que está escrito naquela",
+      "coluna, não o tempo total de atendimento - ver o comentário maior em",
+      "pdf.total.averages, que vale igual aqui."
+    ],
+    "total": {
+      "label": "Total geral",
+      "values": [
+        { "column": "Total", "field": "total", "format": "number" },
+        { "column": "Finalizados", "field": "finalizados", "format": "number" },
+        { "column": "Em aberto", "field": "em_aberto", "format": "number" },
+        { "column": "Mensagens enviadas", "field": "mensagens_enviadas", "format": "number" },
+        { "column": "Tempo total", "field": "duracao_total_segundos", "format": "duration" },
+        { "column": "Espera média", "field": "soma_esperas_medias_segundos", "format": "duration" },
+        { "column": "Duração média", "field": "soma_duracoes_medias_segundos", "format": "duration" }
+      ]
+    }
+  }
+}

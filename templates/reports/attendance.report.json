@@ -1,0 +1,147 @@
+{
+  "_comment": [
+    "Relatório de Atendimentos: o QUE aparece e COMO, num lugar só.",
+    "",
+    "Para mexer na aparência do relatório - acrescentar coluna, mudar largura,",
+    "trocar o texto de uma célula vazia, reordenar - edite aqui. Não é preciso",
+    "abrir o código nem recompilar: o arquivo é lido a cada geração.",
+    "",
+    "O que NÃO vive aqui: a consulta ao banco (reports.service.ts) e a",
+    "identidade visual compartilhada pelos relatórios (report.layout.json).",
+    "",
+    "`field` é a chave da linha devolvida pela consulta. Nome errado não",
+    "quebra o relatório: a célula sai vazia, o que é fácil de ver no PDF."
+  ],
+
+  "title": "Relatório de Atendimentos",
+  "fileName": "atendimentos",
+  "_comment_fileName": "vira atendimentos_2026_10_17.pdf / .xlsx",
+
+  "pdf": {
+    "_comment": [
+      "Tudo texto formatado, pensado para leitura. Larguras em pontos; '*'",
+      "divide o espaço que sobra. 'empty' é o texto da célula sem valor, em",
+      "itálico cinza - célula em branco num PDF deixa a dúvida entre 'não tem'",
+      "e 'o sistema falhou'."
+    ],
+    "columns": [
+      { "title": "Protocolo", "field": "protocolo", "width": 62 },
+      { "title": "Contato", "field": "contato", "width": "*" },
+      { "title": "Cliente", "field": "cliente", "width": "*", "empty": "Sem cliente" },
+      {
+        "title": "Atendente",
+        "field": "atendente",
+        "width": "*",
+        "empty": "Não assumido",
+        "_comment": "'Não assumido' e não um traço: a conversa que ninguém pegou é justamente a que interessa achar numa auditoria"
+      },
+      {
+        "title": "Setor",
+        "field": "setor",
+        "width": 62,
+        "empty": "Sem setor",
+        "_comment": "só o modal 'Novo atendimento' grava o setor; conversa que chega por mensagem do contato nasce sem, e aí a célula mostra 'Sem setor'"
+      },
+      { "title": "Canal", "field": "canal", "width": 62 },
+      { "title": "Abertura", "field": "aberto_em", "width": 58, "format": "shortDateTime" },
+      {
+        "title": "Espera",
+        "field": "espera_segundos",
+        "width": 46,
+        "align": "right",
+        "format": "duration"
+      },
+      {
+        "title": "Duração",
+        "field": "duracao_segundos",
+        "width": 52,
+        "align": "right",
+        "format": "duration"
+      },
+      { "title": "Situação", "field": "situacao", "width": 74 }
+    ],
+
+    "total": {
+      "_comment": "o rodapé da tabela; 'summaryColumns' é quantas colunas o texto da esquerda ocupa",
+      "summaryColumns": 7,
+      "_comment_averages": "sem 'label': o resumo logo abaixo da tabela já deixa claro que este é o total do período",
+      "averages": [
+        { "column": "Espera", "field": "espera_total_segundos" },
+        { "column": "Duração", "field": "duracao_total_segundos" }
+      ]
+    },
+
+    "_comment_summary": "a caixa de resumo depois da tabela - contagens que não são soma de nenhuma coluna, então não cabem em 'averages'",
+    "summary": {
+      "title": "Total geral",
+      "items": [
+        { "label": "Total de atendimentos", "field": "total", "format": "number" },
+        { "label": "Finalizados", "field": "finalizados", "format": "number" },
+        { "label": "Em aberto", "field": "em_aberto", "format": "number" }
+      ]
+    }
+  },
+
+  "excel": {
+    "_comment": [
+      "Sem as colunas '(segundos)' de Espera/Duração: aqui cada linha é um",
+      "atendimento (diferente de produtividade, que soma vários), e quem quer",
+      "a soma ou a ordenação tem a coluna de texto mesmo - o Excel ordena",
+      "'9min' e '1h 20min' de forma estranha, mas dado individual não costuma",
+      "precisar somar direto na planilha; quem precisar exporta com fórmula",
+      "própria.",
+      "",
+      "Sem 'width': a largura é calculada pelo conteúdo real de cada coluna -",
+      "ver ReportExcelService."
+    ],
+    "columns": [
+      {
+        "title": "Protocolo",
+        "field": "protocolo",
+        "_comment": "como texto: 13 dígitos viram notação científica e perdem o zero à esquerda"
+      },
+      { "title": "Contato", "field": "contato" },
+      { "title": "Telefone", "field": "telefone" },
+      { "title": "Cliente", "field": "cliente" },
+      { "title": "Atendente", "field": "atendente" },
+      { "title": "Setor", "field": "setor" },
+      { "title": "Canal", "field": "canal" },
+      {
+        "title": "Abertura",
+        "field": "aberto_em",
+        "type": "date",
+        "format": "dd/mm/yyyy hh:mm"
+      },
+      {
+        "title": "Atendimento iniciado",
+        "field": "atendido_em",
+        "type": "date",
+        "format": "dd/mm/yyyy hh:mm"
+      },
+      {
+        "title": "Finalização",
+        "field": "finalizado_em",
+        "type": "date",
+        "format": "dd/mm/yyyy hh:mm"
+      },
+      {
+        "title": "Espera",
+        "field": "espera_segundos",
+        "format": "duration",
+        "align": "right",
+        "_comment": "texto ('9min'), não número - sem 'align' o Excel alinharia à esquerda, igual a 'Situação'"
+      },
+      { "title": "Duração", "field": "duracao_segundos", "format": "duration", "align": "right" },
+      { "title": "Situação", "field": "situacao" }
+    ],
+
+    "_comment_total": "a linha de totais no fim da planilha - igual ao resumo do PDF, mas tudo numa linha só, já que o Excel não tem o limite de espaço do PDF",
+    "total": {
+      "label": "Total geral",
+      "values": [
+        { "column": "Espera", "field": "espera_total_segundos", "format": "duration" },
+        { "column": "Duração", "field": "duracao_total_segundos", "format": "duration" }
+      ]
+    }
+  }
+}

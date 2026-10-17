@@ -1,4 +1,8 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "test", "dist", "scripts", "**/*spec.ts"]
+  // `jest.config.mjs` é da raiz, e sem ele fora daqui o TypeScript infere o
+  // `rootDir` como a raiz do projeto em vez de `src/` - a saída inteira ia
+  // para `dist/src/`, e os scripts de migration (que apontam para
+  // `dist/core/...`) paravam de achar o datasource.
+  "exclude": ["node_modules", "test", "dist", "scripts", "jest.config.mjs", "**/*spec.ts"]
 }

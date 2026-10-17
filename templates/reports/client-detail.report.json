@@ -1,0 +1,112 @@
+{
+  "_comment": [
+    "Relatório Analítico por Cliente: o detalhe linha a linha de UM cliente ou",
+    "contato escolhido na busca - mesma estrutura de attendance.report.json",
+    "(mesma consulta no backend, `reports.service.ts: atendimentos()`), só com",
+    "título e nome de arquivo próprios. Ver attendance.report.json para os",
+    "comentários gerais sobre como editar este arquivo."
+  ],
+
+  "title": "Relatório Analítico por Cliente",
+  "fileName": "analitico_cliente",
+  "_comment_fileName": "vira analitico_cliente_2026_10_17.pdf / .xlsx",
+
+  "pdf": {
+    "columns": [
+      { "title": "Protocolo", "field": "protocolo", "width": 62 },
+      { "title": "Contato", "field": "contato", "width": "*" },
+      { "title": "Cliente", "field": "cliente", "width": "*", "empty": "Sem cliente" },
+      {
+        "title": "Atendente",
+        "field": "atendente",
+        "width": "*",
+        "empty": "Não assumido"
+      },
+      {
+        "title": "Setor",
+        "field": "setor",
+        "width": 62,
+        "empty": "Sem setor"
+      },
+      { "title": "Canal", "field": "canal", "width": 62 },
+      { "title": "Abertura", "field": "aberto_em", "width": 58, "format": "shortDateTime" },
+      {
+        "title": "Espera",
+        "field": "espera_segundos",
+        "width": 46,
+        "align": "right",
+        "format": "duration"
+      },
+      {
+        "title": "Duração",
+        "field": "duracao_segundos",
+        "width": 52,
+        "align": "right",
+        "format": "duration"
+      },
+      { "title": "Situação", "field": "situacao", "width": 74 }
+    ],
+
+    "total": {
+      "summaryColumns": 7,
+      "averages": [
+        { "column": "Espera", "field": "espera_total_segundos" },
+        { "column": "Duração", "field": "duracao_total_segundos" }
+      ]
+    },
+
+    "summary": {
+      "title": "Total geral",
+      "items": [
+        { "label": "Total de atendimentos", "field": "total", "format": "number" },
+        { "label": "Finalizados", "field": "finalizados", "format": "number" },
+        { "label": "Em aberto", "field": "em_aberto", "format": "number" }
+      ]
+    }
+  },
+
+  "excel": {
+    "columns": [
+      {
+        "title": "Protocolo",
+        "field": "protocolo",
+        "_comment": "como texto: 13 dígitos viram notação científica e perdem o zero à esquerda"
+      },
+      { "title": "Contato", "field": "contato" },
+      { "title": "Telefone", "field": "telefone" },
+      { "title": "Cliente", "field": "cliente" },
+      { "title": "Atendente", "field": "atendente" },
+      { "title": "Setor", "field": "setor" },
+      { "title": "Canal", "field": "canal" },
+      {
+        "title": "Abertura",
+        "field": "aberto_em",
+        "type": "date",
+        "format": "dd/mm/yyyy hh:mm"
+      },
+      {
+        "title": "Atendimento iniciado",
+        "field": "atendido_em",
+        "type": "date",
+        "format": "dd/mm/yyyy hh:mm"
+      },
+      {
+        "title": "Finalização",
+        "field": "finalizado_em",
+        "type": "date",
+        "format": "dd/mm/yyyy hh:mm"
+      },
+      { "title": "Espera", "field": "espera_segundos", "format": "duration", "align": "right" },
+      { "title": "Duração", "field": "duracao_segundos", "format": "duration", "align": "right" },
+      { "title": "Situação", "field": "situacao" }
+    ],
+
+    "total": {
+      "label": "Total geral",
+      "values": [
+        { "column": "Espera", "field": "espera_total_segundos", "format": "duration" },
+        { "column": "Duração", "field": "duracao_total_segundos", "format": "duration" }
+      ]
+    }
+  }
+}

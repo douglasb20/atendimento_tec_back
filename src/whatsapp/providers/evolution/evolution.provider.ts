@@ -10,6 +10,7 @@ import { MessageMedia } from '@types';
 import {
   ProviderClientInfo,
   ProviderConnectionResult,
+  ProviderDesconexao,
   ProviderConnectionStatus,
   ProviderMediaPayload,
   ProviderMediaType,
@@ -266,16 +267,33 @@ export class EvolutionProvider implements WhatsappProvider {
     return result.qrCode ?? null;
   }
 
-  async requestDisconnection(session: ProviderSessionRef): Promise<void> {
+  async requestDisconnection(session: ProviderSessionRef): Promise<ProviderDesconexao> {
     try {
       await this.http.delete(`/instance/logout/${session.sessionId}`, this.comToken(session));
       this.logger.log(`Sessão encerrada: ${session.sessionId}`);
+      return { jaEstavaSemConexao: false };
     } catch (error) {
       // Já desconectada ou inexistente: não é falha do ponto de vista do domínio.
       if (this.statusOf(error) === 404) {
         this.logger.warn(`Sessão ${session.sessionId} já não existe na Evolution.`);
-        return;
+        return { jaEstavaSemConexao: true };
       }
+
+      // Socket já morto - também não é falha: o pedido era encerrar, e está
+      // encerrado. Acontece quando a sessão cai por fora (o celular remove o
+      // aparelho em "Dispositivos conectados", ou o WhatsApp derruba o
+      // pareamento): a Evolution continua reportando `state: "open"`, mas o
+      // Baileys responde "Connection Closed" - em 500 no `/instance/logout` e
+      // em 428 nas rotas que precisam do socket. Sem este tratamento o
+      // atendente via um erro vermelho ao desconectar algo que já estava
+      // desconectado.
+      if (this.ehSocketMorto(error)) {
+        this.logger.warn(
+          `Sessão ${session.sessionId} já estava sem conexão na Evolution; logout dispensado.`,
+        );
+        return { jaEstavaSemConexao: true };
+      }
+
       this.fail('Falha ao encerrar a sessão do WhatsApp', error);
     }
   }
@@ -887,6 +905,16 @@ export class EvolutionProvider implements WhatsappProvider {
 
   private statusOf(error: unknown): number | undefined {
     return isAxiosError(error) ? error.response?.status : undefined;
+  }
+
+  /**
+   * O erro de socket já encerrado do Baileys.
+   *
+   * Vem com código diferente conforme a rota (500 no `/instance/logout`, 428
+   * nas que exigem conexão viva), então o que identifica é a mensagem.
+   */
+  private ehSocketMorto(error: unknown): boolean {
+    return this.messageOf(error).toLowerCase().includes('connection closed');
   }
 
   private messageOf(error: unknown): string {

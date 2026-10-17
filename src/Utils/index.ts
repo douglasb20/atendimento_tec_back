@@ -66,6 +66,37 @@ export function toMMSS(seconds) {
   return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
+/**
+ * Duração em formato compacto, pela maior unidade que couber: `45s`, `32min`,
+ * `1h 20min`, `2d 6h`.
+ *
+ * Espelha `duracaoCompacta` do front (`service/Util`) - os relatórios saem nos
+ * dois lados (tela e PDF) e precisam dizer a mesma coisa.
+ *
+ * Diferente do `toMMSS`, que é exato mas ilegível de relance num relatório:
+ * `294:34:18` não comunica "12 dias" a ninguém. Abaixo de um minuto mostra os
+ * segundos em vez de arredondar para `0min` - atendimento de 29 segundos
+ * existe, e "0min" o faria parecer vazio.
+ */
+export function duracaoCompacta(segundos: number | null | undefined): string {
+  if (segundos === null || segundos === undefined) return '';
+
+  const seguro = Math.max(0, Math.floor(segundos));
+  if (seguro < 60) return `${seguro}s`;
+
+  const minutos = Math.round(seguro / 60);
+  if (minutos < 60) return `${minutos}min`;
+
+  const horas = Math.floor(minutos / 60);
+  const restoMinutos = minutos % 60;
+
+  if (horas < 24) return restoMinutos === 0 ? `${horas}h` : `${horas}h ${restoMinutos}min`;
+
+  const dias = Math.floor(horas / 24);
+  const restoHoras = horas % 24;
+  return restoHoras === 0 ? `${dias}d` : `${dias}d ${restoHoras}h`;
+}
+
 export function formatFileSize(bytes) {
   const kb = 1024;
   const mb = kb * 1024;

@@ -50,12 +50,14 @@
     "cookie-parser": "^1.4.7",
     "crypto": "^1.0.1",
     "date-fns": "^4.1.0",
+    "exceljs": "^4.4.0",
     "handlebars": "^4.7.9",
     "ioredis": "^5.8.2",
     "ms": "^2.1.3",
     "nodemailer": "^10.0.10",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "pdfmake": "^0.2.23",
     "pg": "^8.20.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
@@ -73,6 +75,7 @@
     "@types/multer": "^1.4.12",
     "@types/node": "^22.13.4",
     "@types/passport-jwt": "^4.0.1",
+    "@types/pdfmake": "^0.3.3",
     "@types/supertest": "^6.0.2",
     "@typescript-eslint/eslint-plugin": "^8.32.1",
     "@typescript-eslint/parser": "^8.32.1",
@@ -101,32 +104,5 @@
     "body-parser": "^2.3.0",
     "liquidjs": "^10.29.0",
     "@babel/core": "^7.29.7"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "./src/",
-    "moduleDirectories": [
-      "node_modules",
-      "src"
-    ],
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node",
-    "moduleNameMapper": {
-      "^@/(.*)$": "<rootDir>/$1"
-    },
-    "transformIgnorePatterns": [
-      "node_modules/(?!(uuid)/)"
-    ]
   }
 }

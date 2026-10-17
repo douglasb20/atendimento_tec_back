@@ -105,7 +105,11 @@ export class UsersController {
   // sem `user:view` (a maioria) não conseguia transferir, mesmo com a
   // permissão certa para a ação em si. Mesmo padrão já aplicado em
   // `departments.controller.ts`.
-  @Permissions('user:view', 'support.chat:transfer')
+  //
+  // `report.attendance:view` pelo mesmo motivo: o filtro "Atendente" do
+  // relatório monta o select com esta listagem, e um supervisor pode ter a
+  // permissão do relatório sem ter a de gerenciar usuários.
+  @Permissions('user:view', 'support.chat:transfer', 'report.attendance:view')
   @HttpCode(HttpStatus.OK)
   async findAll() {
     return this.usersService.findAll();

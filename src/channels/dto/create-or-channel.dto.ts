@@ -161,10 +161,37 @@ export class CreateOrChannelDto {
   })
   inatividade_mensagem_aviso?: string | null;
 
-  /** Ao finalizar por inatividade, envia também `mensagem_despedida` - opt-in. */
+  /** Ao finalizar por inatividade, envia também uma mensagem de encerramento -
+   * opt-in. O texto é o de `inatividade_mensagem_finalizacao`, ou a despedida
+   * padrão quando aquele está vazio. */
   @IsOptional()
   @IsBoolean({ message: 'inatividade_enviar_despedida deve ser verdadeiro ou falso' })
   inatividade_enviar_despedida?: boolean;
+
+  /** Liga o texto próprio no lugar da `mensagem_despedida` no encerramento por
+   * inatividade. Campo próprio em vez de deduzir pelo texto vazio: a escolha
+   * precisa estar gravada, não subentendida. */
+  @IsOptional()
+  @IsBoolean({ message: 'inatividade_usar_mensagem_propria deve ser verdadeiro ou falso' })
+  inatividade_usar_mensagem_propria?: boolean;
+
+  /**
+   * Texto do encerramento por inatividade. Obrigatório com
+   * `inatividade_usar_mensagem_propria` ligado - escolher o texto próprio e
+   * deixá-lo em branco não enviaria nada, que é diferente das duas opções
+   * oferecidas na tela.
+   *
+   * O `@ValidateIf` só cobre o par com o switch; que o switch só vale com a
+   * inatividade ativa é regra entre campos, validada no `ChannelsService`
+   * (mesmo motivo de `inatividade_avisar_em_minutos`).
+   */
+  @ValidateIf((dto: CreateOrChannelDto) => dto.inatividade_usar_mensagem_propria === true)
+  @IsString({ message: 'A mensagem de finalização precisa ser um texto' })
+  @IsNotEmpty({ message: 'Informe a mensagem de finalização por inatividade' })
+  @MaxLength(LIMITE_MENSAGEM, {
+    message: `A mensagem de finalização deve ter no máximo ${LIMITE_MENSAGEM} caracteres`,
+  })
+  inatividade_mensagem_finalizacao?: string | null;
 
   /**
    * Os setores atendidos por este canal. Pode ser mais de um, como no
