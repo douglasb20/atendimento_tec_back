@@ -25,8 +25,8 @@
         "field": "duracao_total_segundos",
         "width": 76,
         "align": "right",
-        "format": "duration",
-        "_comment": "soma das durações da linha, já descontada a pausa - não é média"
+        "format": "duration_hours",
+        "_comment": "soma das durações da linha, já descontada a pausa - não é média; sempre em horas, nunca em dias"
       },
       {
         "title": "Espera média",
@@ -64,7 +64,7 @@
         { "column": "Total", "field": "total", "format": "number" },
         { "column": "Finalizados", "field": "finalizados", "format": "number" },
         { "column": "Em aberto", "field": "em_aberto", "format": "number" },
-        { "column": "Tempo total", "field": "duracao_total_segundos" },
+        { "column": "Tempo total", "field": "duracao_total_segundos", "format": "duration_hours" },
         { "column": "Espera média", "field": "soma_esperas_medias_segundos" },
         { "column": "Duração média", "field": "soma_duracoes_medias_segundos" }
       ]
@@ -99,9 +99,9 @@
       {
         "title": "Tempo total",
         "field": "duracao_total_segundos",
-        "format": "duration",
+        "format": "duration_hours",
         "align": "right",
-        "_comment": "texto ('3h 35min'), não número - sem 'align' o Excel alinharia à esquerda, igual a 'Cliente'"
+        "_comment": "texto ('3h 35min'), não número - sem 'align' o Excel alinharia à esquerda, igual a 'Cliente'; sempre em horas, nunca em dias"
       },
       {
         "title": "Espera média",
@@ -131,7 +131,7 @@
         { "column": "Total", "field": "total", "format": "number" },
         { "column": "Finalizados", "field": "finalizados", "format": "number" },
         { "column": "Em aberto", "field": "em_aberto", "format": "number" },
-        { "column": "Tempo total", "field": "duracao_total_segundos", "format": "duration" },
+        { "column": "Tempo total", "field": "duracao_total_segundos", "format": "duration_hours" },
         { "column": "Espera média", "field": "soma_esperas_medias_segundos", "format": "duration" },
         { "column": "Duração média", "field": "soma_duracoes_medias_segundos", "format": "duration" }
       ]

@@ -2,7 +2,7 @@ import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import { duracaoCompacta } from '@/Utils';
+import { duracaoCompacta, duracaoEmHoras } from '@/Utils';
 import { FUSO_EXIBICAO } from '@/core/fuso-exibicao';
 import { ExcelColumn } from './report-excel.service';
 import { ReportColumn, ReportTotal } from './report-pdf.service';
@@ -17,7 +17,11 @@ type ColunaDoTemplate = {
   align?: 'left' | 'right' | 'center';
   /** Texto da célula sem valor (só PDF). */
   empty?: string;
-  /** `duration` (segundos legíveis) ou `shortDateTime`. Ausente, usa o valor cru. */
+  /**
+   * `duration` (segundos legíveis), `duration_hours` (idem, mas nunca vira
+   * dias - usado só no "Tempo total") ou `shortDateTime`. Ausente, usa o
+   * valor cru.
+   */
   format?: string;
   /** Excel: `date` ou `number`. Ausente, texto. */
   type?: 'date' | 'number';
@@ -36,8 +40,8 @@ type TemplateDoRelatorio = {
         column: string;
         field: string;
         label?: string;
-        /** `duration` (padrão) ou `number` - uma contagem não vira "Xh Ymin". */
-        format?: 'duration' | 'number';
+        /** `duration` (padrão), `duration_hours` ou `number` - uma contagem não vira "Xh Ymin". */
+        format?: 'duration' | 'duration_hours' | 'number';
       }[];
     };
     /**
@@ -48,7 +52,7 @@ type TemplateDoRelatorio = {
     summary?: {
       /** Texto do cabeçalho da caixa, ex.: "Total geral". */
       title: string;
-      items: { label: string; field: string; format?: 'number' | 'duration' }[];
+      items: { label: string; field: string; format?: 'number' | 'duration' | 'duration_hours' }[];
     };
   };
   excel: {
@@ -62,7 +66,7 @@ type TemplateDoRelatorio = {
     total?: {
       /** Texto da primeira célula, ex.: "Total geral". */
       label: string;
-      values: { column: string; field: string; format?: 'number' | 'duration' }[];
+      values: { column: string; field: string; format?: 'number' | 'duration' | 'duration_hours' }[];
     };
   };
 };
@@ -147,7 +151,9 @@ export class ReportTemplateService {
       valor:
         media.format === 'number'
           ? String(totais[media.field] ?? 0)
-          : duracaoCompacta(totais[media.field] as number) || '-',
+          : media.format === 'duration_hours'
+            ? duracaoEmHoras(totais[media.field] as number) || '-'
+            : duracaoCompacta(totais[media.field] as number) || '-',
       rotulo: media.label,
     }));
 
@@ -184,7 +190,9 @@ export class ReportTemplateService {
         valor:
           item.format === 'duration'
             ? duracaoCompacta(totais[item.field] as number) || '-'
-            : String(totais[item.field] ?? 0),
+            : item.format === 'duration_hours'
+              ? duracaoEmHoras(totais[item.field] as number) || '-'
+              : String(totais[item.field] ?? 0),
       })),
     };
   }
@@ -224,7 +232,9 @@ export class ReportTemplateService {
         valor:
           item.format === 'duration'
             ? duracaoCompacta(totais[item.field] as number) || '-'
-            : Number(totais[item.field] ?? 0),
+            : item.format === 'duration_hours'
+              ? duracaoEmHoras(totais[item.field] as number) || '-'
+              : Number(totais[item.field] ?? 0),
       })),
     };
   }
@@ -233,6 +243,7 @@ export class ReportTemplateService {
     if (valor === null || valor === undefined) return null;
 
     if (formato === 'duration') return duracaoCompacta(valor as number) || null;
+    if (formato === 'duration_hours') return duracaoEmHoras(valor as number) || null;
     if (formato === 'shortDateTime') return this.dataHoraCurta(valor as string);
 
     return String(valor);
@@ -249,6 +260,7 @@ export class ReportTemplateService {
     if (coluna.type === 'date') return new Date(valor as string);
     if (coluna.type === 'number') return Number(valor);
     if (coluna.format === 'duration') return duracaoCompacta(valor as number) || null;
+    if (coluna.format === 'duration_hours') return duracaoEmHoras(valor as number) || null;
 
     return String(valor);
   }
