@@ -35,14 +35,14 @@
         "field": "espera_segundos",
         "width": 46,
         "align": "right",
-        "format": "duration"
+        "format": "duration_hours"
       },
       {
         "title": "Duração",
         "field": "duracao_segundos",
         "width": 52,
         "align": "right",
-        "format": "duration"
+        "format": "duration_hours"
       },
       { "title": "Situação", "field": "situacao", "width": 74 }
     ],
@@ -50,8 +50,8 @@
     "total": {
       "summaryColumns": 7,
       "averages": [
-        { "column": "Espera", "field": "espera_total_segundos" },
-        { "column": "Duração", "field": "duracao_total_segundos" }
+        { "column": "Espera", "field": "espera_total_segundos", "format": "duration_hours" },
+        { "column": "Duração", "field": "duracao_total_segundos", "format": "duration_hours" }
       ]
     },
 
@@ -96,16 +96,26 @@
         "type": "date",
         "format": "dd/mm/yyyy hh:mm"
       },
-      { "title": "Espera", "field": "espera_segundos", "format": "duration", "align": "right" },
-      { "title": "Duração", "field": "duracao_segundos", "format": "duration", "align": "right" },
+      {
+        "title": "Espera",
+        "field": "espera_segundos",
+        "format": "duration_hours",
+        "align": "right"
+      },
+      {
+        "title": "Duração",
+        "field": "duracao_segundos",
+        "format": "duration_hours",
+        "align": "right"
+      },
       { "title": "Situação", "field": "situacao" }
     ],
 
     "total": {
       "label": "Total geral",
       "values": [
-        { "column": "Espera", "field": "espera_total_segundos", "format": "duration" },
-        { "column": "Duração", "field": "duracao_total_segundos", "format": "duration" }
+        { "column": "Espera", "field": "espera_total_segundos", "format": "duration_hours" },
+        { "column": "Duração", "field": "duracao_total_segundos", "format": "duration_hours" }
       ]
     }
   }

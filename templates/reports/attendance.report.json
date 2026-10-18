@@ -49,14 +49,15 @@
         "field": "espera_segundos",
         "width": 46,
         "align": "right",
-        "format": "duration"
+        "format": "duration_hours",
+        "_comment": "sempre em horas, nunca em dias - um atendimento parado vira '46h', não '1d 22h'"
       },
       {
         "title": "Duração",
         "field": "duracao_segundos",
         "width": 52,
         "align": "right",
-        "format": "duration"
+        "format": "duration_hours"
       },
       { "title": "Situação", "field": "situacao", "width": 74 }
     ],
@@ -66,8 +67,8 @@
       "summaryColumns": 7,
       "_comment_averages": "sem 'label': o resumo logo abaixo da tabela já deixa claro que este é o total do período",
       "averages": [
-        { "column": "Espera", "field": "espera_total_segundos" },
-        { "column": "Duração", "field": "duracao_total_segundos" }
+        { "column": "Espera", "field": "espera_total_segundos", "format": "duration_hours" },
+        { "column": "Duração", "field": "duracao_total_segundos", "format": "duration_hours" }
       ]
     },
 
@@ -127,11 +128,16 @@
       {
         "title": "Espera",
         "field": "espera_segundos",
-        "format": "duration",
+        "format": "duration_hours",
         "align": "right",
-        "_comment": "texto ('9min'), não número - sem 'align' o Excel alinharia à esquerda, igual a 'Situação'"
+        "_comment": "texto ('9min'), não número - sem 'align' o Excel alinharia à esquerda, igual a 'Situação'; sempre em horas, nunca em dias"
       },
-      { "title": "Duração", "field": "duracao_segundos", "format": "duration", "align": "right" },
+      {
+        "title": "Duração",
+        "field": "duracao_segundos",
+        "format": "duration_hours",
+        "align": "right"
+      },
       { "title": "Situação", "field": "situacao" }
     ],
 
@@ -139,8 +145,8 @@
     "total": {
       "label": "Total geral",
       "values": [
-        { "column": "Espera", "field": "espera_total_segundos", "format": "duration" },
-        { "column": "Duração", "field": "duracao_total_segundos", "format": "duration" }
+        { "column": "Espera", "field": "espera_total_segundos", "format": "duration_hours" },
+        { "column": "Duração", "field": "duracao_total_segundos", "format": "duration_hours" }
       ]
     }
   }
