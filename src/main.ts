@@ -45,8 +45,11 @@ async function bootstrap() {
 
   const queue = app.get<Queue>('BullQueue_whatsapp-messages-queue');
 
+  // `.ping()` não existe mais em `IRedisClient` (o BullMQ passou a abstrair
+  // ioredis/node-redis/Bun numa interface única); `.info()` é suportado por
+  // todos os adapters e serve ao mesmo propósito aqui - só confirmar conexão.
   queue.client
-    .then((client) => client.ping())
+    .then((client) => client.info())
     .then(() => console.log('Redis conectado ao Bull ✔'))
     .catch((err) => console.error('Erro ao conectar no Redis Bull:', err));
 
