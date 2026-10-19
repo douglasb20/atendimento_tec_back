@@ -4,7 +4,12 @@ import { Repository, SelectQueryBuilder } from 'typeorm';
 
 import { FUSO_EXIBICAO } from '@/core/fuso-exibicao';
 import { SupportChats } from '@/support-chats/entities/support-chats.entity';
-import { ClientReportGroupBy, ClientReportSortBy, ReportFilterDto } from './dto/report-filter.dto';
+import {
+  AttendanceSortBy,
+  ClientReportGroupBy,
+  ClientReportSortBy,
+  ReportFilterDto,
+} from './dto/report-filter.dto';
 
 /** Uma linha do relatório de atendimentos, como sai da consulta. */
 export type AttendanceRow = {
@@ -19,9 +24,18 @@ export type AttendanceRow = {
   aberto_em: Date;
   atendido_em: Date | null;
   finalizado_em: Date | null;
-  /** Segundos entre a abertura e o encerramento, **sem** o tempo pausado. */
+  /**
+   * Segundos entre a resposta e o encerramento, **sem** o tempo pausado.
+   * Nulo também quando ninguém assumiu - sem resposta não há atendimento a
+   * medir, só a espera abaixo.
+   */
   duracao_segundos: number | null;
-  /** Segundos entre a abertura e o momento em que alguém assumiu. */
+  /**
+   * Segundos entre a abertura e o momento em que alguém assumiu - ou, se
+   * nunca foi assumido mas já foi finalizado, até o fechamento (o tempo que
+   * a conversa passou esperando antes de ser encerrada sem resposta). Nulo
+   * só enquanto a conversa segue aberta e sem dono.
+   */
   espera_segundos: number | null;
   situacao: string;
 };
@@ -425,19 +439,26 @@ export class ReportsService {
       // Soma e média usam a mesma fórmula do relatório de atendimentos:
       // `GREATEST(..., 0)` porque a pausa é gravada por fora da duração, e um
       // atendimento curto com pausa longa daria negativo sem o teto em zero.
+      //
+      // Sem `answered_at` não existe duração de atendimento - ninguém
+      // assumiu, então não há o que medir do início da resposta ao fim; só
+      // "espera" (abaixo) faz sentido para essa linha. Contá-la como
+      // `finished_at - created_at` inflava a duração com o tempo que a
+      // conversa passou largada, e entrava na média como se fosse
+      // atendimento de verdade.
       .addSelect(
-        `COALESCE(SUM(CASE WHEN sc.finished_at IS NULL THEN NULL ELSE
+        `COALESCE(SUM(CASE WHEN sc.finished_at IS NULL OR sc.answered_at IS NULL THEN NULL ELSE
              GREATEST(
-               EXTRACT(EPOCH FROM (sc.finished_at - sc.created_at)) - sc.paused_total_seconds,
+               EXTRACT(EPOCH FROM (sc.finished_at - sc.answered_at)) - sc.paused_total_seconds,
                0
              )
            END), 0)`,
         'duracao_total_segundos',
       )
       .addSelect(
-        `AVG(CASE WHEN sc.finished_at IS NULL THEN NULL ELSE
+        `AVG(CASE WHEN sc.finished_at IS NULL OR sc.answered_at IS NULL THEN NULL ELSE
              GREATEST(
-               EXTRACT(EPOCH FROM (sc.finished_at - sc.created_at)) - sc.paused_total_seconds,
+               EXTRACT(EPOCH FROM (sc.finished_at - sc.answered_at)) - sc.paused_total_seconds,
                0
              )
            END)`,
@@ -576,33 +597,38 @@ export class ReportsService {
       // bug que derrubou a rota na primeira versão.
       .select('COUNT(*)', 'total')
       .addSelect('COUNT(*) FILTER (WHERE st.is_final)', 'finalizados')
+      // Sem `answered_at` não existe duração de atendimento - ver o
+      // comentário equivalente em `consultaProdutividade`.
       .addSelect(
-        `COALESCE(SUM(CASE WHEN sc.finished_at IS NULL THEN NULL ELSE
+        `COALESCE(SUM(CASE WHEN sc.finished_at IS NULL OR sc.answered_at IS NULL THEN NULL ELSE
              GREATEST(
-               EXTRACT(EPOCH FROM (sc.finished_at - sc.created_at)) - sc.paused_total_seconds,
+               EXTRACT(EPOCH FROM (sc.finished_at - sc.answered_at)) - sc.paused_total_seconds,
                0
              )
            END), 0)`,
         'duracao_total_segundos',
       )
       .addSelect(
-        `AVG(CASE WHEN sc.finished_at IS NULL THEN NULL ELSE
+        `AVG(CASE WHEN sc.finished_at IS NULL OR sc.answered_at IS NULL THEN NULL ELSE
              GREATEST(
-               EXTRACT(EPOCH FROM (sc.finished_at - sc.created_at)) - sc.paused_total_seconds,
+               EXTRACT(EPOCH FROM (sc.finished_at - sc.answered_at)) - sc.paused_total_seconds,
                0
              )
            END)`,
         'duracao_media_segundos',
       )
+      // Nunca assumido e já finalizado: a "espera" vai até o fechamento, não
+      // até um "assumir" que nunca aconteceu - só fica nula se a conversa
+      // ainda está aberta, porque aí ninguém sabe quanto vai esperar ainda.
       .addSelect(
-        `COALESCE(SUM(CASE WHEN sc.answered_at IS NULL THEN NULL ELSE
-             EXTRACT(EPOCH FROM (sc.answered_at - sc.created_at))
+        `COALESCE(SUM(CASE WHEN sc.answered_at IS NULL AND sc.finished_at IS NULL THEN NULL ELSE
+             EXTRACT(EPOCH FROM (COALESCE(sc.answered_at, sc.finished_at) - sc.created_at))
            END), 0)`,
         'espera_total_segundos',
       )
       .addSelect(
-        `AVG(CASE WHEN sc.answered_at IS NULL THEN NULL ELSE
-             EXTRACT(EPOCH FROM (sc.answered_at - sc.created_at))
+        `AVG(CASE WHEN sc.answered_at IS NULL AND sc.finished_at IS NULL THEN NULL ELSE
+             EXTRACT(EPOCH FROM (COALESCE(sc.answered_at, sc.finished_at) - sc.created_at))
            END)`,
         'espera_media_segundos',
       )
@@ -731,18 +757,26 @@ export class ReportsService {
       // A mesma fórmula do dashboard: `GREATEST(..., 0)` porque a pausa é
       // gravada por fora da duração, e um atendimento curto com pausa longa
       // daria negativo.
+      //
+      // Sem `answered_at` não existe duração de atendimento - ninguém
+      // assumiu, e `finished_at - created_at` mediria o tempo que a conversa
+      // passou largada até fechar por inatividade, não tempo atendido. Esse
+      // caso já tem "espera" (abaixo) para contar o que de fato aconteceu.
       .addSelect(
-        `CASE WHEN sc.finished_at IS NULL THEN NULL ELSE
+        `CASE WHEN sc.finished_at IS NULL OR sc.answered_at IS NULL THEN NULL ELSE
            GREATEST(
-             EXTRACT(EPOCH FROM (sc.finished_at - sc.created_at)) - sc.paused_total_seconds,
+             EXTRACT(EPOCH FROM (sc.finished_at - sc.answered_at)) - sc.paused_total_seconds,
              0
            )
          END`,
         'duracao_segundos',
       )
+      // Nunca assumido e já finalizado: a "espera" vai até o fechamento, não
+      // até um "assumir" que nunca aconteceu - só fica nula se a conversa
+      // ainda está aberta, porque aí ninguém sabe quanto vai esperar ainda.
       .addSelect(
-        `CASE WHEN sc.answered_at IS NULL THEN NULL ELSE
-           EXTRACT(EPOCH FROM (sc.answered_at - sc.created_at))
+        `CASE WHEN sc.answered_at IS NULL AND sc.finished_at IS NULL THEN NULL ELSE
+           EXTRACT(EPOCH FROM (COALESCE(sc.answered_at, sc.finished_at) - sc.created_at))
          END`,
         'espera_segundos',
       )
@@ -753,9 +787,47 @@ export class ReportsService {
     this.aplicaPeriodo(query, filtro);
     this.aplicaFiltros(query, filtro);
 
-    // Mais recente primeiro: quem abre o relatório quer ver o que acabou de
-    // acontecer, não o começo do período.
-    return query.orderBy('sc.created_at', 'DESC');
+    return this.aplicaOrdenacaoDeAtendimentos(query, filtro.ordenar_atendimentos_por);
+  }
+
+  /**
+   * A ordenação do relatório de Atendimentos/tela de Histórico.
+   *
+   * Ausente vira "mais recentes" - mesmo padrão de sempre, antes deste filtro
+   * existir, então não muda quem não escolhe nada. As expressões usam os
+   * mesmos aliases desta consulta (`sc.created_at`, e os `CASE` de duração e
+   * espera escritos de novo porque o Postgres não aceita o alias da coluna no
+   * `ORDER BY` de uma consulta sem `GROUP BY`).
+   */
+  private aplicaOrdenacaoDeAtendimentos(
+    query: SelectQueryBuilder<SupportChats>,
+    ordenarPor: AttendanceSortBy | undefined,
+  ): SelectQueryBuilder<SupportChats> {
+    // Mesma ressalva das demais consultas: sem `answered_at` não há duração
+    // de atendimento, só espera - ver `consultaAtendimentos`.
+    const DURACAO = `CASE WHEN sc.finished_at IS NULL OR sc.answered_at IS NULL THEN NULL ELSE
+         GREATEST(EXTRACT(EPOCH FROM (sc.finished_at - sc.answered_at)) - sc.paused_total_seconds, 0)
+       END`;
+    const ESPERA = `CASE WHEN sc.answered_at IS NULL AND sc.finished_at IS NULL THEN NULL ELSE
+         EXTRACT(EPOCH FROM (COALESCE(sc.answered_at, sc.finished_at) - sc.created_at))
+       END`;
+
+    const mapa: Record<AttendanceSortBy, [string, 'ASC' | 'DESC']> = {
+      mais_recentes: ['sc.created_at', 'DESC'],
+      mais_antigos: ['sc.created_at', 'ASC'],
+      maior_duracao: [DURACAO, 'DESC'],
+      menor_duracao: [DURACAO, 'ASC'],
+      maior_espera: [ESPERA, 'DESC'],
+      menor_espera: [ESPERA, 'ASC'],
+    };
+
+    const ordenacaoPorData = !ordenarPor || ordenarPor === 'mais_recentes' || ordenarPor === 'mais_antigos';
+    const [expressao, direcao] = mapa[ordenarPor ?? 'mais_recentes'];
+
+    // `NULLS LAST` nas durações/esperas: atendimento em aberto não tem
+    // duração nem espera ainda, e sem isto o Postgres os colocaria primeiro
+    // em "maior" (NULL conta como maior que qualquer número por padrão).
+    return query.orderBy(expressao, direcao, ordenacaoPorData ? undefined : 'NULLS LAST');
   }
 
   /**

@@ -47,9 +47,12 @@ export class ReportsController {
     private readonly reportTemplateService: ReportTemplateService,
   ) {}
 
+  // `support.chat:history` também libera: é a mesma consulta que a tela de
+  // Histórico usa para listar, sem exportação nem os filtros de
+  // setor/canal/situação - ver `AtendimentosHistoricoSection` no front.
   @Get('attendance')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('report.attendance:view')
+  @Permissions('report.attendance:view', 'support.chat:history')
   @HttpCode(HttpStatus.OK)
   async atendimentos(@Query() filtro: ReportFilterDto): Promise<AttendanceReport> {
     return this.reportsService.atendimentos(filtro);

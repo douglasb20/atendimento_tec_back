@@ -93,18 +93,22 @@ export class DashboardService {
    * porque a pausa é gravada por fora da duração - um atendimento curto com
    * pausa longa daria negativo.
    *
-   * Só entram os que têm `finished_at`: sem ele não há intervalo a medir.
+   * Só entram os que têm `finished_at` **e** `answered_at`: sem o segundo,
+   * ninguém assumiu a conversa, e `finished_at - created_at` mediria o tempo
+   * que ela ficou largada até fechar por inatividade, não tempo atendido -
+   * mesma ressalva de `reports.service.ts`.
    */
   private async tempoMedioDeAtendimento(): Promise<number | null> {
     const { media } = await this.supportChatsRepository
       .createQueryBuilder('chat')
       .select(
-        'AVG(GREATEST(EXTRACT(EPOCH FROM (chat.finished_at - chat.created_at)) - chat.paused_total_seconds, 0))',
+        'AVG(GREATEST(EXTRACT(EPOCH FROM (chat.finished_at - chat.answered_at)) - chat.paused_total_seconds, 0))',
         'media',
       )
       .innerJoin('support_chat_status', 'st', 'st.id = chat.support_chat_status_id')
       .where('st.is_final = true')
       .andWhere('chat.finished_at IS NOT NULL')
+      .andWhere('chat.answered_at IS NOT NULL')
       .getRawOne<{ media: string | null }>();
 
     return media === null ? null : Math.round(Number(media));

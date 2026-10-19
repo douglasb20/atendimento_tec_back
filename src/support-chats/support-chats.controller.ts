@@ -135,9 +135,12 @@ export class SupportChatsController {
     return this.supportChatsService.listAllSupportChats(req.user['id'], podeVerOutros);
   }
 
+  // `support.chat:history` também libera: é o mesmo detalhe que o modal da
+  // tela de Histórico abre a partir do protocolo, sem precisar do acesso ao
+  // chat ao vivo.
   @Get('/:id/messages')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('support.chat:view')
+  @Permissions('support.chat:view', 'support.chat:history')
   @HttpCode(HttpStatus.OK)
   async findSupportChatById(@Param('id', ParseIntPipe) id: number) {
     return this.supportChatsService.findSupportChatsById(id);

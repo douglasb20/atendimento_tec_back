@@ -41,6 +41,22 @@ export const ORDENACOES_RELATORIO_CLIENTE = [
 export type ClientReportSortBy = (typeof ORDENACOES_RELATORIO_CLIENTE)[number];
 
 /**
+ * A ordenação do relatório de Atendimentos/tela de Histórico - linha a
+ * linha, por isso as opções são sobre o próprio atendimento (data, duração,
+ * espera), diferente do dropdown por cliente/contato acima.
+ */
+export const ORDENACOES_ATENDIMENTOS = [
+  'mais_recentes',
+  'mais_antigos',
+  'maior_duracao',
+  'menor_duracao',
+  'maior_espera',
+  'menor_espera',
+] as const;
+
+export type AttendanceSortBy = (typeof ORDENACOES_ATENDIMENTOS)[number];
+
+/**
  * Filtros do relatório de atendimentos.
  *
  * Todos opcionais: sem nenhum, o relatório traz o período inteiro sem
@@ -161,4 +177,12 @@ export class ReportFilterDto {
   @IsOptional()
   @IsIn(ORDENACOES_RELATORIO_CLIENTE, { message: 'A ordenação é inválida' })
   ordenar_por?: ClientReportSortBy;
+
+  /**
+   * O relatório de Atendimentos e a tela de Histórico: ausente mantém o
+   * padrão de sempre (mais recente primeiro) - não muda quem não escolhe nada.
+   */
+  @IsOptional()
+  @IsIn(ORDENACOES_ATENDIMENTOS, { message: 'A ordenação é inválida' })
+  ordenar_atendimentos_por?: AttendanceSortBy;
 }
