@@ -839,9 +839,24 @@ export class ReportsService {
    * comparação acontece sobre a data já convertida para o fuso de exibição,
    * o mesmo idioma do dashboard.
    */
+  /**
+   * ⚠️ `:de`/`:ate` sempre passam por `::timestamptz` antes de `::date` -
+   * nunca cast direto. O container roda com `TZ=America/Sao_Paulo` (ver
+   * `Dockerfile`), e o driver `pg` serializa um `Date` do Node como string
+   * **com o offset local** (`2026-10-19T21:00:00.000-03:00` para a meia-noite
+   * UTC do dia 20) - é assim que `node-postgres` sempre mandou parâmetros de
+   * data, timezone do processo ou não. Um cast direto `string::date` pega a
+   * data escrita *antes* do offset, sem reconverter para UTC: aquele exemplo
+   * virava `2026-10-19`, um dia a menos, e todo atendimento do próprio dia
+   * sumia de "últimos 7 dias" até o dia seguinte. Passar por `::timestamptz`
+   * primeiro normaliza o instante antes do truncamento, e `::date` depois já
+   * opera num timestamp correto. Comprovado reproduzindo com `pg.Client` puro
+   * (fora do TypeORM) - o bug está na combinação driver+fuso do container,
+   * não na query em si rodada via `psql`.
+   */
   private aplicaPeriodo(query: SelectQueryBuilder<SupportChats>, filtro: ReportFilterDto): void {
     if (filtro.de) {
-      query.andWhere(`(sc.created_at AT TIME ZONE :fuso)::date >= :de::date`, {
+      query.andWhere(`(sc.created_at AT TIME ZONE :fuso)::date >= :de::timestamptz::date`, {
         fuso: FUSO_EXIBICAO,
         de: filtro.de,
       });
@@ -851,7 +866,7 @@ export class ReportsService {
     // inteiro, que é o que quem preenche "até" espera. Com comparação por
     // instante, tudo depois de 00:00 do dia 16 ficaria de fora.
     if (filtro.ate) {
-      query.andWhere(`(sc.created_at AT TIME ZONE :fuso)::date <= :ate::date`, {
+      query.andWhere(`(sc.created_at AT TIME ZONE :fuso)::date <= :ate::timestamptz::date`, {
         fuso: FUSO_EXIBICAO,
         ate: filtro.ate,
       });
