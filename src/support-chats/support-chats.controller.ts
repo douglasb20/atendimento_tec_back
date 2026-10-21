@@ -147,6 +147,21 @@ export class SupportChatsController {
   }
 
   /**
+   * Uma resposta pode citar mensagem de protocolo já encerrado. Em vez de
+   * abrir o histórico inteiro, devolve só a mensagem do mesmo contato.
+   */
+  @Get('/:id/mensagem-citada/:messageId')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('support.chat:view')
+  @HttpCode(HttpStatus.OK)
+  async findMensagemCitata(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('messageId') messageId: string,
+  ) {
+    return this.supportChatsService.findMensagemCitata(id, messageId);
+  }
+
+  /**
    * Quantos atendimentos anteriores este contato tem.
    *
    * Mesma permissão de abrir a conversa: quem vê o atendimento atual pode ver

@@ -58,6 +58,12 @@ export class UserRepository extends Repository<Users> {
     return query.getExists();
   }
 
+  async corAgendaEmUso(cor: string, ignorarId?: number): Promise<boolean> {
+    const query = this.createQueryBuilder('u').where('upper(u.schedule_color) = upper(:cor)', { cor });
+    if (ignorarId) query.andWhere('u.id != :ignorarId', { ignorarId });
+    return query.getExists();
+  }
+
   async findById(id: number) {
     const user = await this.findOne({
       where: { id: id, status: 1 },

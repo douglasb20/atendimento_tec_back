@@ -119,6 +119,15 @@ export const CATALOGO = {
     padrao: true,
   },
 
+  notif_compromisso: {
+    rotulo: 'Lembretes de compromissos',
+    descricao: 'Avisos quando um compromisso estiver próximo do horário marcado.',
+    tipo: 'booleano',
+    grupo: 'notificacoes',
+    secao: 'movimentacoes',
+    padrao: true,
+  },
+
   notif_som: {
     rotulo: 'Notificação sonora',
     descricao: 'Tocar alerta sonoro no navegador.',

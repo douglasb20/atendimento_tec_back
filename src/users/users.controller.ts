@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -113,6 +114,15 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   async findAll() {
     return this.usersService.findAll();
+  }
+
+  /** Cores que ainda podem ser escolhidas no cadastro/edição do atendente. */
+  @Get('cores-agenda')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('user:view', 'user:add', 'user:update')
+  @HttpCode(HttpStatus.OK)
+  async coresAgenda(@Query('user_id') userId?: string) {
+    return this.usersService.coresAgendaDisponiveis(userId ? Number(userId) : undefined);
   }
 
   @Get(':id')

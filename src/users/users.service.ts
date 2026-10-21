@@ -22,6 +22,7 @@ import { RedisCacheRepository } from '@/redis-cache/redis-cache.repository';
 import { UserConfigService } from '@/user-config/user-config.service';
 import { DepartmentsRepository } from '@/departments/departments.repository';
 import { StatusConvite, UserInvitesService } from './user-invites.service';
+import { CORES_AGENDA } from './schedule-colors';
 
 @Injectable({ scope: Scope.REQUEST })
 export class UsersService {
@@ -107,6 +108,8 @@ export class UsersService {
    */
   async addUser(createUserDto: CreateUserDto): Promise<Users> {
     await this.recusaEmailEmUso(createUserDto.email);
+    await this.validarCorAgenda(createUserDto.schedule_color);
+    createUserDto.schedule_color = createUserDto.schedule_color.toUpperCase();
 
     try {
       await this.query.startTransaction();
@@ -167,6 +170,11 @@ export class UsersService {
 
     if (updateUserDto.email) {
       await this.recusaEmailEmUso(updateUserDto.email, user_id);
+    }
+
+    if (updateUserDto.schedule_color !== undefined) {
+      await this.validarCorAgenda(updateUserDto.schedule_color, user_id);
+      updateUserDto.schedule_color = updateUserDto.schedule_color.toUpperCase();
     }
 
     try {
@@ -370,6 +378,31 @@ export class UsersService {
         `O usuário master do sistema não pode ser ${acao} por aqui.`,
       );
     }
+  }
+
+  /** Paleta fixa e sem repetição - a constraint única é a segunda barreira. */
+  private async validarCorAgenda(cor: string, ignorarId?: number): Promise<void> {
+    const normalizada = cor?.toUpperCase();
+    if (!normalizada || !CORES_AGENDA.includes(normalizada as (typeof CORES_AGENDA)[number])) {
+      throw new ConflictException('A cor escolhida não pertence à paleta da agenda');
+    }
+
+    if (await this.usersRepository.corAgendaEmUso(normalizada, ignorarId)) {
+      throw new ConflictException('Esta cor já está em uso por outro atendente');
+    }
+  }
+
+  async coresAgendaDisponiveis(userId?: number): Promise<string[]> {
+    const usuario = userId ? await this.usersRepository.findById(userId) : null;
+    const usadas = new Set(
+      (await this.usersRepository.find({ select: ['schedule_color'] }))
+        .map((u) => u.schedule_color?.toUpperCase())
+        .filter(Boolean),
+    );
+
+    // Na edição, a própria cor continua como opção válida.
+    if (usuario?.schedule_color) usadas.delete(usuario.schedule_color.toUpperCase());
+    return CORES_AGENDA.filter((cor) => !usadas.has(cor));
   }
 
   async userInfo(user_id: number) {

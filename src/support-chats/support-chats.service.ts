@@ -1379,6 +1379,39 @@ export class SupportChatsService {
   }
 
   /**
+   * Busca a mensagem citada em outro protocolo do mesmo contato. `message_id`
+   * é único, mas não pode ser usado sozinho: a conferência evita que uma chave
+   * conhecida revele uma conversa de outro contato.
+   */
+  async findMensagemCitata(supportChatId: number, messageId: string) {
+    const atual = await this.supportChatsRepository.findOne({
+      where: { id: supportChatId },
+      select: { id: true, contact_id: true },
+    });
+
+    if (!atual) throw new NotFoundException('Chat de suporte não encontrado');
+
+    const mensagem = await this.messagesService.findByMessageId(messageId);
+    if (!mensagem || mensagem.is_system_hidden) {
+      throw new NotFoundException('Mensagem citada não encontrada');
+    }
+
+    const chatDaMensagem = await this.supportChatsRepository.findOne({
+      where: { id: mensagem.support_chat_id },
+      select: { id: true, contact_id: true, protocol: true },
+    });
+
+    if (!chatDaMensagem || chatDaMensagem.contact_id !== atual.contact_id) {
+      throw new NotFoundException('Mensagem citada não encontrada');
+    }
+
+    return {
+      mensagem: this.messagesService.comUrlPublica(mensagem),
+      protocolo: chatDaMensagem.protocol,
+    };
+  }
+
+  /**
    * O setor a gravar na conversa nova, validado contra os do atendente.
    *
    * Atendente associado a setor(es) só pode escolher um dos seus - sem isso,

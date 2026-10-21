@@ -85,7 +85,9 @@ export class DepartmentsService {
    * Serve a aba "Equipe" do cadastro de setor - a mesma associação que o
    * cadastro de usuário grava, só que editada pelo outro lado.
    */
-  async membros(id: number): Promise<{ id: number; name: string; last_name: string | null; email: string; membro: boolean }[]> {
+  async membros(
+    id: number,
+  ): Promise<{ id: number; name: string; last_name: string | null; email: string; schedule_color: string; membro: boolean }[]> {
     await this.departmentsRepository.findById(id); // 404 se o setor não existir
 
     const usuarios = await this.userRepository.findActives();
@@ -95,6 +97,7 @@ export class DepartmentsService {
       name: usuario.name,
       last_name: usuario.last_name,
       email: usuario.email,
+      schedule_color: usuario.schedule_color,
       membro: usuario.departments?.some((setor) => setor.id === id) ?? false,
     }));
   }

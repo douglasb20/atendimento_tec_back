@@ -1,5 +1,5 @@
+import { IsBoolean, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 import { CreateUserDto } from './create-user.dto';
-import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class UpdateUserDto extends CreateUserDto {
   lastlogin_at?: string;
@@ -18,4 +18,10 @@ export class UpdateUserDto extends CreateUserDto {
   @IsBoolean()
   @IsOptional()
   changed_avatar?: boolean;
+
+  /** Ausente preserva a cor; obrigatória apenas no cadastro de atendente. */
+  @IsOptional()
+  @IsString()
+  @Matches(/^#[0-9A-Fa-f]{6}$/, { message: 'Informe uma cor de agenda válida' })
+  declare schedule_color: string;
 }

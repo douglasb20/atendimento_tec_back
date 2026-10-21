@@ -41,8 +41,13 @@ export class PermissionGuard implements CanActivate {
     }
 
     // Liberação explícita. Ver `sem-permissao.decorator.ts`: sem ela, endpoint
-    // sem `@Permissions` é negado.
-    if (this.reflector.get<boolean>(SEM_PERMISSAO, handler)) {
+    // sem `@Permissions` é negado. Lida do handler **e** da classe, pelo mesmo
+    // motivo do bloco de `permissions` abaixo: `@SemPermissao()` no
+    // `@Controller` valia para todos os métodos, mas era ignorado em silêncio.
+    if (
+      this.reflector.get<boolean>(SEM_PERMISSAO, handler) ||
+      this.reflector.get<boolean>(SEM_PERMISSAO, context.getClass())
+    ) {
       return true;
     }
 

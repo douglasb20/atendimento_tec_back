@@ -58,6 +58,13 @@ export const CATALOGO = {
       'Uma mensagem apagada pelo contato aparece com o texto original, marcada com um ícone. Desligado, mostra só "Mensagem apagada", sem o conteúdo.',
     padrao: false,
   },
+
+  agenda_conjunta: {
+    rotulo: 'Exibir agenda conjunta',
+    descricao:
+      'Permite que os atendentes vejam os compromissos de todos e escolham outro responsável ao criar ou editar um compromisso.',
+    padrao: false,
+  },
 } as const satisfies Record<string, DefinicaoAjusteAtendimento>;
 
 export type ChaveAjusteAtendimento = keyof typeof CATALOGO;

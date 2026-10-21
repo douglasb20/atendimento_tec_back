@@ -67,6 +67,10 @@ export class Users {
   @Column({ default: 1, nullable: true })
   status: number;
 
+  /** Cor exclusiva usada para identificar os compromissos deste atendente. */
+  @Column({ type: 'varchar', length: 7, unique: true })
+  schedule_color: string;
+
   // ⚠️ `tema` e `modo_tema` **saíram daqui** na migration `1789600000001`:
   // viraram chaves em `user_config`, junto das demais preferências. Quem
   // precisa delas chama `UserConfigService.paraUsuario()`; `GET /users/info`

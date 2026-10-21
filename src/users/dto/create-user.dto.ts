@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsArray, IsEmail, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsEmail, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches } from 'class-validator';
 
 export class CreateUserDto {
   @IsString({ message: (opt) => `Campo ${opt.property} aceita somente formato string` })
@@ -55,4 +55,9 @@ export class CreateUserDto {
   @IsOptional()
   @IsInt({ message: (opt) => `Campo ${opt.property} aceita somente formato numérico` })
   permission_group_id?: number | null;
+
+  /** Cor exclusiva que identifica os compromissos deste atendente na agenda. */
+  @IsString()
+  @Matches(/^#[0-9A-Fa-f]{6}$/, { message: 'Informe uma cor de agenda válida' })
+  schedule_color: string;
 }

@@ -43,6 +43,8 @@ import { DepartmentsModule } from '@/departments/departments.module';
 import { ChatbotsModule } from '@/chatbots/chatbots.module';
 import { ChatbotEngineModule } from '@/chatbot-engine/chatbot-engine.module';
 import { HealthModule } from '@/health/health.module';
+import { SchedulesModule } from '@/schedules/schedules.module';
+import { NotificationsModule } from '@/notifications/notifications.module';
 
 // const destPath = path.resolve(__dirname, '..', '..', 'files', 'tmp');
 @Global()
@@ -120,6 +122,8 @@ import { HealthModule } from '@/health/health.module';
     ChatbotsModule,
     ChatbotEngineModule,
     HealthModule,
+    SchedulesModule,
+    NotificationsModule,
   ],
   exports: [ QueryStorageService],
   providers: [
