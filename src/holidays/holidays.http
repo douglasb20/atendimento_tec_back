@@ -1,0 +1,44 @@
+@baseUrl = http://localhost:3001/api
+@token = {{token}}
+
+### Listar feriados
+GET {{baseUrl}}/holidays
+Authorization: Bearer {{token}}
+
+### Criar feriado recorrente (Natal)
+POST {{baseUrl}}/holidays
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Natal",
+  "recurring": true,
+  "month": 12,
+  "day": 25
+}
+
+### Criar feriado de data completa (Carnaval, móvel)
+POST {{baseUrl}}/holidays
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Carnaval",
+  "recurring": false,
+  "year": 2027,
+  "month": 2,
+  "day": 16
+}
+
+### Atualizar feriado
+PATCH {{baseUrl}}/holidays/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Natal (atualizado)"
+}
+
+### Remover feriado
+DELETE {{baseUrl}}/holidays/1
+Authorization: Bearer {{token}}

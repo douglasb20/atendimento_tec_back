@@ -54,22 +54,13 @@ export class ChatbotsService {
       throw new ConflictException(`Já existe um chatbot chamado "${name}"`);
     }
 
-    if (
-      dto.type !== 'complementar' &&
-      dto.channel_id &&
-      (await this.chatbotsRepository.ativoNoCanal(dto.channel_id, dto.type))
-    ) {
-      throw new BadRequestException(
-        `Este canal já tem um chatbot de ${dto.type} ativo. Desative-o antes de ativar outro.`,
-      );
-    }
+    const channelIds = dto.type === 'complementar' ? [] : (dto.channel_ids ?? []);
+    await this.assertSemConflitoNosCanais(channelIds, dto.type);
 
     return runInTransaction(this.dataSource, async (manager) => {
-      const salvo = await manager.save(Chatbots, {
-        name,
-        type: dto.type,
-        channel_id: dto.type === 'complementar' ? null : dto.channel_id ?? null,
-      });
+      const salvo = await manager.save(Chatbots, { name, type: dto.type });
+
+      await this.chatbotsRepository.substituiCanais(salvo.id, channelIds, manager);
 
       // O rascunho nasce junto, com só o nó Início - a tela de edição sempre
       // encontra algo para carregar, sem precisar de um caso especial de
@@ -96,18 +87,14 @@ export class ChatbotsService {
     }
 
     const type = dto.type ?? chatbot.type;
-    const channelId = dto.type === 'complementar' ? null : dto.channel_id ?? chatbot.channel_id;
     const active = dto.active ?? chatbot.active;
+    const channelIds =
+      type === 'complementar'
+        ? []
+        : (dto.channel_ids ?? (await this.chatbotsRepository.findCanaisDoChatbot(id)));
 
-    if (
-      type !== 'complementar' &&
-      channelId &&
-      active &&
-      (await this.chatbotsRepository.ativoNoCanal(channelId, type, id))
-    ) {
-      throw new BadRequestException(
-        `Este canal já tem um chatbot de ${type} ativo. Desative-o antes de ativar outro.`,
-      );
+    if (active) {
+      await this.assertSemConflitoNosCanais(channelIds, type, id);
     }
 
     return runInTransaction(this.dataSource, async (manager) => {
@@ -115,15 +102,40 @@ export class ChatbotsService {
         ...chatbot,
         ...(name && { name }),
         ...(dto.type !== undefined && { type: dto.type }),
-        channel_id: channelId,
         ...(dto.active !== undefined && { active: dto.active }),
         ...(dto.settings !== undefined && { settings: dto.settings }),
       });
+
+      if (dto.channel_ids !== undefined || dto.type === 'complementar') {
+        await this.chatbotsRepository.substituiCanais(id, channelIds, manager);
+      }
 
       this.logger.log(`Chatbot atualizado: id ${id}`);
 
       return manager.findOne(Chatbots, { where: { id } });
     });
+  }
+
+  /**
+   * Nenhum dos canais da lista pode já ter outro chatbot ativo do mesmo tipo
+   * - a trava que antes era constraint de banco (`uq_chatbots_channel_type_
+   * active`) e virou validação de aplicação com o M:N (ver `entities/
+   * chatbots.entity.ts`).
+   */
+  private async assertSemConflitoNosCanais(
+    channelIds: number[],
+    type: Chatbots['type'],
+    ignorarId?: number,
+  ): Promise<void> {
+    if (type === 'complementar') return;
+
+    for (const channelId of channelIds) {
+      if (await this.chatbotsRepository.ativoNoCanal(channelId, type, ignorarId)) {
+        throw new BadRequestException(
+          `Este canal já tem um chatbot de ${type} ativo. Desative-o antes de ativar outro.`,
+        );
+      }
+    }
   }
 
   async remove(id: number): Promise<{ status: string }> {

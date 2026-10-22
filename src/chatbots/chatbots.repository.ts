@@ -15,7 +15,7 @@ export class ChatbotsRepository extends Repository<Chatbots> {
    */
   async findAllActive(): Promise<Chatbots[]> {
     return this.createQueryBuilder('c')
-      .leftJoinAndSelect('c.channel', 'channel')
+      .leftJoinAndSelect('c.channels', 'channels')
       .where('c.deleted_at IS NULL')
       .andWhere("c.type != 'complementar'")
       .orderBy('c.name', 'ASC')
@@ -54,13 +54,15 @@ export class ChatbotsRepository extends Repository<Chatbots> {
   /**
    * Já existe um chatbot ativo deste tipo neste canal?
    *
-   * Só um chatbot de cada tipo por canal - decisão do usuário. Chamado antes
-   * de ativar/criar, para devolver um erro legível em vez de deixar a
-   * constraint do banco estourar sem contexto.
+   * Sem constraint de banco (M:N não suporta um índice único direto nesse
+   * formato) - decisão do usuário: valida na aplicação, chamado antes de
+   * ativar/vincular cada canal, para devolver um erro legível em caso de
+   * conflito.
    */
   async ativoNoCanal(channelId: number, type: ChatbotType, ignorarId?: number): Promise<boolean> {
     const query = this.createQueryBuilder('c')
-      .where('c.channel_id = :channelId', { channelId })
+      .innerJoin('channel_x_chatbot', 'cxc', 'cxc.chatbot_id = c.id')
+      .where('cxc.channel_id = :channelId', { channelId })
       .andWhere('c.type = :type', { type })
       .andWhere('c.active = true')
       .andWhere('c.deleted_at IS NULL');
@@ -74,8 +76,36 @@ export class ChatbotsRepository extends Repository<Chatbots> {
   async findEntradaAtivoDoCanal(channelId: number, manager?: EntityManager): Promise<Chatbots | null> {
     const repo = manager ? manager.getRepository(Chatbots) : this;
 
-    return repo.findOne({
-      where: { channel_id: channelId, type: 'entrada', active: true, deleted_at: IsNull() },
-    });
+    return repo
+      .createQueryBuilder('c')
+      .innerJoin('channel_x_chatbot', 'cxc', 'cxc.chatbot_id = c.id')
+      .where('cxc.channel_id = :channelId', { channelId })
+      .andWhere('c.type = :type', { type: 'entrada' })
+      .andWhere('c.active = true')
+      .andWhere('c.deleted_at IS NULL')
+      .getOne();
+  }
+
+  /** Substitui todos os canais vinculados ao chatbot de uma vez - "Salvar"
+   * sempre manda a lista inteira, mesmo desenho de `substituiSchedule`. */
+  async substituiCanais(chatbotId: number, channelIds: number[], manager: EntityManager): Promise<void> {
+    await manager.query('DELETE FROM channel_x_chatbot WHERE chatbot_id = $1', [chatbotId]);
+
+    for (const channelId of channelIds) {
+      await manager.query(
+        'INSERT INTO channel_x_chatbot (chatbot_id, channel_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [chatbotId, channelId],
+      );
+    }
+  }
+
+  /** Os canais vinculados ao chatbot - usado pela validação de conflito ao salvar. */
+  async findCanaisDoChatbot(chatbotId: number, manager?: EntityManager): Promise<number[]> {
+    const linhas = await (manager ?? this.manager).query(
+      'SELECT channel_id FROM channel_x_chatbot WHERE chatbot_id = $1',
+      [chatbotId],
+    );
+
+    return linhas.map((l: { channel_id: number }) => l.channel_id);
   }
 }
