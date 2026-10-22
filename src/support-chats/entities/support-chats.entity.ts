@@ -32,6 +32,18 @@ export class SupportChats {
   @Column({ name: 'department_id', type: 'int', nullable: true })
   department_id: number | null;
 
+  /**
+   * true quando o atendente iniciou o atendimento manualmente (modal "Novo
+   * atendimento"); false quando nasceu do fluxo normal, mensagem do contato
+   * via webhook.
+   *
+   * Atendimentos anteriores a esta coluna ficam `false` por default da
+   * migration, sem significar "o cliente iniciou" - só que a informação não
+   * foi capturada.
+   */
+  @Column({ name: 'started_by_agent', type: 'boolean', default: false })
+  started_by_agent: boolean;
+
   @Column({ name: 'support_chat_status_id', type: 'int' })
   support_chat_status_id: number;
 
