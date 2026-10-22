@@ -1469,6 +1469,7 @@ export class SupportChatsService {
         manager,
         user_id,
         departmentId,
+        true,
       );
 
       // Só promove a dono quem de fato criou agora - uma conversa que já
