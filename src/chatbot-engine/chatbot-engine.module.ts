@@ -3,6 +3,7 @@ import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { ChatbotsModule } from '@/chatbots/chatbots.module';
+import { HolidaysModule } from '@/holidays/holidays.module';
 import { SupportChatsModule } from '@/support-chats/support-chats.module';
 import { MessagesModule } from '@/support-chats/messages/messages.module';
 import { WhatsappModule } from '@/whatsapp/whatsapp.module';
@@ -14,6 +15,8 @@ import { ChatbotFlowExecutions } from './entities/chatbot-flow-executions.entity
 import { ExecutionEngine } from './execution-engine.service';
 import { ConditionalHandler } from './node-handlers/conditional.handler';
 import { FinishHandler } from './node-handlers/finish.handler';
+import { HolidayHandler } from './node-handlers/holiday.handler';
+import { MenuHandler } from './node-handlers/menu.handler';
 import { MessageHandler } from './node-handlers/message.handler';
 import { NODE_HANDLERS } from './node-handlers/node-handler.interface';
 import { NodeHandlersRegistry } from './node-handlers/node-handlers.registry';
@@ -29,6 +32,7 @@ import { ChatbotFlowExecutionProcessor } from './processors/chatbot-flow-executi
     TypeOrmModule.forFeature([ChatbotFlowExecutions]),
     BullModule.registerQueue({ name: 'chatbot-flow-execution' }),
     ChatbotsModule,
+    HolidaysModule,
     forwardRef(() => SupportChatsModule),
     MessagesModule,
     forwardRef(() => WhatsappModule),
@@ -43,6 +47,8 @@ import { ChatbotFlowExecutionProcessor } from './processors/chatbot-flow-executi
     StartHandler,
     MessageHandler,
     ConditionalHandler,
+    MenuHandler,
+    HolidayHandler,
     FinishHandler,
     {
       provide: NODE_HANDLERS,
@@ -50,9 +56,11 @@ import { ChatbotFlowExecutionProcessor } from './processors/chatbot-flow-executi
         start: StartHandler,
         message: MessageHandler,
         conditional: ConditionalHandler,
+        menu: MenuHandler,
+        holiday: HolidayHandler,
         finish: FinishHandler,
-      ) => [start, message, conditional, finish],
-      inject: [StartHandler, MessageHandler, ConditionalHandler, FinishHandler],
+      ) => [start, message, conditional, menu, holiday, finish],
+      inject: [StartHandler, MessageHandler, ConditionalHandler, MenuHandler, HolidayHandler, FinishHandler],
     },
   ],
   exports: [ChatbotFlowExecutionsService, ChatbotFlowExecutionsRepository],

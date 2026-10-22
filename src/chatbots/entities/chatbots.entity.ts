@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, JoinTable, ManyToMany, ManyToOne, JoinColumn, PrimaryGeneratedColumn } from 'typeorm';
 
 import { Channels } from '@/channels/entities/channels.entity';
 import { ChatbotFlowVersions } from './chatbot-flow-versions.entity';
@@ -6,7 +6,7 @@ import { ChatbotFlowVersions } from './chatbot-flow-versions.entity';
 export type ChatbotType = 'entrada' | 'saida' | 'agendamento' | 'complementar';
 
 /**
- * Cadastro do chatbot: nome, tipo, canal e configurações (modal
+ * Cadastro do chatbot: nome, tipo, canais e configurações (modal
  * "Configurações" - alerta de inatividade, redirecionar tentativas erradas,
  * acionamento por evento, gatilho de encerramento, mensagens de sistema).
  *
@@ -14,8 +14,15 @@ export type ChatbotType = 'entrada' | 'saida' | 'agendamento' | 'complementar';
  * versionado. Ver a migration `1789630000000` para o porquê da separação.
  *
  * `type = 'complementar'`: os fluxos complementares (subfluxos, chamados pelo
- * nó "Executar Fluxo") - mesma entidade, sem `channel_id`, compartilháveis
- * entre qualquer chatbot do sistema (decisão do usuário, 23/09/2026).
+ * nó "Executar Fluxo") - mesma entidade, sem canal, compartilháveis entre
+ * qualquer chatbot do sistema (decisão do usuário, 23/09/2026).
+ *
+ * **Canal é M:N** (`channel_x_chatbot`, migration `1790020000000`) - o mesmo
+ * chatbot pode ficar ligado a vários canais (reaproveitar o mesmo fluxo em
+ * vários números), decisão que reverteu o `channel_id` único original. A
+ * trava "só um chatbot ativo de cada tipo por canal" não é mais constraint de
+ * banco - vira "nenhum canal pode ter dois vínculos para chatbots do mesmo
+ * tipo", verificada em `ChatbotsService` (ver lá).
  */
 @Entity('chatbots')
 export class Chatbots {
@@ -31,12 +38,14 @@ export class Chatbots {
   @Column({ type: 'boolean', default: true })
   active: boolean;
 
-  @Column({ type: 'int', nullable: true, default: null })
-  channel_id: number | null;
-
-  @ManyToOne(() => Channels)
-  @JoinColumn({ name: 'channel_id' })
-  channel: Channels | null;
+  /** Lado dono do M:N - o `@JoinTable` fica aqui, não em `Channels`. */
+  @ManyToMany(() => Channels)
+  @JoinTable({
+    name: 'channel_x_chatbot',
+    joinColumn: { name: 'chatbot_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'channel_id', referencedColumnName: 'id' },
+  })
+  channels: Channels[];
 
   /** Modal "Configurações": recursos (alertas, gatilhos) e mensagens de sistema. */
   @Column({ type: 'jsonb', default: {} })

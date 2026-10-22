@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsNotEmpty, IsString, MaxLength, ValidateIf } from 'class-validator';
+import { ArrayMinSize, IsIn, IsInt, IsNotEmpty, IsString, MaxLength, ValidateIf } from 'class-validator';
 
 import { ChatbotType } from '../entities/chatbots.entity';
 
@@ -14,10 +14,13 @@ export class CreateChatbotDto {
   type: ChatbotType;
 
   /**
-   * Canal em que este chatbot roda. Obrigatório para entrada/saída/
-   * agendamento; ausente/nulo para complementar (subfluxo não amarra a canal).
+   * Canais em que este chatbot roda - M:N (migration `1790020000000`), o
+   * mesmo chatbot pode ficar ligado a vários. Obrigatório (ao menos um) para
+   * entrada/saída/agendamento; ausente/vazio para complementar (subfluxo não
+   * amarra a canal nenhum).
    */
   @ValidateIf((dto: CreateChatbotDto) => dto.type !== 'complementar')
-  @IsInt({ message: 'Selecione um canal válido' })
-  channel_id?: number | null;
+  @IsInt({ each: true, message: 'Selecione ao menos um canal válido' })
+  @ArrayMinSize(1, { message: 'Selecione ao menos um canal' })
+  channel_ids?: number[];
 }

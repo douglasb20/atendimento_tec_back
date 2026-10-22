@@ -42,6 +42,7 @@ import { ReportsModule } from '@/reports/reports.module';
 import { DepartmentsModule } from '@/departments/departments.module';
 import { ChatbotsModule } from '@/chatbots/chatbots.module';
 import { ChatbotEngineModule } from '@/chatbot-engine/chatbot-engine.module';
+import { HolidaysModule } from '@/holidays/holidays.module';
 import { HealthModule } from '@/health/health.module';
 import { SchedulesModule } from '@/schedules/schedules.module';
 import { NotificationsModule } from '@/notifications/notifications.module';
@@ -121,6 +122,7 @@ import { NotificationsModule } from '@/notifications/notifications.module';
     DepartmentsModule,
     ChatbotsModule,
     ChatbotEngineModule,
+    HolidaysModule,
     HealthModule,
     SchedulesModule,
     NotificationsModule,
