@@ -1225,6 +1225,23 @@ export class SupportChatsService {
           return;
         }
 
+        // Falso positivo conhecido da Evolution/Baileys: editar uma mensagem
+        // dispara, além do `messages.upsert` de edição (tratado certo em
+        // `onMessageEdit`), um `messages.update` separado para a mensagem
+        // original em que `update.message` vem `null` e `update.status`
+        // vem `undefined` - a Evolution interpreta essa combinação como
+        // revogação e manda `messages.delete`, mesmo a mensagem nunca tendo
+        // sido apagada de verdade. Uma mensagem já editada não pode ter sido
+        // revogada depois (o WhatsApp não permite editar o que já foi
+        // apagado), então chegar aqui com `is_edited = true` é sempre esse
+        // falso positivo - nunca uma revogação real.
+        if (mensagem.is_edited) {
+          this.logger.debug(
+            `Revogação ignorada: mensagem ${messageId} já foi editada (falso positivo conhecido da Evolution).`,
+          );
+          return;
+        }
+
         const supportChat = await this.supportChatsRepository.findOne({
           where: { id: mensagem.support_chat_id },
         });
