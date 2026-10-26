@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
 
-import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
 import { runInTransaction } from '@/Utils';
@@ -186,6 +186,34 @@ export class ChatbotsService {
       this.logger.log(`Fluxo salvo: chatbot ${chatbotId}, draft ${draft.id}`);
 
       return manager.findOne(ChatbotFlowVersions, { where: { id: draft.id } });
+    });
+  }
+
+  /**
+   * Congela o draft atual numa nova versão `published` e aponta
+   * `Chatbots.current_published_version_id` para ela - é só a partir daqui
+   * que o motor de execução (`findEntradaAtivoDoCanal`) passa a enxergar o
+   * fluxo. O draft não é alterado, continua editável normalmente.
+   */
+  async publish(chatbotId: number): Promise<Chatbots> {
+    await this.chatbotsRepository.findById(chatbotId);
+
+    return runInTransaction(this.dataSource, async (manager) => {
+      const draft = await this.chatbotFlowVersionsRepository.findDraft(chatbotId, manager);
+
+      if (!draft) {
+        throw new NotFoundException('Rascunho do fluxo não encontrado');
+      }
+
+      const publicada = await this.chatbotFlowVersionsRepository.publicarDraft(draft, manager);
+
+      await manager.update(Chatbots, chatbotId, { current_published_version_id: publicada.id });
+
+      this.logger.log(
+        `Fluxo publicado: chatbot ${chatbotId}, versão ${publicada.version_number} (id ${publicada.id})`,
+      );
+
+      return manager.findOne(Chatbots, { where: { id: chatbotId } });
     });
   }
 }

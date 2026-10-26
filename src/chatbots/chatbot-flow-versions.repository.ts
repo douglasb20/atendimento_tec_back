@@ -37,4 +37,21 @@ export class ChatbotFlowVersionsRepository extends Repository<ChatbotFlowVersion
 
     return ultima?.version_number ?? 0;
   }
+
+  /**
+   * Congela o draft numa nova linha `published`, nunca editada depois - o
+   * draft em si continua existindo e editável, intocado por esta operação.
+   */
+  async publicarDraft(draft: ChatbotFlowVersions, manager: EntityManager): Promise<ChatbotFlowVersions> {
+    const repo = manager.getRepository(ChatbotFlowVersions);
+    const proximaVersao = (await this.maiorVersaoUsada(draft.chatbot_id, manager)) + 1;
+
+    return repo.save({
+      chatbot_id: draft.chatbot_id,
+      status: 'published',
+      graph: draft.graph,
+      version_number: proximaVersao,
+      published_at: new Date(),
+    });
+  }
 }
