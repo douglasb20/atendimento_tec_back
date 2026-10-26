@@ -87,6 +87,14 @@ export class ChatbotsController {
     return this.chatbotsService.saveFlow(id, dto);
   }
 
+  @Post('/:id/publish')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('chatbot:update')
+  @HttpCode(HttpStatus.OK)
+  publish(@Param('id', ParseIntPipe) id: number) {
+    return this.chatbotsService.publish(id);
+  }
+
   @Post('/sign-media')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('chatbot:update')
