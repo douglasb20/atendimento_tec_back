@@ -1,5 +1,6 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { EntityManager } from 'typeorm';
 import { Queue } from 'bullmq';
 
@@ -52,6 +53,11 @@ export class ChatbotFlowExecutionsService {
 
   /** Enfileira o job do motor - chamado só depois do commit. */
   async enfileirar(executionId: number, trigger: ChatbotFlowExecutionJob['trigger']): Promise<void> {
-    await this.queue.add('process', { executionId, trigger }, { jobId: `execution:${executionId}` });
+    // O BullMQ recusa `:` e não adiciona outro job com um id que já foi
+    // concluído. Uma mesma execução tem, no mínimo, um job de início e outro
+    // a cada resposta do contato; por isso cada disparo precisa de um id
+    // próprio. Duplicatas de webhook continuam seguras: o motor encontra a
+    // execução já concluída/suspensa em outro nó e ignora o job excedente.
+    await this.queue.add('process', { executionId, trigger }, { jobId: `execution-${executionId}-${randomUUID()}` });
   }
 }

@@ -164,7 +164,16 @@ export class ExecutionEngine {
 
       // 'continue'
       budget.consumeTransition();
-      currentNodeId = this.resolveProximoNo(graph, currentNodeId, resultado.outputHandle);
+      const proximoNoId = this.encontraProximoNo(graph, currentNodeId, resultado.outputHandle);
+
+      // Um nó sem saída ligada é um terminal válido para o fluxo principal.
+      // Isso permite, por exemplo, `Início → Mensagem` sem obrigar a pessoa a
+      // adicionar um nó Finalizar só para encerrar depois do envio.
+      if (!proximoNoId) {
+        return this.persisteConcluida(execucao, { variables, budget, effects: effectsAcumulados, manager });
+      }
+
+      currentNodeId = proximoNoId;
     }
   }
 
@@ -174,15 +183,25 @@ export class ExecutionEngine {
   }
 
   private resolveProximoNo(graph: ChatbotFlowGraph, fromNodeId: string, outputHandle: string | null): string {
+    const proximoNoId = this.encontraProximoNo(graph, fromNodeId, outputHandle);
+
+    if (!proximoNoId) {
+      throw new Error(`Nenhuma ligação a partir de "${fromNodeId}" pela saída "${outputHandle}"`);
+    }
+
+    return proximoNoId;
+  }
+
+  private encontraProximoNo(
+    graph: ChatbotFlowGraph,
+    fromNodeId: string,
+    outputHandle: string | null,
+  ): string | null {
     const edge = graph.edges.find(
       (e) => e.source === fromNodeId && (e.sourceHandle ?? null) === (outputHandle ?? null),
     );
 
-    if (!edge) {
-      throw new Error(`Nenhuma ligação a partir de "${fromNodeId}" pela saída "${outputHandle}"`);
-    }
-
-    return edge.target;
+    return edge?.target ?? null;
   }
 
   /**
@@ -356,12 +375,21 @@ export class ExecutionEngine {
           await this.storageService.copyObject(effect.mediaKey, mediaKeyParaEnvio);
         }
 
-        const mediaUrl = this.storageService.getPublicUrl(mediaKeyParaEnvio);
+        // A Evolution converte imagens para JPEG e, para isso, baixa a URL
+        // recebida. Em alguns ambientes ela falha nessa busca externa mesmo
+        // quando o objeto do B2 está público. Para imagens do próprio fluxo,
+        // entregamos os bytes diretamente e eliminamos essa dependência. Para
+        // vídeos/documentos preservamos a URL, pois base64 deles pode deixar a
+        // requisição grande demais.
+        const media =
+          ehAnexoPermanente && effect.mediaType === 'image'
+            ? (await this.storageService.getBuffer(mediaKeyParaEnvio)).toString('base64')
+            : this.storageService.getPublicUrl(mediaKeyParaEnvio);
         const enviadoEm = new Date();
         const enviada = await this.whatsappService.sendMedia(supportChat.channel.session_id, {
           to: supportChat.contact.remote_jid,
           mediaType: effect.mediaType,
-          media: mediaUrl,
+          media,
           mimetype: effect.mimetype,
           caption: effect.caption,
           fileName: effect.fileName,

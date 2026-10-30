@@ -172,9 +172,27 @@ export class ChatbotsService {
     return this.storageService.createPresignedPost(key, dto.fileType);
   }
 
+  /**
+   * Uma versão publicada é imutável do ponto de vista do editor. `active`
+   * controla somente se o motor pode iniciar novas execuções; não é uma
+   * ferramenta de edição e, portanto, não participa desta decisão.
+   */
+  private emProducao(chatbot: Chatbots): boolean {
+    return chatbot.current_published_version_id != null;
+  }
+
+  private assertNaoEmProducao(chatbot: Chatbots): void {
+    if (this.emProducao(chatbot)) {
+      throw new BadRequestException(
+        'Este chatbot está publicado - despublique-o antes de editar ou publicar o fluxo.',
+      );
+    }
+  }
+
   /** Substitui o grafo do rascunho inteiro - não há edição parcial de nó. */
   async saveFlow(chatbotId: number, dto: SaveFlowDto): Promise<ChatbotFlowVersions> {
-    await this.chatbotsRepository.findById(chatbotId);
+    const chatbot = await this.chatbotsRepository.findById(chatbotId);
+    this.assertNaoEmProducao(chatbot);
 
     return runInTransaction(this.dataSource, async (manager) => {
       const draft = await this.chatbotFlowVersionsRepository.findDraft(chatbotId, manager);
@@ -193,10 +211,12 @@ export class ChatbotsService {
    * Congela o draft atual numa nova versão `published` e aponta
    * `Chatbots.current_published_version_id` para ela - é só a partir daqui
    * que o motor de execução (`findEntradaAtivoDoCanal`) passa a enxergar o
-   * fluxo. O draft não é alterado, continua editável normalmente.
+   * fluxo. O draft não é alterado por esta operação; para voltar a editá-lo,
+   * é necessário despublicar, sem alterar o status ativo/inativo do chatbot.
    */
   async publish(chatbotId: number): Promise<Chatbots> {
-    await this.chatbotsRepository.findById(chatbotId);
+    const chatbot = await this.chatbotsRepository.findById(chatbotId);
+    this.assertNaoEmProducao(chatbot);
 
     return runInTransaction(this.dataSource, async (manager) => {
       const draft = await this.chatbotFlowVersionsRepository.findDraft(chatbotId, manager);
@@ -212,6 +232,26 @@ export class ChatbotsService {
       this.logger.log(
         `Fluxo publicado: chatbot ${chatbotId}, versão ${publicada.version_number} (id ${publicada.id})`,
       );
+
+      return manager.findOne(Chatbots, { where: { id: chatbotId } });
+    });
+  }
+
+  /**
+   * Retira o fluxo de produção sem apagar seu histórico de versões e sem
+   * mudar `active`. Execuções já iniciadas conservam a versão gravada nelas;
+   * apenas novas conversas deixam de acionar este chatbot até publicar outra
+   * versão.
+   */
+  async unpublish(chatbotId: number): Promise<Chatbots> {
+    const chatbot = await this.chatbotsRepository.findById(chatbotId);
+
+    if (!chatbot.current_published_version_id) return chatbot;
+
+    return runInTransaction(this.dataSource, async (manager) => {
+      await manager.update(Chatbots, chatbotId, { current_published_version_id: null });
+
+      this.logger.log(`Fluxo despublicado: chatbot ${chatbotId}`);
 
       return manager.findOne(Chatbots, { where: { id: chatbotId } });
     });

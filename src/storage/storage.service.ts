@@ -126,6 +126,25 @@ export class StorageService {
   }
 
   /**
+   * Lê um objeto do storage para os casos em que o destinatário precisa dos
+   * bytes, e não consegue baixar uma URL pública por conta própria.
+   */
+  async getBuffer(key: string): Promise<Buffer> {
+    const response = await this.s3.send(
+      new GetObjectCommand({
+        Bucket: process.env.STORAGE_BUCKET!,
+        Key: key,
+      }),
+    );
+
+    if (!response.Body) {
+      throw new Error(`Objeto de storage sem conteúdo: ${key}`);
+    }
+
+    return Buffer.from(await response.Body.transformToByteArray());
+  }
+
+  /**
    * Duplica um objeto dentro do bucket, sem baixar os bytes.
    *
    * O `CopyObject` roda inteiramente no servidor de storage: nada trafega por
