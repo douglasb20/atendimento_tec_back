@@ -16,7 +16,7 @@ import { VariableStore } from '../variable-store';
  * `ExecutionEngine`, não o handler (é I/O, roda fora da transação).
  */
 export type NodeEffect =
-  | { type: 'send_text'; text: string }
+  | { type: 'send_text'; text: string; typingDelayMs?: number }
   | {
       type: 'send_media';
       mediaType: ProviderMediaType;
@@ -24,6 +24,7 @@ export type NodeEffect =
       mimetype?: string;
       caption?: string;
       fileName?: string;
+      typingDelayMs?: number;
     };
 
 /**

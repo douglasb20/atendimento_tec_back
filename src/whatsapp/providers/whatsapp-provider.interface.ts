@@ -127,6 +127,7 @@ export interface WhatsappProvider {
     session: ProviderSessionRef,
     to: string,
     message: string,
+    typingDelayMs?: number,
   ): Promise<ProviderSentMessage>;
 
   replyMessage(
@@ -268,6 +269,8 @@ export type ProviderMediaPayload = {
   fileName?: string;
   /** Quando presente, a mídia é enviada como resposta a esta mensagem. */
   quotedMessageId?: string;
+  /** Tempo para manter a presença "digitando" antes do envio. */
+  typingDelayMs?: number;
 };
 
 /** Identifica uma mensagem para o provider: o trio que o WhatsApp exige. */

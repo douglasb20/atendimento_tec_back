@@ -521,11 +521,12 @@ export class EvolutionProvider implements WhatsappProvider {
     session: ProviderSessionRef,
     to: string,
     message: string,
+    typingDelayMs?: number,
   ): Promise<ProviderSentMessage> {
     try {
       const { data } = await this.http.post<EvolutionSendResponse>(
         `/message/sendText/${session.sessionId}`,
-        { number: this.toNumber(to), text: message },
+        { number: this.toNumber(to), text: message, ...(typingDelayMs && { delay: typingDelayMs }) },
         this.comToken(session),
       );
       return this.toSentMessage(data);
@@ -669,7 +670,7 @@ export class EvolutionProvider implements WhatsappProvider {
     session: ProviderSessionRef,
     payload: ProviderMediaPayload,
   ): Promise<ProviderSentMessage> {
-    const { to, mediaType, media, mimetype, caption, fileName, quotedMessageId } = payload;
+    const { to, mediaType, media, mimetype, caption, fileName, quotedMessageId, typingDelayMs } = payload;
 
     // Vídeo/áudio/documento são aceitos por URL: a Evolution repassa ao Baileys,
     // que baixa direto - sem trafegar bytes por aqui nem passar por browser.
@@ -681,6 +682,7 @@ export class EvolutionProvider implements WhatsappProvider {
       ...(caption && { caption }),
       ...(fileName && { fileName }),
       ...(quotedMessageId && { quoted: { key: { id: quotedMessageId } } }),
+      ...(typingDelayMs && { delay: typingDelayMs }),
     };
 
     // Documento sem nome de arquivo é rejeitado quando a mídia vem em base64.
@@ -691,7 +693,7 @@ export class EvolutionProvider implements WhatsappProvider {
     const endpoint =
       mediaType === 'sticker'
         ? `/message/sendSticker/${session.sessionId}`
-        : mediaType === 'voice'
+        : mediaType === 'voice' || mediaType === 'audio'
           ? `/message/sendWhatsAppAudio/${session.sessionId}`
           : `/message/sendMedia/${session.sessionId}`;
 
@@ -701,10 +703,10 @@ export class EvolutionProvider implements WhatsappProvider {
       delete body.media;
     }
 
-    // A rota de mensagem de voz tem corpo próprio: só `audio`, sem `mediatype`
-    // nem `caption` (o WhatsApp não exibe legenda em bolha de voz). A Evolution
-    // baixa a URL e converte para OGG/Opus com ffmpeg antes de enviar.
-    if (mediaType === 'voice') {
+    // A rota de áudio/voz tem corpo próprio: só `audio`, sem `mediatype` nem
+    // `caption` (o WhatsApp não exibe legenda em bolha de voz). A Evolution
+    // converte para OGG/Opus e marca a mensagem como PTT antes de enviar.
+    if (mediaType === 'voice' || mediaType === 'audio') {
       body.audio = media;
       delete body.media;
       delete body.mediatype;
