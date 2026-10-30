@@ -223,7 +223,19 @@ export class SupportChatsService {
     copiaAnexo?: () => ReturnType<ChannelsService['copiaAnexoSaudacaoParaEnvio']>,
   ): Promise<void> {
     const mensagem = montaMensagemAutomatica(texto, supportChat);
-    const anexo = copiaAnexo ? await copiaAnexo() : null;
+    // Anexo sumido do bucket não pode derrubar quem chamou: a despedida roda
+    // dentro da finalização e a saudação dentro da fila de mensagens. Sem o
+    // arquivo, segue só com o texto.
+    let anexo: Awaited<ReturnType<NonNullable<typeof copiaAnexo>>> = null;
+    if (copiaAnexo) {
+      try {
+        anexo = await copiaAnexo();
+      } catch (err) {
+        this.logger.warn(
+          `Anexo da mensagem automática indisponível na conversa ${supportChat.id}: ${err.message}`,
+        );
+      }
+    }
     if (!mensagem && !anexo) return;
 
     try {
