@@ -340,6 +340,7 @@ export class ExecutionEngine {
           supportChat.channel.session_id,
           supportChat.contact.remote_jid,
           effect.text,
+          effect.typingDelayMs,
         );
 
         await runInTransaction(this.dataSource, (manager) =>
@@ -375,14 +376,13 @@ export class ExecutionEngine {
           await this.storageService.copyObject(effect.mediaKey, mediaKeyParaEnvio);
         }
 
-        // A Evolution converte imagens para JPEG e, para isso, baixa a URL
-        // recebida. Em alguns ambientes ela falha nessa busca externa mesmo
-        // quando o objeto do B2 está público. Para imagens do próprio fluxo,
-        // entregamos os bytes diretamente e eliminamos essa dependência. Para
-        // vídeos/documentos preservamos a URL, pois base64 deles pode deixar a
-        // requisição grande demais.
+        // A Evolution precisa baixar/transformar imagens e áudios. Em alguns
+        // ambientes ela não consegue concluir esse download externo, embora o
+        // objeto do B2 esteja público. Para esses tipos do próprio fluxo,
+        // entregamos os bytes diretamente. Vídeos/documentos permanecem por
+        // URL, pois base64 deles pode deixar a requisição grande demais.
         const media =
-          ehAnexoPermanente && effect.mediaType === 'image'
+          ehAnexoPermanente && ['image', 'audio', 'voice'].includes(effect.mediaType)
             ? (await this.storageService.getBuffer(mediaKeyParaEnvio)).toString('base64')
             : this.storageService.getPublicUrl(mediaKeyParaEnvio);
         const enviadoEm = new Date();
@@ -393,6 +393,7 @@ export class ExecutionEngine {
           mimetype: effect.mimetype,
           caption: effect.caption,
           fileName: effect.fileName,
+          typingDelayMs: effect.typingDelayMs,
         });
 
         // Mesma corrida documentada em `SupportChatsService.sendMedia`: a

@@ -235,10 +235,15 @@ export class WhatsappService {
     return provider.downloadMedia(session, messageId, chatId);
   }
 
-  async sendMessage(sessionId: string, to: string, message: string): Promise<ProviderSentMessage> {
+  async sendMessage(
+    sessionId: string,
+    to: string,
+    message: string,
+    typingDelayMs?: number,
+  ): Promise<ProviderSentMessage> {
     const { provider, session } = await this.resolve(sessionId);
     this.logger.log(`Enviando mensagem para ${to}`);
-    return provider.sendMessage(session, to, message);
+    return provider.sendMessage(session, to, message, typingDelayMs);
   }
 
   async replyMessage(

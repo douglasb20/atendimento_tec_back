@@ -14,6 +14,8 @@ type MessageNodeData = {
   attachmentMimetype?: string;
   attachmentVariable?: string;
   continueOn?: 'auto' | 'after_reply';
+  simulateTyping?: boolean;
+  typingDelaySeconds?: number;
 };
 
 /**
@@ -50,9 +52,10 @@ export class MessageHandler implements NodeHandler {
     ctx: NodeExecutionContext,
   ): NodeEffect[] {
     const texto = ctx.variables.interpolate(String(data.value ?? ''));
+    const typingDelayMs = this.resolveTempoDigitacao(data);
 
     if (messageType === 'text') {
-      return texto ? [{ type: 'send_text', text: texto }] : [];
+      return texto ? [{ type: 'send_text', text: texto, typingDelayMs }] : [];
     }
 
     // Origem "variável": o próprio valor interpolado é a URL/data URI/base64
@@ -84,7 +87,16 @@ export class MessageHandler implements NodeHandler {
         mimetype: mimetype || undefined,
         fileName: fileName || undefined,
         caption: texto || undefined,
+        typingDelayMs,
       },
     ];
+  }
+
+  private resolveTempoDigitacao(data: MessageNodeData): number | undefined {
+    if (!data.simulateTyping) return undefined;
+
+    const segundos = Number(data.typingDelaySeconds ?? 2);
+    const segundosValidos = Number.isFinite(segundos) ? Math.min(Math.max(segundos, 1), 10) : 2;
+    return Math.round(segundosValidos * 1000);
   }
 }
