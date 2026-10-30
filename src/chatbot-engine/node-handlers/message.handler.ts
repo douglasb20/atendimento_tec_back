@@ -29,13 +29,19 @@ export class MessageHandler implements NodeHandler {
     const data = ctx.node.data as MessageNodeData;
     const messageType = data.messageType ?? 'text';
 
-    const effects = this.montaEfeitos(data, messageType, ctx);
-
     if (data.continueOn === 'after_reply') {
+      // Na retomada, a mensagem deste nó já foi enviada antes da suspensão.
+      // Não pode ser montada/enviada outra vez: basta seguir a saída única
+      // para o próximo nó com a resposta já disponível em `_last_message`.
+      if (ctx.resumePayload) {
+        return { kind: 'continue', outputHandle: null };
+      }
+
+      const effects = this.montaEfeitos(data, messageType, ctx);
       return { kind: 'suspend', waitingFor: { type: 'contact_reply', node_id: ctx.node.id }, effects };
     }
 
-    return { kind: 'continue', outputHandle: null, effects };
+    return { kind: 'continue', outputHandle: null, effects: this.montaEfeitos(data, messageType, ctx) };
   }
 
   private montaEfeitos(

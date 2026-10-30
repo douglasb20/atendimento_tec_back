@@ -95,6 +95,14 @@ export class ChatbotsController {
     return this.chatbotsService.publish(id);
   }
 
+  @Post('/:id/unpublish')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('chatbot:update')
+  @HttpCode(HttpStatus.OK)
+  unpublish(@Param('id', ParseIntPipe) id: number) {
+    return this.chatbotsService.unpublish(id);
+  }
+
   @Post('/sign-media')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('chatbot:update')
