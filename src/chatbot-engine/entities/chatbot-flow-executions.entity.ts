@@ -29,6 +29,11 @@ export type WaitingFor = {
   type: 'contact_reply';
   node_id: string;
   since: string;
+  token?: string;
+  timeout_minutes?: number;
+  timeout_handle?: string;
+  timeout_at?: string;
+  reply?: { text: string; received_at: string };
 };
 
 /**

@@ -91,6 +91,15 @@ export const CATALOGO = {
     padrao: false,
   },
 
+  notif_chatbot: {
+    rotulo: 'Mensagens na fila Chatbot',
+    descricao: 'Avisos de mensagens do cliente enquanto ele está no chatbot. Não avisa os envios automáticos do bot.',
+    tipo: 'booleano',
+    grupo: 'notificacoes',
+    secao: 'mensagens',
+    padrao: false,
+  },
+
   notif_mensagem_cliente: {
     rotulo: 'Mensagens em atendimento',
     descricao: 'Avisos de mensagens em conversas que já estão em atendimento.',

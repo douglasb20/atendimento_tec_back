@@ -26,6 +26,11 @@ const LIMITE_MENSAGEM = 1000;
 const TIPOS_ANEXO: TipoAnexoChannel[] = ['image', 'video', 'audio', 'document'];
 
 export class CreateOrChannelDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  default_department_id?: number | null;
+
   @IsString({ message: (opt) => `Campo ${opt.property} aceita somente formato string` })
   @IsNotEmpty({ message: (opt) => `Campo ${opt.property} é obrigatório` })
   name: string;
@@ -195,8 +200,7 @@ export class CreateOrChannelDto {
 
   /**
    * Os setores atendidos por este canal. Pode ser mais de um, como no
-   * Whaticket - hoje é só a associação; quem escolhe entre eles para cada
-   * conversa nova é o chatbot por fluxo, ainda não construído.
+   * Whaticket. O setor padrão decide a entrada e o chatbot pode alterá-lo.
    *
    * Ausente, os vínculos ficam como estão; `[]` tira o canal de todos.
    */

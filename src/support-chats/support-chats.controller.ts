@@ -27,15 +27,14 @@ import { FinalizarSemAtendimentoDto } from './dto/finalizar-sem-atendimento.dto'
 import { TransferirAtendimentoDto } from './dto/transferir-atendimento.dto';
 import { CreateSupportChatDto } from './dto/create-support-chat.dto';
 import { AttendanceSettingsService } from '@/attendance-settings/attendance-settings.service';
-import { PermissionService } from 'permissions/permission.service';
 import { nomeCompleto } from '@/Utils';
+import { AcessoAtendimentoGuard } from '@/permissions/acesso-atendimento.guard';
 
 @Controller('support-chats')
 export class SupportChatsController {
   constructor(
     private readonly supportChatsService: SupportChatsService,
     private readonly attendanceSettingsService: AttendanceSettingsService,
-    private readonly permissionService: PermissionService,
   ) {}
 
   /**
@@ -68,7 +67,7 @@ export class SupportChatsController {
    * `ParseIntPipe`, mas registrar aqui deixa isso explícito).
    */
   @Post('/nova')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:update')
   @HttpCode(HttpStatus.CREATED)
   async criarNova(@Body() dto: CreateSupportChatDto, @Req() req: Request) {
@@ -76,7 +75,7 @@ export class SupportChatsController {
   }
 
   @Post('/:id/send-message')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:update')
   @HttpCode(HttpStatus.OK)
   async sendMessage(
@@ -93,7 +92,7 @@ export class SupportChatsController {
   }
 
   @Post('/sign-media-post')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:update')
   @HttpCode(HttpStatus.OK)
   async signMediaPost(@Body() signMediaPostDto: SignMediaPostDto) {
@@ -101,7 +100,7 @@ export class SupportChatsController {
   }
 
   @Post('/:id/send-reply')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:update')
   @HttpCode(HttpStatus.OK)
   async replyMessage(
@@ -119,27 +118,18 @@ export class SupportChatsController {
   }
 
   @Get()
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:view')
   @HttpCode(HttpStatus.OK)
   async listAllSupportChats(@Req() req: Request) {
-    // O guard já libera `is_superuser` para a rota em si, mas essa checagem é
-    // separada - decide algo dentro dela (o que a lista mostra), não se pode
-    // chamá-la. Precisa da mesma exceção do guard: sem ela, o master
-    // continuaria sem ver atendimento alheio, já que nunca tem a permissão
-    // concedida explicitamente.
-    const podeVerOutros =
-      Boolean(req.user['is_superuser']) ||
-      (await this.permissionService.hasPermission(req.user['id'], ['support.chat:view_others']));
-
-    return this.supportChatsService.listAllSupportChats(req.user['id'], podeVerOutros);
+    return this.supportChatsService.listAllSupportChats(req.user['id']);
   }
 
   // `support.chat:history` também libera: é o mesmo detalhe que o modal da
   // tela de Histórico abre a partir do protocolo, sem precisar do acesso ao
   // chat ao vivo.
   @Get('/:id/messages')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:view', 'support.chat:history')
   @HttpCode(HttpStatus.OK)
   async findSupportChatById(@Param('id', ParseIntPipe) id: number) {
@@ -151,7 +141,7 @@ export class SupportChatsController {
    * abrir o histórico inteiro, devolve só a mensagem do mesmo contato.
    */
   @Get('/:id/mensagem-citada/:messageId')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:view')
   @HttpCode(HttpStatus.OK)
   async findMensagemCitata(
@@ -168,7 +158,7 @@ export class SupportChatsController {
    * os anteriores **do mesmo contato** - é o histórico dele, não de outro.
    */
   @Get('/:id/anteriores')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:view')
   @HttpCode(HttpStatus.OK)
   async contarAnteriores(
@@ -183,7 +173,7 @@ export class SupportChatsController {
 
   /** O atendimento imediatamente anterior ao informado, com suas mensagens. */
   @Get('/:id/anterior')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:view')
   @HttpCode(HttpStatus.OK)
   async findAnterior(
@@ -194,7 +184,7 @@ export class SupportChatsController {
   }
 
   @Post('/:id/send-media')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:update')
   @HttpCode(HttpStatus.OK)
   async sendMedia(
@@ -214,7 +204,7 @@ export class SupportChatsController {
   }
 
   @Post('/:id/delete-message')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('message:delete')
   @HttpCode(HttpStatus.OK)
   async deleteMessage(
@@ -235,7 +225,7 @@ export class SupportChatsController {
    * mensagem própria dentro de 60h; este some apenas do nosso lado.
    */
   @Post('/:id/ocultar-mensagens')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('message:delete')
   @HttpCode(HttpStatus.OK)
   async ocultarMensagens(
@@ -250,7 +240,7 @@ export class SupportChatsController {
   }
 
   @Post('/:id/marcar-lida')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:view')
   @HttpCode(HttpStatus.OK)
   async marcarComoLida(@Param('id', ParseIntPipe) id: number) {
@@ -264,7 +254,7 @@ export class SupportChatsController {
    * do atendimento.
    */
   @Post('/:id/marcar-nao-lida')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:view')
   @HttpCode(HttpStatus.OK)
   async marcarComoNaoLida(@Param('id', ParseIntPipe) id: number) {
@@ -272,7 +262,7 @@ export class SupportChatsController {
   }
 
   @Post('/:id/iniciar')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:update')
   @HttpCode(HttpStatus.OK)
   async iniciarAtendimento(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
@@ -281,7 +271,7 @@ export class SupportChatsController {
 
   /** Permissão própria: `support.chat:pause` vale para pausar e retomar. */
   @Post('/:id/pausar')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:pause')
   @HttpCode(HttpStatus.OK)
   async pausarAtendimento(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
@@ -293,7 +283,7 @@ export class SupportChatsController {
   }
 
   @Post('/:id/retomar')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:pause')
   @HttpCode(HttpStatus.OK)
   async retomarAtendimento(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
@@ -305,7 +295,7 @@ export class SupportChatsController {
   }
 
   @Post('/:id/finalizar')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:update')
   @HttpCode(HttpStatus.OK)
   async finalizarAtendimento(
@@ -333,7 +323,7 @@ export class SupportChatsController {
    * justamente o `EM_ANDAMENTO` e dispensa as outras duas.
    */
   @Post('/:id/finalizar-sem-atendimento')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:update')
   @HttpCode(HttpStatus.OK)
   async finalizarSemAtendimento(
@@ -349,7 +339,7 @@ export class SupportChatsController {
    * transferir é a única que tira a conversa das mãos de alguém.
    */
   @Post('/:id/transferir')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:transfer')
   @HttpCode(HttpStatus.OK)
   async transferirAtendimento(
@@ -367,8 +357,15 @@ export class SupportChatsController {
     );
   }
 
+  @Get('/:id/destinos-transferencia')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
+  @Permissions('support.chat:transfer')
+  async destinosTransferencia(@Param('id', ParseIntPipe) id: number) {
+    return this.supportChatsService.destinosTransferencia(id);
+  }
+
   @Post('/:id/edit-message')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('message:update')
   @HttpCode(HttpStatus.OK)
   async editMessage(
@@ -391,7 +388,7 @@ export class SupportChatsController {
   }
 
   @Post('/:id/send-reaction')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:update')
   @HttpCode(HttpStatus.OK)
   async sendReaction(

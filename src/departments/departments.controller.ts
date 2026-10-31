@@ -20,10 +20,12 @@ import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
 import { UpdateDepartmentUsersDto } from './dto/update-department-users.dto';
 import { UpdateDepartmentScheduleDto } from './dto/update-department-schedule.dto';
+import { SalvarExcecaoHorarioDto } from './dto/salvar-excecao-horario.dto';
+import { ExcecoesHorarioService } from './excecoes-horario.service';
 
 @Controller('departments')
 export class DepartmentsController {
-  constructor(private readonly departmentsService: DepartmentsService) {}
+  constructor(private readonly departmentsService: DepartmentsService, private readonly excecoes: ExcecoesHorarioService) {}
 
   @Get()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
@@ -39,6 +41,8 @@ export class DepartmentsController {
     'channel:update',
     'channel:add',
     'support.chat:update',
+    'support.chat:transfer',
+    'chatbot:update',
   )
   @HttpCode(HttpStatus.OK)
   findAll() {
@@ -107,5 +111,35 @@ export class DepartmentsController {
   @HttpCode(HttpStatus.OK)
   updateSchedule(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateDepartmentScheduleDto) {
     return this.departmentsService.updateSchedule(id, dto);
+  }
+
+  @Get('/:id/schedule-exceptions')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('department:view', 'department:update')
+  listarExcecoes(@Param('id', ParseIntPipe) id: number) {
+    return this.excecoes.listar(id);
+  }
+
+  @Post('/:id/schedule-exceptions')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('department:update')
+  criarExcecao(@Param('id', ParseIntPipe) id: number, @Body() dto: SalvarExcecaoHorarioDto) {
+    return this.excecoes.salvar(id, dto);
+  }
+
+  @Patch('/:id/schedule-exceptions/:exceptionId')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('department:update')
+  editarExcecao(@Param('id', ParseIntPipe) id: number, @Param('exceptionId', ParseIntPipe) excecaoId: number,
+    @Body() dto: SalvarExcecaoHorarioDto) {
+    return this.excecoes.salvar(id, dto, excecaoId);
+  }
+
+  @Delete('/:id/schedule-exceptions/:exceptionId')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('department:update')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removerExcecao(@Param('id', ParseIntPipe) id: number, @Param('exceptionId', ParseIntPipe) excecaoId: number) {
+    return this.excecoes.remover(id, excecaoId);
   }
 }

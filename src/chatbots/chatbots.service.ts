@@ -14,6 +14,7 @@ import { SaveFlowDto } from './dto/save-flow.dto';
 import { UpdateChatbotDto } from './dto/update-chatbot.dto';
 import { ChatbotFlowVersions } from './entities/chatbot-flow-versions.entity';
 import { Chatbots } from './entities/chatbots.entity';
+import { validarTemposDeResposta } from './tempo-resposta';
 
 /**
  * Onde os anexos do nó Mensagem vivem - permanentes, presos ao cadastro do
@@ -225,6 +226,17 @@ export class ChatbotsService {
         throw new NotFoundException('Rascunho do fluxo não encontrado');
       }
 
+      validarTemposDeResposta(draft.graph);
+
+      for (const no of draft.graph.nodes.filter((no) => ['set_department', 'business_hours'].includes(no.type))) {
+        const setorId = Number(no.data.department_id);
+        if (!Number.isSafeInteger(setorId) || setorId <= 0) throw new BadRequestException('Escolha o setor em todos os nós de definição de setor ou verificação de horário');
+        const [setor] = await manager.query('SELECT id FROM departments WHERE id = $1 AND deleted_at IS NULL', [setorId]);
+        if (!setor) throw new BadRequestException('Um nó de setor ou horário aponta para um setor removido');
+        const invalidos = await manager.query(`SELECT c.name FROM channels c JOIN channel_x_chatbot cc ON cc.channel_id = c.id
+          WHERE cc.chatbot_id = $1 AND NOT EXISTS (SELECT 1 FROM channel_x_department cd WHERE cd.channel_id = c.id AND cd.department_id = $2)`, [chatbotId, setorId]);
+        if (invalidos.length) throw new BadRequestException(`O setor do fluxo precisa estar vinculado aos canais: ${invalidos.map((c: { name: string }) => c.name).join(', ')}`);
+      }
       const publicada = await this.chatbotFlowVersionsRepository.publicarDraft(draft, manager);
 
       await manager.update(Chatbots, chatbotId, { current_published_version_id: publicada.id });

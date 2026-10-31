@@ -80,19 +80,17 @@ export class ChannelsService {
 
   async createChannel(createChannelDto: CreateOrChannelDto): Promise<Channels> {
     this.validaInatividade(createChannelDto);
+    createChannelDto.default_department_id = await this.validaSetorPadrao(createChannelDto);
     const { department_ids, ...dadosDoCanal } = createChannelDto;
 
     const channel = this.channelsRepository.create({
       ...dadosDoCanal,
     });
 
-    await this.channelsRepository.save(channel);
-
-    if (department_ids !== undefined) {
-      await runInTransaction(this.dataSource, (manager) =>
-        this.gravaSetores(channel.id, department_ids, manager),
-      );
-    }
+    await runInTransaction(this.dataSource, async (manager) => {
+      await manager.save(channel);
+      if (department_ids !== undefined) await this.gravaSetores(channel.id, department_ids, manager);
+    });
 
     return channel;
   }
@@ -100,6 +98,7 @@ export class ChannelsService {
   async updateChannel(channelId: number, createChannelDto: CreateOrChannelDto): Promise<Channels> {
     this.validaInatividade(createChannelDto);
     const channel = await this.findChannel(channelId);
+    createChannelDto.default_department_id = await this.validaSetorPadrao(createChannelDto, channelId);
     const { department_ids, ...dadosDoCanal } = createChannelDto;
 
     // O anexo antigo sai do storage quando é trocado ou removido: sem isto o
@@ -111,16 +110,10 @@ export class ChannelsService {
       ...channel,
       ...dadosDoCanal,
     });
-    await this.channelsRepository.save(channelUpdated);
-
-    // Só com o campo presente: o formulário sempre o envia hoje, mas outros
-    // caminhos de escrita (integração, por exemplo) não precisam derrubar os
-    // vínculos por omissão.
-    if (department_ids !== undefined) {
-      await runInTransaction(this.dataSource, (manager) =>
-        this.gravaSetores(channelId, department_ids, manager),
-      );
-    }
+    await runInTransaction(this.dataSource, async (manager) => {
+      await manager.save(channelUpdated);
+      if (department_ids !== undefined) await this.gravaSetores(channelId, department_ids, manager);
+    });
 
     // A rejeição de chamadas vive no provider (setting da instância): sem
     // reaplicar aqui, a mudança só valeria na próxima reconexão do canal.
@@ -129,7 +122,20 @@ export class ChannelsService {
       await this.whatsappService.aplicarPreferencias(channelUpdated.session_id);
     }
 
-    return channel;
+    return channelUpdated;
+  }
+
+  private async validaSetorPadrao(dto: CreateOrChannelDto, canalId?: number): Promise<number | null> {
+    const atuais = canalId ? await this.dataSource.query('SELECT department_id FROM channel_x_department WHERE channel_id = $1', [canalId]) : [];
+    const ids = dto.department_ids ?? atuais.map((s: { department_id: number }) => Number(s.department_id));
+    if (!ids.length) return null; // Canal legado sem setores permanece na triagem geral.
+    const setores = await this.departmentsRepository.findByIds(ids);
+    if (setores.length !== new Set(ids).size) throw new BadRequestException('Há setores inválidos no canal');
+    if (ids.length === 1) return ids[0];
+    const anterior = canalId ? await this.channelsRepository.findOneBy({ id: canalId }) : null;
+    const padrao = dto.default_department_id === undefined ? anterior?.default_department_id : dto.default_department_id;
+    if (!padrao || !ids.includes(padrao)) throw new BadRequestException('Escolha um setor padrão entre os setores deste canal');
+    return padrao;
   }
 
   /**

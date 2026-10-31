@@ -18,12 +18,14 @@ import { AuthGuard } from '@nestjs/passport';
 import { Permissions } from 'permissions/permissions.decorator';
 import { PermissionGuard } from 'permissions/permissions.guard';
 import { ChatbotsService } from './chatbots.service';
+import { ChatbotHabilitadoGuard } from './chatbot-habilitado.guard';
 import { AssinarMediaDto } from './dto/assinar-media.dto';
 import { CreateChatbotDto } from './dto/create-chatbot.dto';
 import { SaveFlowDto } from './dto/save-flow.dto';
 import { UpdateChatbotDto } from './dto/update-chatbot.dto';
 
 @Controller('chatbots')
+@UseGuards(ChatbotHabilitadoGuard)
 export class ChatbotsController {
   constructor(private readonly chatbotsService: ChatbotsService) {}
 
@@ -89,7 +91,7 @@ export class ChatbotsController {
 
   @Post('/:id/publish')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('chatbot:update')
+  @Permissions('chatbot:publish')
   @HttpCode(HttpStatus.OK)
   publish(@Param('id', ParseIntPipe) id: number) {
     return this.chatbotsService.publish(id);
@@ -97,7 +99,7 @@ export class ChatbotsController {
 
   @Post('/:id/unpublish')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('chatbot:update')
+  @Permissions('chatbot:publish')
   @HttpCode(HttpStatus.OK)
   unpublish(@Param('id', ParseIntPipe) id: number) {
     return this.chatbotsService.unpublish(id);

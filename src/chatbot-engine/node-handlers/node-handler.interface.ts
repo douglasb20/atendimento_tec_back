@@ -32,9 +32,10 @@ export type NodeEffect =
  * reage só a este resultado - nunca precisa saber que tipo de nó gerou.
  */
 export type NodeResult =
-  | { kind: 'continue'; outputHandle: string | null; effects?: NodeEffect[] }
+  | { kind: 'continue'; outputHandle: string | null; effects?: NodeEffect[]; departmentId?: number }
   | { kind: 'suspend'; waitingFor: Omit<WaitingFor, 'since'>; effects?: NodeEffect[] }
   | { kind: 'call_flow'; flowId: number }
+  | { kind: 'close_support_chat'; enviarDespedida: boolean }
   | { kind: 'finish'; effects?: NodeEffect[] };
 
 export type NodeExecutionContext = {

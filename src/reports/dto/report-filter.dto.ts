@@ -100,9 +100,8 @@ export class ReportFilterDto {
   user_id?: number;
 
   /**
-   * Setor(es). ⚠️ Preenchido só nos atendimentos abertos pelo modal "Novo
-   * atendimento" (`criarNova`); os que chegam por mensagem do contato ficam
-   * com setor nulo. Filtrar por setor hoje devolve bem pouca coisa.
+   * Setor(es) responsável(is) pelo atendimento. Registros históricos sem
+   * classificação preservam o setor nulo, em vez de inferir pelo canal atual.
    *
    * Array para suportar multiseleção (hoje só no relatório de Atendimentos) -
    * um id só (`?department_id=3`) continua funcionando normalmente.

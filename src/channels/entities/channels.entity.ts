@@ -204,8 +204,8 @@ export class Channels {
 
   /**
    * Os setores atendidos por este canal - pode ser mais de um, como no
-   * Whaticket. Quem decide para qual setor vai cada conversa nova é o chatbot
-   * por fluxo, ainda não construído; por ora é só a associação.
+   * Whaticket. Novas conversas entram no setor padrão; a transferência ou
+   * o chatbot podem direcioná-las para outro dos setores vinculados.
    *
    * A tabela vem da migration `1789620000000`; o `@JoinTable` só aponta para
    * ela.
@@ -217,6 +217,10 @@ export class Channels {
     inverseJoinColumn: { name: 'department_id', referencedColumnName: 'id' },
   })
   departments: Departments[];
+
+  /** Setor inicial de novos atendimentos, antes de eventual roteamento pelo chatbot. */
+  @Column({ type: 'int', nullable: true })
+  default_department_id: number | null;
 
   @BeforeInsert()
   generateSessionId() {

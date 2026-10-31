@@ -1,6 +1,10 @@
 import { IsInt, IsOptional, IsPositive, IsString, MaxLength } from 'class-validator';
 
 export class TransferirAtendimentoDto {
+  @IsInt({ message: 'Escolha o setor de destino' })
+  @IsPositive()
+  department_id: number;
+
   /**
    * Para quem vai o atendimento.
    *

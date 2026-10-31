@@ -67,13 +67,14 @@ export type MessageWithLastMessage = SupportChatMessages & {
 /**
  * Status de um atendimento, conforme semeado em `support_chat_status`.
  *
- * Os de id 4 e 5 têm `is_final = true`: o `findOrOpen` só reaproveita conversas
+ * Os de id 4 em diante têm `is_final = true`: o `findOrOpen` só reaproveita conversas
  * não finais, então encerrar um atendimento faz a próxima mensagem do contato
  * abrir outro, com protocolo novo.
  */
 export enum SupportChatStatusId {
   AGUARDANDO = 1,
   EM_ANDAMENTO = 2,
+  /** Fila do chatbot; a espera por atendimento humano usa AGUARDANDO. */
   EM_FILA = 3,
   FINALIZADO_SEM_RESPOSTA = 4,
   FINALIZADO = 5,
@@ -81,4 +82,6 @@ export enum SupportChatStatusId {
    *  (`InactivityResolutionService`), distinto de `FINALIZADO_SEM_RESPOSTA` -
    *  aquele nunca é atribuído por código nenhum. */
   FINALIZADO_POR_INATIVIDADE = 6,
+  /** Encerrado ao chegar no nó "Encerrar atendimento" de um fluxo de chatbot. */
+  FINALIZADO_PELO_CHATBOT = 7,
 }
