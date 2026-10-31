@@ -44,6 +44,9 @@ export class Departments {
   @Column({ type: 'boolean', default: false })
   schedule_enabled: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  respect_holidays: boolean;
+
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 

@@ -37,6 +37,10 @@ export class ScheduleIntervalDto {
 }
 
 export class UpdateDepartmentScheduleDto {
+  @IsOptional()
+  @IsBoolean()
+  respect_holidays?: boolean;
+
   /** Switch mestre: desligado, o setor é sempre disponível, ignorando os
    * intervalos abaixo - sem isso, um dia sem nenhum intervalo virava
    * "fechado" mesmo quando o setor nunca tinha a intenção de restringir

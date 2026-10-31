@@ -93,8 +93,9 @@ export class WhatsappService {
     dono: number | null | undefined,
     event: string,
     payload: unknown,
+    contexto: unknown = payload,
   ): Promise<void> {
-    await this.whatsappGateway.emitSupportChatMessage(dono, event, payload);
+    await this.whatsappGateway.emitSupportChatMessage(dono, event, payload, contexto);
   }
 
   // == Chamadas ao provider ==

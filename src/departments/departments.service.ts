@@ -11,6 +11,7 @@ import { Departments } from './entities/departments.entity';
 
 export type DepartmentScheduleResult = {
   schedule_enabled: boolean;
+  respect_holidays: boolean;
   intervals: { weekday: number; start_time: string; end_time: string }[];
   absence_message: string | null;
 };
@@ -141,6 +142,7 @@ export class DepartmentsService {
 
     return {
       schedule_enabled: setor.schedule_enabled,
+      respect_holidays: setor.respect_holidays,
       // O driver do Postgres devolve `time` como `HH:mm:ss` - a tela só
       // precisa de `HH:mm`.
       intervals: intervalos.map((i) => ({
@@ -177,6 +179,7 @@ export class DepartmentsService {
 
       await manager.update(Departments, id, {
         schedule_enabled: dto.schedule_enabled,
+        ...(dto.respect_holidays !== undefined ? { respect_holidays: dto.respect_holidays } : {}),
         ...(dto.absence_message !== undefined
           ? { absence_message: dto.absence_message?.trim() || null }
           : {}),

@@ -3,12 +3,14 @@ import { MessageWithLastMessage, SupportChatStatusId } from '@types';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { SupportChats } from './entities/support-chats.entity';
 import { ProtocolCountersRepository } from './protocol-counters.repository';
+import { AcessoAtendimentoService } from '@/permissions/acesso-atendimento.service';
 
 @Injectable()
 export class SupportChatsRepository extends Repository<SupportChats> {
   constructor(
     dataSource: DataSource,
     private readonly protocolCountersRepository: ProtocolCountersRepository,
+    private readonly acesso: AcessoAtendimentoService,
   ) {
     super(SupportChats, dataSource.manager);
   }
@@ -22,16 +24,12 @@ export class SupportChatsRepository extends Repository<SupportChats> {
    * desligado, a fila mantém a ordem de chegada (`sc.id`, crescente: a
    * conversa mais antiga primeiro), sem reordenar a cada mensagem nova.
    *
-   * `podeVerOutros` reflete a permissão `support.chat:view_others` - sem ela,
-   * uma conversa `EM_ANDAMENTO` de outro atendente (`user_id` preenchido e
-   * diferente do `usuarioId` logado) não aparece na lista. O que está em
-   * espera/fila (sem dono ainda) continua visível para todos, com ou sem a
-   * permissão: a regra só entra depois que alguém assume a conversa.
+   * A política compartilhada restringe por setor e por dono. A triagem sem
+   * setor é geral; `view_all_departments` e `view_others` são independentes.
    */
   async findAllSupportChats(
     ordenarPorUltimaMensagem: boolean,
     usuarioId: number,
-    podeVerOutros: boolean,
   ) {
     const query = this.createQueryBuilder('sc')
       // .select('sc.*')
@@ -44,12 +42,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       .innerJoin('support_chat_status', 'scs', 'scs.id = sc.support_chat_status_id')
       .andWhere('scs.is_final = false');
 
-    if (!podeVerOutros) {
-      query.andWhere(
-        `(sc.support_chat_status_id != :emAndamento OR sc.user_id IS NULL OR sc.user_id = :usuarioId)`,
-        { emAndamento: SupportChatStatusId.EM_ANDAMENTO, usuarioId },
-      );
-    }
+    await this.acesso.filtrar(query, usuarioId);
 
     if (!ordenarPorUltimaMensagem) {
       return query.orderBy('sc.id', 'ASC').getMany();
@@ -252,6 +245,11 @@ export class SupportChatsRepository extends Repository<SupportChats> {
   ): Promise<SupportChats> {
     const protocol = await this.protocolCountersRepository.generateProtocol(manager);
 
+    if (!department_id) {
+      const [canal] = await manager.query('SELECT c.default_department_id FROM channels c JOIN departments d ON d.id = c.default_department_id AND d.deleted_at IS NULL WHERE c.id = $1', [channel_id]);
+      department_id = canal?.default_department_id ?? null;
+    }
+
     return manager.save(
       SupportChats,
       manager.create(SupportChats, {
@@ -311,6 +309,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     user_id: number,
     answered_at: Date,
     manager: EntityManager,
+    department_id: number | null,
   ): Promise<number> {
     const resultado = await manager
       .createQueryBuilder()
@@ -331,6 +330,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
         id,
         naoAssumidos: [SupportChatStatusId.AGUARDANDO, SupportChatStatusId.EM_FILA],
       })
+      .andWhere('department_id IS NOT DISTINCT FROM :setorEsperado', { setorEsperado: department_id })
       .execute();
 
     return resultado.affected ?? 0;
@@ -355,12 +355,14 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     user_origem_id: number,
     user_destino_id: number | null,
     manager: EntityManager,
+    department_id: number | null,
   ): Promise<number> {
     const resultado = await manager
       .createQueryBuilder()
       .update(SupportChats)
       .set({
         user_id: user_destino_id,
+        department_id,
         is_waiting: user_destino_id === null,
         support_chat_status_id: user_destino_id
           ? SupportChatStatusId.EM_ANDAMENTO
@@ -439,6 +441,38 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     observation_user: string | null,
     manager: EntityManager,
   ): Promise<number> {
+    return this.finalizarNaoAssumido(
+      id,
+      finished_at,
+      observation_user,
+      SupportChatStatusId.FINALIZADO_SEM_RESPOSTA,
+      manager,
+    );
+  }
+
+  /** Encerra um atendimento ainda não assumido por um nó final do chatbot. */
+  async finalizarPorChatbot(
+    id: number,
+    finished_at: Date,
+    observation_user: string,
+    manager: EntityManager,
+  ): Promise<number> {
+    return this.finalizarNaoAssumido(
+      id,
+      finished_at,
+      observation_user,
+      SupportChatStatusId.FINALIZADO_PELO_CHATBOT,
+      manager,
+    );
+  }
+
+  private async finalizarNaoAssumido(
+    id: number,
+    finished_at: Date,
+    observation_user: string | null,
+    statusId: SupportChatStatusId,
+    manager: EntityManager,
+  ): Promise<number> {
     const resultado = await manager
       .createQueryBuilder()
       .update(SupportChats)
@@ -447,7 +481,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
         observation_user,
         is_waiting: false,
         unread_count: 0,
-        support_chat_status_id: SupportChatStatusId.FINALIZADO_SEM_RESPOSTA,
+        support_chat_status_id: statusId,
       })
       .where('id = :id AND support_chat_status_id IN (:...abertos)', {
         id,

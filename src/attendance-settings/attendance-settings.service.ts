@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { runInTransaction } from 'Utils';
 import {
@@ -24,7 +25,16 @@ export class AttendanceSettingsService {
   constructor(
     private readonly repository: AttendanceSettingsRepository,
     private readonly dataSource: DataSource,
+    private readonly eventos: EventEmitter2,
   ) {}
+
+  /** O lock compartilhado impede iniciar/avançar um fluxo durante a desativação. */
+  async chatbotHabilitado(manager?: EntityManager): Promise<boolean> {
+    const [ajuste] = await (manager ?? this.dataSource).query(
+      `SELECT valor FROM attendance_settings WHERE chave = 'chatbot_habilitado'${manager ? ' FOR SHARE' : ''}`,
+    );
+    return ajuste?.valor === 'true';
+  }
 
   private async valores(): Promise<Map<string, string>> {
     const linhas = await this.repository.todos();
@@ -78,16 +88,30 @@ export class AttendanceSettingsService {
         throw new BadRequestException(`Ajuste desconhecido: "${chave}"`);
       }
 
+      if (typeof valor !== 'boolean') throw new BadRequestException(`O ajuste "${chave}" deve ser booleano`);
+
       paraGravar.push({ chave, valor: String(Boolean(valor)) });
     }
 
     if (!paraGravar.length) return;
 
+    const encaminhados: number[] = [];
     await runInTransaction(this.dataSource, async (manager) => {
       for (const { chave, valor } of paraGravar) {
         await this.repository.grava(chave, valor, updated_by, manager);
       }
+      if (ajustes.chatbot_habilitado === false) {
+        // Mesma ordem de locks do motor: configuração → atendimento → execução.
+        const [chats] = await manager.query(`UPDATE support_chats SET support_chat_status_id = 1
+          WHERE support_chat_status_id = 3 AND user_id IS NULL RETURNING id`);
+        encaminhados.push(...chats.map((chat: { id: number }) => chat.id));
+        await manager.query(`UPDATE chatbot_flow_executions SET status = 'aborted', waiting_for = NULL,
+          finished_at = NOW(), updated_at = NOW(), version = version + 1
+          WHERE status IN ('running', 'suspended')`);
+      }
     });
+
+    await this.eventos.emitAsync('atendimento.ajustes-atualizados', { encaminhados });
 
     this.logger.log(
       `Ajustes de atendimento atualizados por ${updated_by ?? 'desconhecido'}: ${paraGravar.map((p) => p.chave).join(', ')}`,

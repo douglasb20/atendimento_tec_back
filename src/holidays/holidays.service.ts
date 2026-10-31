@@ -6,6 +6,7 @@ import { HolidaysRepository } from './holidays.repository';
 import { CreateHolidayDto } from './dto/create-holiday.dto';
 import { UpdateHolidayDto } from './dto/update-holiday.dto';
 import { Holidays } from './entities/holidays.entity';
+import { partesDataAtendimento } from '@/core/data-atendimento';
 
 @Injectable()
 export class HolidaysService {
@@ -23,7 +24,8 @@ export class HolidaysService {
   /** Hoje é feriado - usado pelo nó "Feriados" do chatbot. `data` é injetável
    * só para teste; em runtime é sempre `new Date()`. */
   async ehFeriadoHoje(data = new Date()): Promise<boolean> {
-    return this.holidaysRepository.existeEm(data.getMonth() + 1, data.getDate(), data.getFullYear());
+    const partes = partesDataAtendimento(data);
+    return this.holidaysRepository.existeEm(partes.mes, partes.dia, partes.ano);
   }
 
   async findOne(id: number): Promise<Holidays> {

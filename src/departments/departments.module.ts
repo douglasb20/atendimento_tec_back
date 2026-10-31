@@ -7,6 +7,10 @@ import { DepartmentsService } from './departments.service';
 import { DepartmentSchedules } from './entities/department-schedules.entity';
 import { Departments } from './entities/departments.entity';
 import { UsersModule } from '@/users/users.module';
+import { HolidaysModule } from '@/holidays/holidays.module';
+import { DepartmentScheduleExceptions } from './entities/department-schedule-exceptions.entity';
+import { DisponibilidadeSetorService } from './disponibilidade-setor.service';
+import { ExcecoesHorarioService } from './excecoes-horario.service';
 
 /**
  * Setores de atendimento.
@@ -19,11 +23,11 @@ import { UsersModule } from '@/users/users.module';
  * deste para resolver os `department_ids` ao gravar um usuário.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Departments, DepartmentSchedules]), forwardRef(() => UsersModule)],
+  imports: [TypeOrmModule.forFeature([Departments, DepartmentSchedules, DepartmentScheduleExceptions]), forwardRef(() => UsersModule), HolidaysModule],
   controllers: [DepartmentsController],
-  providers: [DepartmentsService, DepartmentsRepository],
+  providers: [DepartmentsService, DepartmentsRepository, DisponibilidadeSetorService, ExcecoesHorarioService],
   // O módulo de usuários usa o repository para resolver os ids ao gravar os
   // setores de um usuário.
-  exports: [DepartmentsService, DepartmentsRepository],
+  exports: [DepartmentsService, DepartmentsRepository, DisponibilidadeSetorService],
 })
 export class DepartmentsModule {}

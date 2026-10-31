@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { randomUUID } from 'node:crypto';
+import { OnEvent } from '@nestjs/event-emitter';
 
 import { comDdiBrasil, ContactsService } from '@/contacts/contacts.service';
 import { ContactsRepository } from '@/contacts/contacts.repository';
@@ -51,6 +52,8 @@ import { DepartmentsRepository } from '@/departments/departments.repository';
 import { Departments } from '@/departments/entities/departments.entity';
 import { AttendanceSettingsService } from '@/attendance-settings/attendance-settings.service';
 import { ChannelsService } from '@/channels/channels.service';
+import { AcessoAtendimentoService } from '@/permissions/acesso-atendimento.service';
+import { DisponibilidadeSetorService } from '@/departments/disponibilidade-setor.service';
 
 /**
  * Tipo de mídia do envio → tipo interno persistido, o mesmo que o webhook
@@ -89,6 +92,8 @@ export class SupportChatsService {
     private readonly contactsRepository: ContactsRepository,
     private readonly attendanceSettingsService: AttendanceSettingsService,
     private readonly channelsService: ChannelsService,
+    private readonly acessoAtendimento: AcessoAtendimentoService,
+    private readonly disponibilidadeSetor: DisponibilidadeSetorService,
   ) {}
 
   /**
@@ -182,33 +187,17 @@ export class SupportChatsService {
     setores.sort((a, b) => a.id - b.id);
 
     const agora = new Date();
-    const diaAtual = agora.getDay();
-    const horaAtual = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}:00`;
-
-    let primeiroFechado: Departments | null = null;
+    let primeiroFechado: { mensagemAusencia: string | null } | null = null;
 
     for (const setor of setores) {
-      // Switch mestre desligado: setor sempre disponível, independente do
-      // que estiver salvo em `department_schedules` - evita interpretar um
-      // dia sem intervalo cadastrado como "fechado" quando o setor nunca
-      // teve a intenção de restringir horário nenhum.
-      if (!setor.schedule_enabled) return { texto: channel.mensagem_saudacao, comAnexo: true };
-
-      const intervalos = await this.departmentsRepository.findSchedule(setor.id);
-
-      const disponivel =
-        intervalos.length === 0 ||
-        intervalos.some(
-          (i) => i.weekday === diaAtual && i.start_time <= horaAtual && horaAtual < i.end_time,
-        );
-
-      if (disponivel) return { texto: channel.mensagem_saudacao, comAnexo: true };
-
-      if (!primeiroFechado) primeiroFechado = setor;
+      if (setor.deleted_at) continue;
+      const disponibilidade = await this.disponibilidadeSetor.verificar(setor.id, agora);
+      if (disponibilidade.disponivel) return { texto: channel.mensagem_saudacao, comAnexo: true };
+      if (!primeiroFechado) primeiroFechado = disponibilidade;
     }
 
     return primeiroFechado
-      ? { texto: primeiroFechado.absence_message, comAnexo: false }
+      ? { texto: primeiroFechado.mensagemAusencia, comAnexo: false }
       : { texto: channel.mensagem_saudacao, comAnexo: true };
   }
 
@@ -520,14 +509,13 @@ export class SupportChatsService {
     }
   }
 
-  async listAllSupportChats(usuarioId: number, podeVerOutros: boolean) {
+  async listAllSupportChats(usuarioId: number) {
     const ordenarPorUltimaMensagem = await this.attendanceSettingsService.getBooleano(
       'ordenar_atendimento_por_ultima_mensagem',
     );
     const conversas = await this.supportChatsRepository.findAllSupportChats(
       ordenarPorUltimaMensagem,
       usuarioId,
-      podeVerOutros,
     );
 
     // A listagem carrega `user` e `contact`, e as colunas guardam a key. O
@@ -546,6 +534,42 @@ export class SupportChatsService {
    */
   async findParaEnvioBot(id: number): Promise<SupportChats | null> {
     return this.supportChatsRepository.findParaEstado(id);
+  }
+
+  /** Mesmo lock da atribuição humana: o bot não avança após alguém assumir. */
+  async bloquearParaExecucaoBot(id: number, manager: EntityManager): Promise<boolean> {
+    if (!await this.attendanceSettingsService.chatbotHabilitado(manager)) return false;
+    const chat = await manager.findOne(SupportChats, {
+      where: { id }, lock: { mode: 'pessimistic_write' },
+    });
+    return chat?.support_chat_status_id === SupportChatStatusId.EM_FILA && !chat.user_id;
+  }
+
+  @OnEvent('atendimento.ajustes-atualizados')
+  async notificarAjustesAtualizados({ encaminhados }: { encaminhados: number[] }): Promise<void> {
+    try {
+      this.whatsappService.emitEvent('attendance_settings:updated', await this.attendanceSettingsService.vigentes());
+      for (const id of encaminhados) await this.recarregaEEmiteEstado(id);
+    } catch (erro) {
+      this.logger.warn(`Configurações salvas, mas houve falha ao atualizar as telas: ${erro.message}`);
+    }
+  }
+
+  async devolverBotParaEspera(id: number): Promise<void> {
+    const resultado = await this.supportChatsRepository.createQueryBuilder()
+      .update(SupportChats).set({ support_chat_status_id: SupportChatStatusId.AGUARDANDO })
+      .where('id = :id AND support_chat_status_id = :bot AND user_id IS NULL',
+        { id, bot: SupportChatStatusId.EM_FILA }).execute();
+    if (resultado.affected) await this.recarregaEEmiteEstado(id);
+  }
+
+  async definirSetorPorChatbot(id: number, setorId: number, manager: EntityManager): Promise<void> {
+    const resultado = await manager.query(`UPDATE support_chats sc SET department_id = $2
+      WHERE sc.id = $1 AND sc.support_chat_status_id IN (1, 3)
+      AND EXISTS (SELECT 1 FROM channel_x_department cd JOIN departments d ON d.id = cd.department_id
+        WHERE cd.channel_id = sc.channel_id AND cd.department_id = $2 AND d.deleted_at IS NULL)
+      RETURNING sc.id`, [id, setorId]);
+    if (!resultado[1]) throw new BadRequestException('O chatbot não pode encaminhar este atendimento ao setor escolhido');
   }
 
   async findSupportChatsById(id: number) {
@@ -890,10 +914,12 @@ export class SupportChatsService {
       executionId: number;
       trigger: 'start' | 'resume';
       resumeText?: string;
+      waitingToken?: string;
     } | null = null;
 
     const abertura = await runInTransaction(this.dataSource, async (manager) => {
       try {
+        const chatbotHabilitado = await this.attendanceSettingsService.chatbotHabilitado(manager);
         const { sessionId, data } = payload;
         const channel = await this.channelsRepository.findBySessionId(sessionId);
         const phoneContact = data.message.id.remote;
@@ -971,6 +997,7 @@ export class SupportChatsService {
             criada,
             savedMessage.content,
             manager,
+            chatbotHabilitado,
           );
         }
 
@@ -993,7 +1020,8 @@ export class SupportChatsService {
 
             supportChat.unread_count = naoLidas;
 
-            this.whatsappService.emitEvent('whatsapp:unread_count', {
+            await this.whatsappService.emitSupportChatMessage(supportChat.user_id, 'whatsapp:unread_count', {
+              ...supportChat,
               chatId: supportChat.id,
               unreadCount: naoLidas,
             });
@@ -1075,7 +1103,7 @@ export class SupportChatsService {
       await this.chatbotFlowExecutionsService.enfileirar(
         chatbotParaEnfileirar.executionId,
         chatbotParaEnfileirar.trigger === 'resume'
-          ? { kind: 'resume', resumePayload: { text: chatbotParaEnfileirar.resumeText } }
+          ? { kind: 'resume', waitingToken: chatbotParaEnfileirar.waitingToken, resumePayload: { text: chatbotParaEnfileirar.resumeText } }
           : { kind: 'start' },
       );
     }
@@ -1093,14 +1121,19 @@ export class SupportChatsService {
     conversaCriada: boolean,
     textoRecebido: string,
     manager: EntityManager,
-  ): Promise<{ executionId: number; trigger: 'start' | 'resume'; resumeText?: string } | null> {
+    chatbotHabilitado: boolean,
+  ): Promise<{ executionId: number; trigger: 'start' | 'resume'; resumeText?: string; waitingToken?: string } | null> {
+    if (!chatbotHabilitado) return null;
+    if (!conversaCriada && supportChat.support_chat_status_id !== SupportChatStatusId.EM_FILA) return null;
     const execucaoSuspensa = await this.chatbotFlowExecutionsRepository.findSuspendedAwaitingReply(
       contactId,
+      supportChat.id,
       manager,
     );
 
     if (execucaoSuspensa) {
-      return { executionId: execucaoSuspensa.id, trigger: 'resume', resumeText: textoRecebido };
+      const token = await this.chatbotFlowExecutionsRepository.registrarResposta(execucaoSuspensa, textoRecebido, manager);
+      return token ? { executionId: execucaoSuspensa.id, trigger: 'resume', resumeText: textoRecebido, waitingToken: token } : null;
     }
 
     // Só conversa nova entra por um chatbot de entrada - uma conversa já
@@ -1150,9 +1183,12 @@ export class SupportChatsService {
           // O front substitui a mensagem inteira ao receber o ack, então a
           // key precisa virar URL aqui também - senão o ack apagaria a imagem
           // que o evento anterior já tinha exibido.
-          this.whatsappService.emitEvent(
+          const chat = await this.supportChatsRepository.findParaEstado(savedMessage.support_chat_id, manager);
+          await this.whatsappService.emitSupportChatMessage(
+            chat.user_id,
             'whatsapp:message_ack',
             this.messagesService.comUrlPublica(savedMessage),
+            chat,
           );
         }
       } catch (err) {
@@ -1392,7 +1428,9 @@ export class SupportChatsService {
   async marcarComoLida(id: number): Promise<void> {
     await this.supportChatsRepository.zeraNaoLidas(id);
 
-    this.whatsappService.emitEvent('whatsapp:unread_count', {
+    const chat = await this.supportChatsRepository.findParaEstado(id);
+    await this.whatsappService.emitSupportChatMessage(chat.user_id, 'whatsapp:unread_count', {
+      ...chat,
       chatId: id,
       unreadCount: 0,
     });
@@ -1510,7 +1548,10 @@ export class SupportChatsService {
           user_id,
           new Date(),
           manager,
+          resultado.supportChat.department_id,
         );
+      } else if (!(await this.acessoAtendimento.podeVer(user_id, resultado.supportChat))) {
+        throw new ForbiddenException('Já existe um atendimento para este contato em outro setor ou com outro atendente');
       }
 
       return resultado;
@@ -1609,9 +1650,11 @@ export class SupportChatsService {
     }
 
     const assumidoEm = new Date();
-    const afetadas = await runInTransaction(this.dataSource, (manager) =>
-      this.supportChatsRepository.assumir(id, user_id, assumidoEm, manager),
-    );
+    const afetadas = await runInTransaction(this.dataSource, async (manager) => {
+      const linhas = await this.supportChatsRepository.assumir(id, user_id, assumidoEm, manager, supportChat.department_id);
+      if (linhas) await this.chatbotFlowExecutionsRepository.abortarDoAtendimento(id, manager);
+      return linhas;
+    });
 
     // Zero linhas significa que outro atendente ganhou a corrida entre a
     // leitura acima e o update.
@@ -1901,14 +1944,16 @@ export class SupportChatsService {
       throw new BadRequestException('Este atendimento já foi iniciado; use a finalização normal');
     }
 
-    const afetadas = await runInTransaction(this.dataSource, (manager) =>
-      this.supportChatsRepository.finalizarSemAtendimento(
+    const afetadas = await runInTransaction(this.dataSource, async (manager) => {
+      const linhas = await this.supportChatsRepository.finalizarSemAtendimento(
         id,
         new Date(),
         dto.observation_user?.trim() || null,
         manager,
-      ),
-    );
+      );
+      if (linhas) await this.chatbotFlowExecutionsRepository.abortarDoAtendimento(id, manager);
+      return linhas;
+    });
 
     // `affected = 0` aqui significa que outro atendente assumiu a conversa
     // entre a leitura e o UPDATE - o banco arbitra, como no `iniciar`.
@@ -1919,6 +1964,43 @@ export class SupportChatsService {
     this.logger.log(`Conversa ${id} encerrada sem atendimento por user ${user_id}`);
 
     return this.recarregaEEmiteEstado(id);
+  }
+
+  /**
+   * Encerra a conversa que estava sendo conduzida pelo chatbot. Não exige
+   * atendente nem cliente associado, mas pode enviar a despedida do canal
+   * antes de mudar o estado - a ordem evita o webhook criar outro ticket.
+   */
+  async encerrarPorChatbot(id: number, enviarDespedida: boolean): Promise<void> {
+    const supportChat = await this.supportChatsRepository.findParaEstado(id);
+    if (!supportChat || supportChat.support_chat_status_id !== SupportChatStatusId.EM_FILA || supportChat.user_id) return;
+
+    if (enviarDespedida) {
+      await this.enviaMensagemAutomatica(
+        supportChat,
+        supportChat.channel?.mensagem_despedida,
+        supportChat.channel?.id
+          ? () => this.channelsService.copiaAnexoDespedidaParaEnvio(supportChat.channel.id)
+          : undefined,
+      );
+    }
+
+    const afetadas = await runInTransaction(this.dataSource, (manager) =>
+      this.supportChatsRepository.finalizarPorChatbot(
+        id,
+        new Date(),
+        'Finalizado pelo chatbot',
+        manager,
+      ),
+    );
+
+    if (!afetadas) {
+      this.logger.warn(`Conversa ${id} não foi encerrada pelo chatbot: atendimento assumido ou já finalizado`);
+      return;
+    }
+
+    this.logger.log(`Conversa ${id} encerrada pelo chatbot${enviarDespedida ? ' com despedida' : ''}`);
+    await this.recarregaEEmiteEstado(id);
   }
 
   /**
@@ -1984,6 +2066,13 @@ export class SupportChatsService {
     }
 
     const destinoId = dto.user_destino_id ?? null;
+    const setorDestino = await this.departmentsRepository.findOneBy({ id: dto.department_id });
+    if (!setorDestino) throw new BadRequestException('Setor de destino não encontrado');
+    const vinculo = await this.dataSource.query(
+      'SELECT 1 FROM channel_x_department WHERE channel_id = $1 AND department_id = $2',
+      [supportChat.channel_id, dto.department_id],
+    );
+    if (!vinculo.length) throw new BadRequestException('O setor de destino não pertence a este canal');
 
     if (destinoId !== null) {
       // Compara com o dono real da conversa, não com quem chama: o master
@@ -1994,13 +2083,16 @@ export class SupportChatsService {
       }
       // Lança `BadRequestException` se não existir ou estiver inativo - não
       // dá para entregar uma conversa a quem não pode atendê-la.
-      await this.userRepository.findById(destinoId);
+      const atendente = await this.userRepository.findByIdComSetores(destinoId);
+      if (!atendente.departments?.some((setor) => Number(setor.id) === dto.department_id)) {
+        throw new BadRequestException('O atendente de destino não pertence ao setor escolhido');
+      }
     }
 
     const motivo = dto.motivo?.trim() || null;
 
     const afetadas = await runInTransaction(this.dataSource, async (manager) => {
-      const linhas = await this.supportChatsRepository.transferir(id, user_id, destinoId, manager);
+      const linhas = await this.supportChatsRepository.transferir(id, supportChat.user_id, destinoId, manager, dto.department_id);
 
       // Só registra o evento se a troca de dono valeu: senão a conversa teria
       // no histórico uma transferência que não chegou a acontecer.
@@ -2011,6 +2103,8 @@ export class SupportChatsService {
           destinoId,
           motivo,
           manager,
+          supportChat.department_id,
+          dto.department_id,
         );
       }
 
@@ -2025,12 +2119,27 @@ export class SupportChatsService {
       `Atendimento ${id} transferido por ${user_id} para ${destinoId ?? 'a fila de espera'}`,
     );
 
-    return this.recarregaEEmiteEstado(id);
+    return this.recarregaEEmiteEstado(id, {
+      supportChatEvents: await this.supportChatEventsRepository.findPorConversa(id),
+    });
   }
 
   /** Eventos do atendimento, para a conversa mostrar o que aconteceu nela. */
   async listaEventos(id: number): Promise<SupportChatEvents[]> {
     return this.supportChatEventsRepository.findPorConversa(id);
+  }
+
+  async destinosTransferencia(id: number) {
+    const chat = await this.supportChatsRepository.findParaEstado(id);
+    if (!chat) throw new NotFoundException('Atendimento não encontrado');
+    const setores = await this.dataSource.query(`SELECT d.id, d.name FROM departments d
+      JOIN channel_x_department cd ON cd.department_id = d.id
+      WHERE cd.channel_id = $1 AND d.deleted_at IS NULL ORDER BY d.name`, [chat.channel_id]);
+    const atendentes = await this.dataSource.query(`SELECT u.id, u.name, u.last_name, u.email, ud.department_id
+      FROM users u JOIN user_x_department ud ON ud.user_id = u.id
+      JOIN channel_x_department cd ON cd.department_id = ud.department_id
+      WHERE cd.channel_id = $1 AND u.status = 1 ORDER BY u.name`, [chat.channel_id]);
+    return { setores, atendentes };
   }
 
   /**

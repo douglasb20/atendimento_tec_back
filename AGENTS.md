@@ -81,6 +81,16 @@ O `.env.exemple` foi auditado contra o que o código de fato lê (`process.env` 
 do transporte anterior; `BUCKET_*`; e `ENCRYPT_*_JWT_SECRET`, que nunca chegaram
 a ser implementadas) e o bloco `REDIS_*` foi documentado.
 
+## Envio de e-mail
+
+`EMAIL_PROVIDER=smtp` (padrão) usa as configurações SMTP do banco, com `MAIL_*`
+como fallback. `EMAIL_PROVIDER=resend` usa `smtp.resend.com:465`, usuário
+`resend`, senha `RESEND_API_KEY` e remetente `RESEND_FROM`, sem alterar os dados
+do banco. Os templates de convite e recuperação são os mesmos. Falta de chave
+ou remetente no modo Resend falha explicitamente; não há fallback automático
+para Gmail. O formulário de teste com campos SMTP continua testando esses
+campos; sem campos avulsos, o teste usa o provedor ativo.
+
 ## Ciclo de vida do atendimento
 
 Estados em `src/@types/index.ts` (`SupportChatStatusId`), semeados em
@@ -150,6 +160,17 @@ dispositivo (`...:45@lid`).
 
 **Não aumente a `concurrency` da fila de mensagens** sem substituir a ordenação
 por outro mecanismo.
+
+## Tempo limite de resposta no chatbot
+
+Mensagem (`continueOn: after_reply`) e Menu aceitam `replyTimeoutEnabled` e
+`replyTimeoutMinutes` (1–10080). Publicar exige ligar a saída `sem-resposta`.
+Cada suspensão ganha um token em `chatbot_flow_executions.waiting_for`; prazo e
+resposta recebida ficam nesse JSONB, não em temporizadores em memória.
+`ChatbotFlowExecutionsService` varre esperas a cada 10 segundos e enfileira
+retomadas deduplicadas por token. O motor relê a execução após bloquear o chat:
+resposta gravada tem prioridade sobre timeout; jobs de outro token são ignorados.
+Assumir/descartar/desabilitar já abortam as execuções e invalidam os prazos.
 
 ## Providers
 

@@ -1,5 +1,5 @@
 import { MailerService } from '@nestjs-modules/mailer';
-import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 
 import { SystemSettingsService } from '@/system-settings/system-settings.service';
@@ -28,6 +28,21 @@ export class ConfigMailerService {
   ) {}
 
   private async configAtual(): Promise<ConfigEmail> {
+    const provedor = (process.env.EMAIL_PROVIDER ?? 'smtp').trim().toLowerCase();
+    if (provedor === 'resend') {
+      const chave = process.env.RESEND_API_KEY?.trim();
+      const remetente = process.env.RESEND_FROM?.trim();
+      if (!chave || !remetente) {
+        throw new BadRequestException('Configure RESEND_API_KEY e RESEND_FROM para enviar pelo Resend');
+      }
+      // Transporte independente: nunca sobrescreve nem usa a senha do SMTP salvo.
+      return { host: 'smtp.resend.com', port: 465, user: 'resend', pass: chave, from: remetente };
+    }
+    if (provedor !== 'smtp') throw new BadRequestException('EMAIL_PROVIDER deve ser smtp ou resend');
+    return this.configSmtp();
+  }
+
+  private async configSmtp(): Promise<ConfigEmail> {
     return {
       host: await this.settings.getTexto('email_host'),
       port: await this.settings.getInteiro('email_port'),
@@ -143,7 +158,10 @@ export class ConfigMailerService {
     destinatario: string,
     parciais: Partial<ConfigEmail> = {},
   ): Promise<ResultadoTeste> {
-    const gravada = await this.configAtual();
+    // O formulário SMTP testa os dados avulsos sem misturar o host do Gmail
+    // com a chave do Resend. Sem campos avulsos, testa o provedor ativo.
+    const temCredenciaisAvulsas = Object.keys(limpaVazios(parciais)).length > 0;
+    const gravada = await (temCredenciaisAvulsas ? this.configSmtp() : this.configAtual());
     const config: ConfigEmail = { ...gravada, ...limpaVazios(parciais) };
 
     if (!config.host || !config.user) {

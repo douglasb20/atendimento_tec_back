@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { StorageModule } from '@/storage/storage.module';
+import { AttendanceSettingsModule } from '@/attendance-settings/attendance-settings.module';
+import { ChatbotHabilitadoGuard } from './chatbot-habilitado.guard';
 
 import { ChatbotFlowVersionsRepository } from './chatbot-flow-versions.repository';
 import { ChatbotsController } from './chatbots.controller';
@@ -17,9 +19,9 @@ import { Chatbots } from './entities/chatbots.entity';
  * `forwardRef`).
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Chatbots, ChatbotFlowVersions]), StorageModule],
+  imports: [TypeOrmModule.forFeature([Chatbots, ChatbotFlowVersions]), StorageModule, AttendanceSettingsModule],
   controllers: [ChatbotsController],
-  providers: [ChatbotsService, ChatbotsRepository, ChatbotFlowVersionsRepository],
+  providers: [ChatbotsService, ChatbotsRepository, ChatbotFlowVersionsRepository, ChatbotHabilitadoGuard],
   exports: [ChatbotsService, ChatbotsRepository, ChatbotFlowVersionsRepository],
 })
 export class ChatbotsModule {}

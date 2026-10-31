@@ -24,10 +24,9 @@ export class SupportChats {
   contact_id: number;
 
   /**
-   * Setor escolhido ao criar o atendimento (modal "Novo atendimento").
-   *
-   * Nulo nas conversas abertas pelo fluxo normal (mensagem do contato via
-   * webhook) - só `criarNova` grava isto.
+   * Setor responsável pelo atendimento. Na entrada usa o padrão do canal;
+   * pode mudar por transferência ou por um nó do chatbot.
+   * Nulo representa a triagem geral de canais ainda sem setores.
    */
   @Column({ name: 'department_id', type: 'int', nullable: true })
   department_id: number | null;

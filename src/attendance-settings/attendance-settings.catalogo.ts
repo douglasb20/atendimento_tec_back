@@ -39,10 +39,10 @@ export const CATALOGO = {
     padrao: false,
   },
 
-  notificar_mensagem_chatbot: {
-    rotulo: 'Notificar mensagem do ChatBot',
-    descricao: 'Avisa o atendente quando o chatbot envia uma mensagem na conversa.',
-    padrao: true,
+  chatbot_habilitado: {
+    rotulo: 'Habilitar chatbot',
+    descricao: 'Habilita o módulo e suas automações. Ao desligar, interrompe os fluxos em andamento e encaminha as conversas para Espera, sem apagar os fluxos.',
+    padrao: false,
   },
 
   carregar_mensagens_anteriores: {

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigTempoResposta, minutosDeEspera, SAIDA_SEM_RESPOSTA } from '@/chatbots/tempo-resposta';
 
 import { NodeExecutionContext, NodeHandler, NodeResult } from './node-handler.interface';
 
@@ -9,7 +10,7 @@ type MenuOption = {
   text: string;
 };
 
-type MenuData = {
+type MenuData = ConfigTempoResposta & {
   title?: string;
   body?: string;
   options: MenuOption[];
@@ -35,7 +36,8 @@ export class MenuHandler implements NodeHandler {
       const texto = this.montaTexto(data, ctx);
       return {
         kind: 'suspend',
-        waitingFor: { type: 'contact_reply', node_id: ctx.node.id },
+        waitingFor: { type: 'contact_reply', node_id: ctx.node.id,
+          timeout_minutes: minutosDeEspera(data), timeout_handle: SAIDA_SEM_RESPOSTA },
         effects: texto ? [{ type: 'send_text', text: texto }] : [],
       };
     }

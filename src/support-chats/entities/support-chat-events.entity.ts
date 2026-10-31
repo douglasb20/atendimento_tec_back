@@ -1,6 +1,7 @@
 import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Users } from 'users/entities/users.entity';
 import { SupportChats } from './support-chats.entity';
+import { Departments } from '@/departments/entities/departments.entity';
 
 /** Tipos de evento do atendimento. Em pausa/retomada, `user_origem_id` é quem
  * pausou/retomou e `user_destino_id` fica nulo (sem o sentido de "devolvido"
@@ -45,6 +46,20 @@ export class SupportChatEvents {
 
   @Column({ name: 'motivo', type: 'text', nullable: true })
   motivo: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  department_origem_id: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  department_destino_id: number | null;
+
+  @ManyToOne(() => Departments)
+  @JoinColumn({ name: 'department_origem_id' })
+  departmentOrigem: Departments | null;
+
+  @ManyToOne(() => Departments)
+  @JoinColumn({ name: 'department_destino_id' })
+  departmentDestino: Departments | null;
 
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;

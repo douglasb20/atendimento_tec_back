@@ -16,7 +16,7 @@ import { COOKIE_ACCESS } from 'core/cookies-de-sessao';
 import { origensPermitidas } from 'core/origens-permitidas';
 import { JwtPayload } from '@types';
 import { EstadoPresenca, PresencaService } from '@/presenca/presenca.service';
-import { PermissionService } from '@/permissions/permission.service';
+import { AcessoAtendimentoService } from '@/permissions/acesso-atendimento.service';
 import { Users } from '@/users/entities/users.entity';
 
 type ClientInfo = {
@@ -39,7 +39,7 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
   constructor(
     private readonly authService: AuthService,
     private readonly presencaService: PresencaService,
-    private readonly permissionService: PermissionService,
+    private readonly acessoAtendimento: AcessoAtendimentoService,
   ) {}
 
   @WebSocketServer()
@@ -219,7 +219,7 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
    */
   async emitSupportChatState(dono: number | null | undefined, event: string, data: any) {
     for (const info of this.clients.values()) {
-      if (await this.podeVerAtendimento(info.user, dono)) {
+      if (await this.acessoAtendimento.podeVer(info.user.id, { ...data, user_id: dono })) {
         info.socket.emit(event, data);
       } else {
         info.socket.emit('whatsapp:chat_removed', { id: data?.id });
@@ -238,20 +238,12 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
    * Não emite `chat_removed` aqui: quem chama já dispara `chat_state` para a
    * mesma conversa, e é lá que a remoção acontece.
    */
-  async emitSupportChatMessage(dono: number | null | undefined, event: string, data: any) {
+  async emitSupportChatMessage(dono: number | null | undefined, event: string, data: any, contexto = data) {
     for (const info of this.clients.values()) {
-      if (await this.podeVerAtendimento(info.user, dono)) {
+      if (await this.acessoAtendimento.podeVer(info.user.id, { ...contexto, user_id: dono })) {
         info.socket.emit(event, data);
       }
     }
-  }
-
-  private async podeVerAtendimento(user: Users, dono: number | null | undefined): Promise<boolean> {
-    if (!dono) return true;
-    if (Number(user.is_superuser)) return true;
-    if (Number(user.id) === Number(dono)) return true;
-
-    return this.permissionService.hasPermission(user.id, ['support.chat:view_others']);
   }
 
   emitToClient(clientId: string, event: string, data: any) {

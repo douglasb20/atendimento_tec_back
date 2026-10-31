@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 
 import { ProviderMediaType } from '@/whatsapp/providers/whatsapp-provider.interface';
+import { ConfigTempoResposta, minutosDeEspera, SAIDA_SEM_RESPOSTA } from '@/chatbots/tempo-resposta';
 import { NodeEffect, NodeExecutionContext, NodeHandler, NodeResult } from './node-handler.interface';
 
 type MessageType = 'text' | ProviderMediaType;
 
-type MessageNodeData = {
+type MessageNodeData = ConfigTempoResposta & {
   messageType?: MessageType;
   value?: string;
   attachmentSource?: 'upload' | 'variable';
@@ -40,7 +41,8 @@ export class MessageHandler implements NodeHandler {
       }
 
       const effects = this.montaEfeitos(data, messageType, ctx);
-      return { kind: 'suspend', waitingFor: { type: 'contact_reply', node_id: ctx.node.id }, effects };
+      return { kind: 'suspend', waitingFor: { type: 'contact_reply', node_id: ctx.node.id,
+        timeout_minutes: minutosDeEspera(data), timeout_handle: SAIDA_SEM_RESPOSTA }, effects };
     }
 
     return { kind: 'continue', outputHandle: null, effects: this.montaEfeitos(data, messageType, ctx) };

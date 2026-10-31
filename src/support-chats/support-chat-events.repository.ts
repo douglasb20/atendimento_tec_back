@@ -21,6 +21,8 @@ export class SupportChatEventsRepository extends Repository<SupportChatEvents> {
     user_destino_id: number | null,
     motivo: string | null,
     manager: EntityManager,
+    department_origem_id?: number | null,
+    department_destino_id?: number | null,
   ): Promise<SupportChatEvents> {
     const repo = manager.getRepository(SupportChatEvents);
 
@@ -31,6 +33,8 @@ export class SupportChatEventsRepository extends Repository<SupportChatEvents> {
         user_origem_id,
         user_destino_id,
         motivo,
+        department_origem_id,
+        department_destino_id,
       }),
     );
   }
@@ -83,7 +87,7 @@ export class SupportChatEventsRepository extends Repository<SupportChatEvents> {
   async findPorConversa(support_chat_id: number): Promise<SupportChatEvents[]> {
     return this.find({
       where: { support_chat_id },
-      relations: ['userOrigem', 'userDestino'],
+      relations: ['userOrigem', 'userDestino', 'departmentOrigem', 'departmentDestino'],
       order: { created_at: 'ASC' },
     });
   }

@@ -1,4 +1,5 @@
 import { ConflictException, Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 
 import { ChatbotFlowExecutions } from './entities/chatbot-flow-executions.entity';
@@ -17,6 +18,7 @@ export class ChatbotFlowExecutionsRepository extends Repository<ChatbotFlowExecu
    */
   async findSuspendedAwaitingReply(
     contactId: number,
+    supportChatId: number,
     manager?: EntityManager,
   ): Promise<ChatbotFlowExecutions | null> {
     const repo = manager ? manager.getRepository(ChatbotFlowExecutions) : this;
@@ -24,15 +26,52 @@ export class ChatbotFlowExecutionsRepository extends Repository<ChatbotFlowExecu
     return repo
       .createQueryBuilder('e')
       .where('e.contact_id = :contactId', { contactId })
+      .andWhere('e.support_chat_id = :supportChatId', { supportChatId })
       .andWhere("e.status = 'suspended'")
       .andWhere("e.waiting_for->>'type' = 'contact_reply'")
       .getOne();
+  }
+
+  /** Assumir/descartar a conversa invalida também os jobs já enfileirados. */
+  async abortarDoAtendimento(supportChatId: number, manager: EntityManager): Promise<void> {
+    await manager.createQueryBuilder().update(ChatbotFlowExecutions)
+      .set({ status: 'aborted', waiting_for: null, finished_at: new Date(),
+        updated_at: new Date(), version: () => 'version + 1' })
+      .where('support_chat_id = :supportChatId', { supportChatId })
+      .andWhere('status IN (:...pendentes)', { pendentes: ['running', 'suspended'] })
+      .execute();
   }
 
   async findById(id: number, manager?: EntityManager): Promise<ChatbotFlowExecutions | null> {
     const repo = manager ? manager.getRepository(ChatbotFlowExecutions) : this;
 
     return repo.findOne({ where: { id } });
+  }
+
+  /** A resposta é registrada antes de enfileirar: um timeout não pode ultrapassá-la. */
+  async registrarResposta(execucao: ChatbotFlowExecutions, texto: string, manager: EntityManager): Promise<string | null> {
+    if (!execucao.waiting_for || execucao.waiting_for.reply) return null;
+    const token = execucao.waiting_for.token ?? randomUUID();
+    const gravou = await this.salvarComLock(execucao.id, execucao.version, {
+      waiting_for: { ...execucao.waiting_for, token, reply: { text: texto, received_at: new Date().toISOString() } },
+    }, manager);
+    return gravou ? token : null;
+  }
+
+  /** Ajusta o início da contagem após o envio, sem ressuscitar uma espera respondida/cancelada. */
+  async renovarPrazoAposEnvio(id: number, token: string, minutos: number): Promise<void> {
+    await this.dataSource.query(`UPDATE chatbot_flow_executions
+      SET waiting_for = jsonb_set(waiting_for, '{timeout_at}', to_jsonb($3::text)), version = version + 1, updated_at = NOW()
+      WHERE id = $1 AND status = 'suspended' AND waiting_for->>'token' = $2
+      AND waiting_for->'reply' IS NULL`, [id, token, new Date(Date.now() + minutos * 60000).toISOString()]);
+  }
+
+  /** O banco recupera prazos/respostas mesmo se o Redis ou o processo reiniciar. */
+  async buscarRetomadasPendentes(): Promise<Pick<ChatbotFlowExecutions, 'id' | 'waiting_for'>[]> {
+    return this.dataSource.query(`SELECT id, waiting_for FROM chatbot_flow_executions
+      WHERE status = 'suspended' AND waiting_for->>'type' = 'contact_reply'
+      AND (waiting_for->'reply' IS NOT NULL OR waiting_for->>'timeout_at' <= $1)
+      ORDER BY updated_at NULLS FIRST LIMIT 100`, [new Date().toISOString()]);
   }
 
   /**

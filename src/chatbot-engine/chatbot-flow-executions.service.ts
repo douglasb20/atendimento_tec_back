@@ -1,5 +1,6 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { randomUUID } from 'node:crypto';
 import { EntityManager } from 'typeorm';
 import { Queue } from 'bullmq';
@@ -8,6 +9,7 @@ import { Chatbots } from '@/chatbots/entities/chatbots.entity';
 
 import { ChatbotFlowExecutions } from './entities/chatbot-flow-executions.entity';
 import { ChatbotFlowExecutionJob } from './processors/chatbot-flow-execution.processor';
+import { ChatbotFlowExecutionsRepository } from './chatbot-flow-executions.repository';
 
 /**
  * A ponte entre `SupportChatsService` (que decide, ao processar uma
@@ -20,6 +22,7 @@ export class ChatbotFlowExecutionsService {
 
   constructor(
     @InjectQueue('chatbot-flow-execution') private readonly queue: Queue<ChatbotFlowExecutionJob>,
+    private readonly executionsRepository: ChatbotFlowExecutionsRepository,
   ) {}
 
   /**
@@ -58,6 +61,25 @@ export class ChatbotFlowExecutionsService {
     // a cada resposta do contato; por isso cada disparo precisa de um id
     // próprio. Duplicatas de webhook continuam seguras: o motor encontra a
     // execução já concluída/suspensa em outro nó e ignora o job excedente.
-    await this.queue.add('process', { executionId, trigger }, { jobId: `execution-${executionId}-${randomUUID()}` });
+    const token = trigger.kind !== 'start' ? trigger.waitingToken : undefined;
+    await this.queue.add('process', { executionId, trigger }, {
+      jobId: token ? `${trigger.kind}-${executionId}-${token}` : `execution-${executionId}-${randomUUID()}`,
+      attempts: 3, backoff: { type: 'exponential', delay: 1000 }, removeOnComplete: true, removeOnFail: true,
+    });
+  }
+
+  @Cron('*/10 * * * * *', { waitForCompletion: true })
+  async recuperarRetomadasPendentes(): Promise<void> {
+    try {
+      for (const execucao of await this.executionsRepository.buscarRetomadasPendentes()) {
+        const espera = execucao.waiting_for;
+        if (!espera?.token) continue;
+        await this.enfileirar(execucao.id, espera.reply
+          ? { kind: 'resume', waitingToken: espera.token, resumePayload: { text: espera.reply.text } }
+          : { kind: 'timeout', waitingToken: espera.token });
+      }
+    } catch (erro) {
+      this.logger.error(`Falha ao recuperar esperas do chatbot: ${erro.message}`);
+    }
   }
 }
