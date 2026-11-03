@@ -17,6 +17,7 @@ import { ExecutionEngine } from './execution-engine.service';
 import { ConditionalHandler } from './node-handlers/conditional.handler';
 import { CloseSupportChatHandler } from './node-handlers/close-support-chat.handler';
 import { FinishHandler } from './node-handlers/finish.handler';
+import { HandoffHandler } from './node-handlers/handoff.handler';
 import { HolidayHandler } from './node-handlers/holiday.handler';
 import { MenuHandler } from './node-handlers/menu.handler';
 import { MessageHandler } from './node-handlers/message.handler';
@@ -58,6 +59,7 @@ import { ChatbotFlowExecutionProcessor } from './processors/chatbot-flow-executi
     MenuHandler,
     HolidayHandler,
     FinishHandler,
+    HandoffHandler,
     {
       provide: NODE_HANDLERS,
       useFactory: (
@@ -70,7 +72,8 @@ import { ChatbotFlowExecutionProcessor } from './processors/chatbot-flow-executi
         menu: MenuHandler,
         holiday: HolidayHandler,
         finish: FinishHandler,
-      ) => [start, setDepartment, businessHours, message, conditional, closeSupportChat, menu, holiday, finish],
+        handoff: HandoffHandler,
+      ) => [start, setDepartment, businessHours, message, conditional, closeSupportChat, menu, holiday, finish, handoff],
       inject: [
         StartHandler,
         SetDepartmentHandler,
@@ -81,6 +84,7 @@ import { ChatbotFlowExecutionProcessor } from './processors/chatbot-flow-executi
         MenuHandler,
         HolidayHandler,
         FinishHandler,
+        HandoffHandler,
       ],
     },
   ],

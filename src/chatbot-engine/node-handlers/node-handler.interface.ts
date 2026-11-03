@@ -35,7 +35,8 @@ export type NodeResult =
   | { kind: 'continue'; outputHandle: string | null; effects?: NodeEffect[]; departmentId?: number }
   | { kind: 'suspend'; waitingFor: Omit<WaitingFor, 'since'>; effects?: NodeEffect[] }
   | { kind: 'call_flow'; flowId: number }
-  | { kind: 'close_support_chat'; enviarDespedida: boolean }
+  | { kind: 'close_support_chat'; enviarDespedida: boolean; executarFluxoSaida?: boolean }
+  | { kind: 'handoff'; departmentId: number; userId: number | null }
   | { kind: 'finish'; effects?: NodeEffect[] };
 
 export type NodeExecutionContext = {

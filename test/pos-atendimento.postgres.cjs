@@ -8,7 +8,9 @@ const { DataSource } = require('typeorm');
 const { SupportChats } = require('../dist/support-chats/entities/support-chats.entity');
 const { SupportChatsRepository } = require('../dist/support-chats/support-chats.repository');
 const { SupportChatsService } = require('../dist/support-chats/support-chats.service');
+const { SupportChatEventsRepository } = require('../dist/support-chats/support-chat-events.repository');
 const { ChatbotsRepository } = require('../dist/chatbots/chatbots.repository');
+const { ChatbotsService } = require('../dist/chatbots/chatbots.service');
 const { ChatbotFlowVersionsRepository } = require('../dist/chatbots/chatbot-flow-versions.repository');
 const { ChatbotFlowExecutionsRepository } = require('../dist/chatbot-engine/chatbot-flow-executions.repository');
 const { ChatbotFlowExecutionsService } = require('../dist/chatbot-engine/chatbot-flow-executions.service');
@@ -19,6 +21,7 @@ const { MessageHandler } = require('../dist/chatbot-engine/node-handlers/message
 const { MenuHandler } = require('../dist/chatbot-engine/node-handlers/menu.handler');
 const { FinishHandler } = require('../dist/chatbot-engine/node-handlers/finish.handler');
 const { CloseSupportChatHandler } = require('../dist/chatbot-engine/node-handlers/close-support-chat.handler');
+const { HandoffHandler } = require('../dist/chatbot-engine/node-handlers/handoff.handler');
 const { validarTentativasMenu } = require('../dist/chatbots/tentativas-menu');
 
 async function testar() {
@@ -36,11 +39,11 @@ async function testar() {
       const [existe] = await qr.query('SELECT to_regclass($1) AS nome', [`public.${tabela}`]);
       if (existe.nome) await qr.query(`CREATE TEMP TABLE "${tabela}" (LIKE public."${tabela}" INCLUDING DEFAULTS INCLUDING CONSTRAINTS INCLUDING INDEXES)`);
     }
-    for (const tabela of ['support_chats', 'chatbot_flow_executions']) {
+    for (const tabela of ['support_chats', 'chatbot_flow_executions', 'support_chat_events', 'chatbot_flow_versions']) {
       await qr.query(`CREATE TEMP SEQUENCE teste_${tabela}_id START 1000`);
       await qr.query(`ALTER TABLE pg_temp.${tabela} ALTER COLUMN id SET DEFAULT nextval('pg_temp.teste_${tabela}_id')`);
     }
-    await qr.query(`INSERT INTO support_chat_status (id, name, is_final) VALUES (1,'Aguardando',false),(2,'Em atendimento',false),(3,'Em chatbot',false),(5,'Finalizado',true);
+    await qr.query(`INSERT INTO support_chat_status (id, name, is_final) VALUES (1,'Aguardando',false),(2,'Em atendimento',false),(3,'Em chatbot',false),(5,'Finalizado',true),(7,'Finalizado pelo chatbot',true);
       INSERT INTO channels (id, name, channel_status_id, session_id, chatbot_habilitado) VALUES (4,'Canal fictício',3,'teste-sem-provider',true);
       INSERT INTO contacts (id,name,avatar_url,remote_jid,has_no_client) VALUES (3,'Contato fictício','','teste@invalid',true);
       INSERT INTO support_chats (id,channel_id,contact_id,user_id,protocol,support_chat_status_id,answered_at)
@@ -48,11 +51,18 @@ async function testar() {
       INSERT INTO chatbots (id,name,type,active,current_published_version_id) VALUES (8,'Saída fictícia','saida',true,9);
       INSERT INTO channel_x_chatbot (channel_id,chatbot_id) VALUES (4,8);
       INSERT INTO attendance_settings (chave,valor) VALUES ('chatbot_habilitado','true');`);
+    await qr.query(`INSERT INTO departments (id,name) VALUES (10,'Setor fictício A'),(11,'Setor fictício B'),(12,'Sem vínculo');
+      INSERT INTO channel_x_department (channel_id,department_id) VALUES (4,10),(4,11);
+      INSERT INTO users (id,name,email,password,avatar_url,lastlogin_at,schedule_color,status) VALUES
+        (7,'Equipe múltipla','multi@invalid','sem-login','',NOW(),'#112233',1),
+        (8,'Equipe única','unico@invalid','sem-login','',NOW(),'#223344',1),
+        (9,'Inativo','inativo@invalid','sem-login','',NOW(),'#334455',0);
+      INSERT INTO user_x_department (user_id,department_id) VALUES (7,10),(7,11),(8,10),(9,10);`);
     const no = (id, type, data = {}) => ({ id, type, data, position: { x: 0, y: 0 } });
     const aresta = (source, target, sourceHandle = null) => ({ id: `${source}-${target}-${sourceHandle}`, source, target, sourceHandle, targetHandle: null });
     const grafo = { nodes: [no('inicio','start'), no('mensagem','message', { value:'Aguardando resposta', continueOn:'after_reply',
       replyTimeoutEnabled:true, replyTimeoutMinutes:1 }), no('fim','finish')],
-      edges: [aresta('inicio','mensagem'), aresta('mensagem','fim'), aresta('mensagem','fim','sem-resposta')] };
+      edges: [aresta('inicio','mensagem'), aresta('mensagem','fim','saida-direita'), aresta('mensagem','fim','sem-resposta')] };
     await qr.query(`INSERT INTO chatbot_flow_versions (id,chatbot_id,status,graph,version_number) VALUES (9,8,'published',$1,1)`, [grafo]);
     let numeroTransacao = 0;
     const banco = { manager: qr.manager, query: (...args) => qr.query(...args), createQueryRunner: () => {
@@ -70,7 +80,8 @@ async function testar() {
     const servico = Object.assign(Object.create(SupportChatsService.prototype), { dataSource:banco, supportChatsRepository:repo,
       attendanceSettingsService:ajustes, chatbotsRepository:fluxos, chatbotFlowExecutionsService:execucoes,
       permissionService:{hasPermission:async()=>true},
-      chatbotFlowExecutionsRepository:execucoesRepo, logger:{warn:()=>{}} });
+      supportChatEventsRepository:new SupportChatEventsRepository(banco),
+      chatbotFlowExecutionsRepository:execucoesRepo, logger:{warn:()=>{},log:()=>{}} });
     let despedidas = 0;
     servico.enviaMensagemAutomatica = async () => { despedidas++; };
     servico.recarregaEEmiteEstado = id => repo.findParaEstado(id,qr.manager);
@@ -78,7 +89,7 @@ async function testar() {
     const mensagens = [];
     const conversasPermitidas = new Set(['42']);
     const criarMotor = () => new ExecutionEngine(banco,execucoesRepo,new ChatbotFlowVersionsRepository(banco),
-      new NodeHandlersRegistry([new StartHandler(),new MessageHandler(),new MenuHandler(),new FinishHandler(),new CloseSupportChatHandler()]),
+      new NodeHandlersRegistry([new StartHandler(),new MessageHandler(),new MenuHandler(),new FinishHandler(),new CloseSupportChatHandler(),new HandoffHandler()]),
       {sendMessage:async (_sessao,_contato,texto)=>{mensagens.push(texto);return {messageId:`ficticia-${mensagens.length}`};}},
       servico,{saveOutgoing:async ({supportChat})=>assert.ok(conversasPermitidas.has(String(supportChat.id)))},{});
     const motor = criarMotor();
@@ -123,7 +134,7 @@ async function testar() {
       invalidOptionOutputHandle:'invalid',invalidAttemptLimitEnabled:true,maxInvalidAttempts:3}),
       no('limite','message',{value:'Limite de tentativas atingido'}),no('fim','finish')],
       edges:[aresta('inicio','menu'),aresta('menu','menu','invalid'),aresta('menu','fim','suporte'),
-        aresta('menu','limite','limite-tentativas'),aresta('limite','fim')] };
+        aresta('menu','limite','limite-tentativas'),aresta('limite','fim','saida-inferior')] };
     await qr.query("INSERT INTO chatbots (id,name,type,active,current_published_version_id) VALUES (18,'Menu fictício','entrada',true,10)");
     await qr.query("INSERT INTO chatbot_flow_versions (id,chatbot_id,status,graph,version_number) VALUES (10,18,'published',$1,1)",[grafoMenu]);
     await qr.query('UPDATE support_chats SET support_chat_status_id=3 WHERE id=$1',[novoId]);
@@ -182,6 +193,138 @@ async function testar() {
       assert.equal(mensagens.filter(texto=>texto===`Excesso ${acao}`).length,1);
     }
     console.log('PostgreSQL: reenviar/aguardar funcionam sem saída inválida conectada; terceira inválida segue Excesso e duplicatas não repetem ações.');
+
+    await qr.query('UPDATE support_chats SET support_chat_status_id=5,finished_at=NOW() WHERE id=$1',[anteriorId]);
+    const entradaComSaida = {nodes:[no('inicio','start'),no('mensagem','message',{value:'Entrada antes de encerrar',continueOn:'auto'}),
+      no('encerrar','close_support_chat',{enviarDespedida:true,executarFluxoSaida:true})],
+      edges:[aresta('inicio','mensagem'),aresta('mensagem','encerrar','saida-direita')]};
+    const saidaComEncerrar = {...grafo,nodes:grafo.nodes.map(n=>n.id==='fim'
+      ?no('fim','close_support_chat',{enviarDespedida:true,executarFluxoSaida:true}):n)};
+    await qr.query('UPDATE chatbot_flow_versions SET graph=$1 WHERE id=9',[saidaComEncerrar]);
+    await qr.query('UPDATE channels SET chatbot_saida_por_padrao=false WHERE id=4');
+    await qr.query("INSERT INTO chatbots (id,name,type,active,current_published_version_id) VALUES (30,'Entrada com saída','entrada',true,40)");
+    await qr.query("INSERT INTO chatbot_flow_versions (id,chatbot_id,status,graph,version_number) VALUES (40,30,'published',$1,1)",[entradaComSaida]);
+    const chatBot = await qr.manager.save(SupportChats,{channel_id:4,contact_id:3,user_id:null,
+      support_chat_status_id:3,protocol:'ENCERRAMENTO-DO-BOT'});
+    conversasPermitidas.add(String(chatBot.id));
+    const entradaBot = await execucoes.iniciar(3,chatBot.id,{id:30,current_published_version_id:40},qr.manager);
+    const despedidasAntes = despedidas;
+    const protocolosAntes = protocolosNovos;
+    await criarMotor().step(entradaBot.id,{kind:'start'});
+    let posBot = await repo.findParaEstado(chatBot.id,qr.manager);
+    assert.equal(posBot.support_chat_status_id,7); assert.equal(posBot.user_id,null);
+    assert.equal(posBot.pos_atendimento_ativo,true); assert.equal(despedidas,despedidasAntes+1);
+    assert.equal(posBot.observation_user,'Finalizado pelo chatbot');
+    const terminoBot = posBot.finished_at.toISOString();
+    const [saidaBot] = await qr.query("SELECT id FROM chatbot_flow_executions WHERE support_chat_id=$1 AND phase='saida'",[chatBot.id]);
+    await criarMotor().step(saidaBot.id,{kind:'start'});
+    const mesmoChat = await repo.findOrOpenComSinal(3,4,qr.manager);
+    assert.equal(String(mesmoChat.supportChat.id),String(chatBot.id));
+    assert.equal(mesmoChat.criada,false); assert.equal(protocolosNovos,protocolosAntes);
+    const respostaBot = await servico.decideAcaoDoChatbot(3,mesmoChat.supportChat,{id:4},false,'Obrigado',qr.manager,true);
+    await criarMotor().step(saidaBot.id,{kind:'resume',waitingToken:respostaBot.waitingToken,resumePayload:{text:'Obrigado'}});
+    posBot = await repo.findParaEstado(chatBot.id,qr.manager);
+    assert.equal(posBot.pos_atendimento_ativo,false); assert.equal(posBot.support_chat_status_id,7);
+    assert.equal(posBot.finished_at.toISOString(),terminoBot); assert.equal(posBot.user_id,null);
+    assert.equal(despedidas,despedidasAntes+1);
+    assert.equal((await qr.query("SELECT COUNT(*)::int total FROM chatbot_flow_executions WHERE support_chat_id=$1 AND phase='saida'",[chatBot.id]))[0].total,1);
+    assert.equal(await repo.buscaAberta(3,4,qr.manager),null);
+    console.log('PostgreSQL: Encerrar do bot inicia saída no mesmo protocolo, independente do padrão humano; resposta e fechamento preservam status e término; Encerrar na saída não repete despedida nem inicia outra saída.');
+
+    let idDestinoAnterior;
+    for (const [indice,dados] of [
+      {destination:'department',department_id:10},
+      {destination:'user',department_id:11,user_id:7},
+      {destination:'user',department_id:10,user_id:8},
+    ].entries()) {
+      if (idDestinoAnterior) await qr.query('UPDATE support_chats SET support_chat_status_id=5,finished_at=NOW() WHERE id=$1',[idDestinoAnterior]);
+      const conversa = await qr.manager.save(SupportChats,{channel_id:4,contact_id:3,user_id:null,department_id:10,
+        support_chat_status_id:3,protocol:`ENCAMINHAMENTO-${indice}`});
+      idDestinoAnterior=conversa.id; conversasPermitidas.add(String(conversa.id));
+      const botId=60+indice,versaoId=70+indice;
+      const entrega={nodes:[no('inicio','start'),no('aviso','message',{value:`Encaminhando ${indice}`}),no('humano','handoff',dados)],
+        edges:[aresta('inicio','aviso'),aresta('aviso','humano','saida-direita')]};
+      await qr.query("INSERT INTO chatbots (id,name,type,active,current_published_version_id) VALUES ($1,$3,'entrada',true,$2)",[botId,versaoId,`Encaminhamento fictício ${indice}`]);
+      await qr.query("INSERT INTO chatbot_flow_versions (id,chatbot_id,status,graph,version_number) VALUES ($1,$2,'published',$3,1)",[versaoId,botId,entrega]);
+      const exec=await execucoes.iniciar(3,conversa.id,{id:botId,current_published_version_id:versaoId},qr.manager);
+      await criarMotor().step(exec.id,{kind:'start'});
+      const apos=await repo.findParaEstado(conversa.id,qr.manager);
+      assert.equal(apos.protocol,`ENCAMINHAMENTO-${indice}`); assert.equal(apos.department_id,dados.department_id);
+      assert.equal(apos.user_id,dados.user_id??null); assert.equal(apos.support_chat_status_id,dados.user_id?2:1);
+      assert.equal(apos.finished_at,null); assert.equal(apos.pos_atendimento_ativo,false);
+      assert.equal(Boolean(apos.answered_at),Boolean(dados.user_id));
+      const [evento]=await qr.query('SELECT tipo,user_origem_id,user_destino_id,department_destino_id FROM support_chat_events WHERE support_chat_id=$1',[conversa.id]);
+      assert.equal(evento.tipo,'encaminhamento'); assert.equal(evento.user_origem_id,null);
+      assert.equal(evento.user_destino_id,dados.user_id??null); assert.equal(evento.department_destino_id,dados.department_id);
+      assert.equal(mensagens.filter(texto=>texto===`Encaminhando ${indice}`).length,1);
+      const mesma=await repo.findOrOpenComSinal(3,4,qr.manager);
+      assert.equal(String(mesma.supportChat.id),String(conversa.id)); assert.equal(mesma.criada,false);
+      await criarMotor().step(exec.id,{kind:'start'});
+      assert.equal((await qr.query('SELECT COUNT(*)::int total FROM support_chat_events WHERE support_chat_id=$1',[conversa.id]))[0].total,1);
+    }
+    // Um humano que assumiu não pode perder o atendimento para um encaminhamento atrasado.
+    await servico.encaminharPorChatbot(idDestinoAnterior,{departmentId:11,userId:7});
+    assert.equal((await repo.findParaEstado(idDestinoAnterior,qr.manager)).user_id,8);
+    await qr.query('UPDATE support_chats SET support_chat_status_id=5,finished_at=NOW() WHERE id=$1',[idDestinoAnterior]);
+    for (const destino of [{departmentId:12,userId:null},{departmentId:11,userId:8},{departmentId:10,userId:9}]) {
+      const conversa=await qr.manager.save(SupportChats,{channel_id:4,contact_id:3,user_id:null,department_id:10,
+        support_chat_status_id:3,protocol:`INVALIDO-${destino.departmentId}-${destino.userId}`});
+      await assert.rejects(servico.encaminharPorChatbot(conversa.id,destino));
+      const apos=await repo.findParaEstado(conversa.id,qr.manager);
+      assert.equal(apos.support_chat_status_id,3);assert.equal(apos.user_id,null);assert.equal(apos.department_id,10);
+      assert.equal((await qr.query('SELECT COUNT(*)::int total FROM support_chat_events WHERE support_chat_id=$1',[conversa.id]))[0].total,0);
+    }
+    console.log('PostgreSQL: encaminhamento para fila e atendentes de um/vários setores preserva o protocolo, grava histórico uma vez e valida setor do canal, vínculo e status; não sobrescreve atribuição humana.');
+
+    // Publicação usa os serviços reais e versões imutáveis, sem alterar fluxos reais.
+    await qr.query('UPDATE support_chats SET support_chat_status_id=5,finished_at=NOW() WHERE support_chat_status_id IN (1,2,3)');
+    const grafoVersao = nome => ({nodes:[no('inicio','start'),no('pergunta','message',{
+      value:`Versão ${nome}`,continueOn:'after_reply',replyTimeoutEnabled:true,replyTimeoutMinutes:1}),
+      no('resposta','message',{value:`Fim ${nome}`}),no('fim','finish')],
+      edges:[aresta('inicio','pergunta'),aresta('pergunta','resposta','saida-direita'),
+        aresta('pergunta','fim','sem-resposta'),aresta('resposta','fim','saida-inferior')]});
+    const anterior=grafoVersao('anterior'),novaVersao=grafoVersao('nova');
+    await qr.query("INSERT INTO chatbots (id,name,type,active,current_published_version_id) VALUES (80,'Publicação fictícia','entrada',true,101)");
+    await qr.query("INSERT INTO chatbot_flow_versions (id,chatbot_id,status,graph,version_number) VALUES (100,80,'draft',$1,0),(101,80,'published',$1,1)",[anterior]);
+    await qr.query('INSERT INTO channel_x_chatbot (channel_id,chatbot_id) VALUES (4,80)');
+    const publicar = new ChatbotsService(fluxos,new ChatbotFlowVersionsRepository(banco),{},banco);
+    const abrirExecucao = async protocolo => {
+      const chat=await qr.manager.save(SupportChats,{channel_id:4,contact_id:3,user_id:null,support_chat_status_id:3,protocol:protocolo});
+      conversasPermitidas.add(String(chat.id));
+      const exec=await execucoes.iniciar(3,chat.id,await fluxos.findEntradaAtivoDoCanal(4,qr.manager),qr.manager);
+      await criarMotor().step(exec.id,{kind:'start'});
+      return exec;
+    };
+    const execAntiga=await abrirExecucao('VERSAO-ANTERIOR');
+    const salvo=await publicar.saveFlow(80,novaVersao);
+    assert.equal(salvo.has_unpublished_changes,true);
+    const antesPublicar=await publicar.findOne(80);
+    assert.equal(String(antesPublicar.current_published_version_id),'101');assert.equal(antesPublicar.has_unpublished_changes,true);
+    assert.equal((await publicar.findDraft(80)).has_unpublished_changes,true);
+    assert.equal((await publicar.findAll()).find(bot=>bot.id===80).has_unpublished_changes,true);
+    assert.deepEqual((await qr.query('SELECT graph FROM chatbot_flow_versions WHERE id=101'))[0].graph,anterior);
+    const pub=await publicar.publish(80);
+    assert.notEqual(String(pub.current_published_version_id),'101');assert.equal(pub.has_unpublished_changes,false);
+    const versaoNovaId=pub.current_published_version_id;
+    const [antigaPendente]=await qr.query('SELECT flow_version_id,waiting_for FROM chatbot_flow_executions WHERE id=$1',[execAntiga.id]);
+    assert.equal(String(antigaPendente.flow_version_id),'101');
+    await criarMotor().step(execAntiga.id,{kind:'resume',waitingToken:antigaPendente.waiting_for.token,resumePayload:{text:'Continuar'}});
+    assert.equal(mensagens.at(-1),'Fim anterior');
+    await publicar.publish(80);
+    assert.equal((await qr.query('SELECT COUNT(*)::int total FROM chatbot_flow_versions WHERE chatbot_id=80'))[0].total,3);
+    const execNova=await abrirExecucao('VERSAO-NOVA');
+    assert.equal(mensagens.at(-1),'Versão nova');
+    assert.equal(String((await qr.query('SELECT flow_version_id FROM chatbot_flow_executions WHERE id=$1',[execNova.id]))[0].flow_version_id),String(versaoNovaId));
+    const retirada=await publicar.unpublish(80);
+    assert.equal(retirada.current_published_version_id,null);
+    assert.deepEqual((await publicar.findDraft(80)).graph,novaVersao);
+    const [novaPendente]=await qr.query('SELECT waiting_for,status FROM chatbot_flow_executions WHERE id=$1',[execNova.id]);
+    assert.equal(novaPendente.status,'suspended');
+    await criarMotor().step(execNova.id,{kind:'resume',waitingToken:novaPendente.waiting_for.token,resumePayload:{text:'Continuar'}});
+    assert.equal(mensagens.at(-1),'Fim nova');
+    await assert.rejects(execucoes.iniciar(3,execNova.support_chat_id,await fluxos.findEntradaAtivoDoCanal(4,qr.manager),qr.manager),/versão publicada/);
+    assert.deepEqual((await qr.query('SELECT graph FROM chatbot_flow_versions WHERE id=101'))[0].graph,anterior);
+    console.log('PostgreSQL: salvar rascunho mantém a publicação; publicar alterações preserva execução antiga e novas usam a versão nova; publicação idêntica não duplica versão; despublicar preserva rascunho e conversas em andamento.');
   } finally {
     await qr.rollbackTransaction(); await qr.release(); await conexao.destroy();
   }

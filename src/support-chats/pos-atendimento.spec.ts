@@ -34,7 +34,8 @@ describe('Pós-atendimento no mesmo protocolo', () => {
       contact: { client_id: 5 }, channel: { id: 4, mensagem_despedida: 'Obrigado!', chatbot_saida_por_padrao: true } };
     const manager = { query: jest.fn().mockResolvedValue([{ support_chat_status_id: 2, user_id: 7, paused_at: null }]),
       findOneBy: jest.fn().mockResolvedValue({ graph: { nodes: [{ id: 'fim', type: 'finish', data: {} }], edges: [] } }), update: jest.fn() };
-    const repo = { findParaEstado: jest.fn().mockResolvedValue(chat), finalizar: jest.fn().mockResolvedValue(1) };
+    const repo = { findParaEstado: jest.fn().mockResolvedValue(chat), finalizar: jest.fn().mockResolvedValue(1),
+      finalizarPorChatbot: jest.fn().mockResolvedValue(1) };
     const ajustes = { chatbotHabilitado: jest.fn().mockResolvedValue(true) };
     const permissoes = { hasPermission: jest.fn().mockResolvedValue(true) };
     const fluxos = { findSaidaAtivoDoCanal: jest.fn().mockResolvedValue({ id: 8, current_published_version_id: 9, name: 'Pós-atendimento' }) };
@@ -46,7 +47,7 @@ describe('Pós-atendimento no mesmo protocolo', () => {
       supportChatsRepository: repo, attendanceSettingsService: ajustes, chatbotsRepository: fluxos,
       permissionService: permissoes,
       chatbotFlowExecutionsService: execucoes, chatbotFlowExecutionsRepository: suspensas,
-      channelsService: { copiaAnexoDespedidaParaEnvio: jest.fn() }, logger: { warn: jest.fn() },
+      channelsService: { copiaAnexoDespedidaParaEnvio: jest.fn() }, logger: { warn: jest.fn(), log: jest.fn() },
     }) as SupportChatsService;
     const despedida = jest.spyOn(servico as never, 'enviaMensagemAutomatica' as never).mockResolvedValue(undefined as never);
     const emitir = jest.spyOn(servico as never, 'recarregaEEmiteEstado' as never).mockResolvedValue({ ...chat, support_chat_status_id: 5, pos_atendimento_ativo: true } as never);
@@ -151,5 +152,54 @@ describe('Pós-atendimento no mesmo protocolo', () => {
     const consulta = (servico as unknown as { dataSource: { query: jest.Mock } }).dataSource.query.mock.calls[0][0];
     expect(consulta).toContain('pos_atendimento_ativo = false');
     expect(consulta).not.toMatch(/SET finished_at|user_id\s*=|observation_user\s*=|INSERT/i);
+  });
+
+  function prepararBot() {
+    const estado = preparar();
+    estado.chat.support_chat_status_id = 3;
+    estado.chat.user_id = null;
+    estado.chat.channel.chatbot_saida_por_padrao = false;
+    estado.manager.query.mockResolvedValue([{ support_chat_status_id: 3, user_id: null }]);
+    return estado;
+  }
+
+  it.each([false, true])('o autor do fluxo escolhe a saída e a despedida (%s), independente da preferência humana', async enviarDespedida => {
+    const { servico, repo, manager, execucoes, despedida, permissoes } = prepararBot();
+    permissoes.hasPermission.mockResolvedValue(false);
+    await servico.encerrarPorChatbot(42, enviarDespedida, true);
+    expect(repo.finalizarPorChatbot).toHaveBeenCalledWith(42, expect.any(Date), 'Finalizado pelo chatbot', manager);
+    expect(manager.update).toHaveBeenCalledWith(expect.anything(), 42, { pos_atendimento_ativo: true });
+    expect(execucoes.iniciar).toHaveBeenCalledWith(3, 42, expect.objectContaining({ id: 8 }), manager, 'saida');
+    expect(permissoes.hasPermission).not.toHaveBeenCalled();
+    expect(despedida).toHaveBeenCalledTimes(enviarDespedida ? 1 : 0);
+    expect(execucoes.enfileirar).toHaveBeenCalledWith(10, { kind: 'start' });
+  });
+
+  it.each(['opcao_desligada', 'sem_saida', 'rascunho', 'modulo_desligado'])('o bot apenas encerra quando %s', async caso => {
+    const { servico, fluxos, ajustes, repo, manager, execucoes } = prepararBot();
+    if (caso === 'sem_saida') fluxos.findSaidaAtivoDoCanal.mockResolvedValue(null);
+    if (caso === 'rascunho') fluxos.findSaidaAtivoDoCanal.mockResolvedValue({ id: 8, current_published_version_id: null });
+    if (caso === 'modulo_desligado') ajustes.chatbotHabilitado.mockResolvedValue(false);
+    await servico.encerrarPorChatbot(42, false, caso !== 'opcao_desligada');
+    expect(repo.finalizarPorChatbot).toHaveBeenCalledTimes(1);
+    expect(manager.update).not.toHaveBeenCalled();
+    expect(execucoes.iniciar).not.toHaveBeenCalled();
+  });
+
+  it('não inicia saída nem envia despedida se alguém assumir durante a finalização do bot', async () => {
+    const { servico, manager, repo, execucoes, despedida } = prepararBot();
+    manager.query.mockResolvedValue([{ support_chat_status_id: 2, user_id: 7 }]);
+    await servico.encerrarPorChatbot(42, true, true);
+    expect(repo.finalizarPorChatbot).not.toHaveBeenCalled();
+    expect(execucoes.iniciar).not.toHaveBeenCalled(); expect(despedida).not.toHaveBeenCalled();
+  });
+
+  it('mantém a saída do bot recuperável se o envio da despedida ou o Redis falharem', async () => {
+    const { servico, execucoes, despedida, manager } = prepararBot();
+    despedida.mockRejectedValue(new Error('Provider indisponível') as never);
+    execucoes.enfileirar.mockRejectedValue(new Error('Redis indisponível'));
+    await expect(servico.encerrarPorChatbot(42, true, true)).resolves.toBeUndefined();
+    expect(manager.update).toHaveBeenCalledWith(expect.anything(), 42, { pos_atendimento_ativo: true });
+    expect(execucoes.enfileirar).toHaveBeenCalledTimes(1);
   });
 });
