@@ -12,6 +12,7 @@ describe('Habilitação do módulo Chatbot', () => {
     const manager = { query: jest.fn(async (sql: string) => {
       consultas.push(sql);
       if (sql.startsWith('SELECT')) return [{ valor: String(habilitado) }];
+      if (sql.includes('pos_atendimento_ativo')) return [[{ id: 11 }], 1];
       if (sql.includes('UPDATE support_chats')) return [[{ id: 10 }], 1];
       return [[], 0];
     }) };
@@ -38,9 +39,10 @@ describe('Habilitação do módulo Chatbot', () => {
     expect(repositorio.grava).toHaveBeenCalledWith('chatbot_habilitado', 'false', 1, expect.anything());
     expect(consultas[0]).toContain('UPDATE support_chats');
     expect(consultas[0]).toContain('support_chat_status_id = 3 AND user_id IS NULL');
-    expect(consultas[1]).toContain("status = 'aborted'");
+    expect(consultas[1]).toContain('pos_atendimento_ativo = false');
+    expect(consultas[2]).toContain("status = 'aborted'");
     expect(consultas.join(' ')).not.toMatch(/DELETE|UPDATE chatbots /);
-    expect(eventos.emitAsync).toHaveBeenCalledWith('atendimento.ajustes-atualizados', { encaminhados: [10] });
+    expect(eventos.emitAsync).toHaveBeenCalledWith('atendimento.ajustes-atualizados', { encaminhados: [10, 11] });
   });
 
   it('habilitar não retoma execuções antigas nem altera publicação', async () => {

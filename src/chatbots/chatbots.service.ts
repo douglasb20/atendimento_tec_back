@@ -15,6 +15,8 @@ import { UpdateChatbotDto } from './dto/update-chatbot.dto';
 import { ChatbotFlowVersions } from './entities/chatbot-flow-versions.entity';
 import { Chatbots } from './entities/chatbots.entity';
 import { validarTemposDeResposta } from './tempo-resposta';
+import { validarFluxoSaida } from './validar-fluxo-saida';
+import { validarTentativasMenu } from './tentativas-menu';
 
 /**
  * Onde os anexos do nó Mensagem vivem - permanentes, presos ao cadastro do
@@ -55,13 +57,8 @@ export class ChatbotsService {
       throw new ConflictException(`Já existe um chatbot chamado "${name}"`);
     }
 
-    const channelIds = dto.type === 'complementar' ? [] : (dto.channel_ids ?? []);
-    await this.assertSemConflitoNosCanais(channelIds, dto.type);
-
     return runInTransaction(this.dataSource, async (manager) => {
       const salvo = await manager.save(Chatbots, { name, type: dto.type });
-
-      await this.chatbotsRepository.substituiCanais(salvo.id, channelIds, manager);
 
       // O rascunho nasce junto, com só o nó Início - a tela de edição sempre
       // encontra algo para carregar, sem precisar de um caso especial de
@@ -88,11 +85,9 @@ export class ChatbotsService {
     }
 
     const type = dto.type ?? chatbot.type;
+    if (type !== chatbot.type) throw new BadRequestException('O tipo de um chatbot já criado não pode ser alterado');
     const active = dto.active ?? chatbot.active;
-    const channelIds =
-      type === 'complementar'
-        ? []
-        : (dto.channel_ids ?? (await this.chatbotsRepository.findCanaisDoChatbot(id)));
+    const channelIds = await this.chatbotsRepository.findCanaisDoChatbot(id);
 
     if (active) {
       await this.assertSemConflitoNosCanais(channelIds, type, id);
@@ -106,10 +101,6 @@ export class ChatbotsService {
         ...(dto.active !== undefined && { active: dto.active }),
         ...(dto.settings !== undefined && { settings: dto.settings }),
       });
-
-      if (dto.channel_ids !== undefined || dto.type === 'complementar') {
-        await this.chatbotsRepository.substituiCanais(id, channelIds, manager);
-      }
 
       this.logger.log(`Chatbot atualizado: id ${id}`);
 
@@ -227,6 +218,8 @@ export class ChatbotsService {
       }
 
       validarTemposDeResposta(draft.graph);
+      validarTentativasMenu(draft.graph);
+      if (chatbot.type === 'saida') validarFluxoSaida(draft.graph);
 
       for (const no of draft.graph.nodes.filter((no) => ['set_department', 'business_hours'].includes(no.type))) {
         const setorId = Number(no.data.department_id);

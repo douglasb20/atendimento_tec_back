@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm';
 import { partesDataAtendimento } from '@/core/data-atendimento';
 import { HolidaysRepository } from '@/holidays/holidays.repository';
 import { DepartmentsRepository } from './departments.repository';
-import { DepartmentScheduleExceptions } from './entities/department-schedule-exceptions.entity';
+import { IntervaloExcecao, ModoExcecao } from './entities/department-schedule-exceptions.entity';
 import { avaliarDisponibilidadeSetor } from './disponibilidade-setor';
 
 @Injectable()
@@ -18,10 +18,16 @@ export class DisponibilidadeSetorService {
     const setor = await this.setores.findById(setorId);
     if (!setor.schedule_enabled) return { disponivel: true, mensagemAusencia: setor.absence_message };
     const data = partesDataAtendimento(agora);
-    const [excecao, semana] = await Promise.all([
-      this.banco.getRepository(DepartmentScheduleExceptions).findOneBy({ department_id: setorId, date: data.data }),
+    const [excecoes, semana] = await Promise.all([
+      this.banco.query(`SELECT mode, intervals FROM department_schedule_exceptions
+        WHERE department_id = $1 AND (
+          (recurring = false AND date = $2::date) OR
+          (recurring = true AND EXTRACT(MONTH FROM date) = $3 AND EXTRACT(DAY FROM date) = $4)
+        ) ORDER BY recurring ASC LIMIT 1`, [setorId, data.data, data.mes, data.dia]),
       this.setores.findSchedule(setorId),
     ]);
+    // false vem antes de true: a decisão específica daquele ano supera a anual.
+    const excecao = excecoes[0] as { mode: ModoExcecao; intervals: IntervaloExcecao[] } | undefined;
     const feriado = !excecao && setor.respect_holidays
       ? await this.feriados.existeEm(data.mes, data.dia, data.ano) : false;
     return {

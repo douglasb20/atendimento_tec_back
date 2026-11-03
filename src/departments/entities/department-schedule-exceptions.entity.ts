@@ -6,7 +6,7 @@ export type ModoExcecao = 'fechado' | 'normal' | 'especial';
 export type IntervaloExcecao = { start_time: string; end_time: string };
 
 @Entity('department_schedule_exceptions')
-@Unique(['department_id', 'date'])
+@Unique('department_schedule_exceptions_department_date_recurrence_key', ['department_id', 'date', 'recurring'])
 export class DepartmentScheduleExceptions {
   @PrimaryGeneratedColumn()
   id: number;
@@ -18,9 +18,12 @@ export class DepartmentScheduleExceptions {
   @JoinColumn({ name: 'department_id' })
   department: Departments;
 
-  /** Data específica, sem conversão para UTC e sem recorrência implícita. */
+  /** Na regra anual, o ano 2000 é apenas uma referência para guardar dia/mês, inclusive 29/02. */
   @Column({ type: 'date' })
   date: string;
+
+  @Column({ type: 'boolean', default: false })
+  recurring: boolean;
 
   @Column({ type: 'varchar', length: 120 })
   description: string;

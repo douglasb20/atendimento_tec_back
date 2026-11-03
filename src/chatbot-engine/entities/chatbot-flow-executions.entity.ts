@@ -90,6 +90,9 @@ export class ChatbotFlowExecutions {
   @Column({ type: 'varchar', length: 12 })
   status: ChatbotFlowExecutionStatus;
 
+  @Column({ type: 'varchar', length: 12, default: 'entrada' })
+  phase: 'entrada' | 'saida';
+
   @Column({ type: 'jsonb', default: [] })
   call_stack: CallStackFrame[];
 

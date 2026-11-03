@@ -54,7 +54,7 @@ export class ExecutionEngine {
    * Processa uma execução até ela suspender, terminar ou falhar. Chamado pelo
    * processor da fila - uma vez por job.
    */
-  async step(executionId: number, trigger: ExecutionTrigger): Promise<void> {
+  async step(executionId: number, trigger: ExecutionTrigger, recuperandoJob = false): Promise<void> {
     let effects: NodeEffect[] = [];
     let execucaoFinal: ChatbotFlowExecutions;
     let encerrarAtendimento = false;
@@ -63,12 +63,19 @@ export class ExecutionEngine {
     await runInTransaction(this.dataSource, async (manager) => {
       let execucao = await this.executionsRepository.findById(executionId, manager);
 
+      // Retry após queda entre o último envio e a liberação do protocolo:
+      // não repete mensagens nem o encerramento humano, apenas conclui a reserva.
+      if (recuperandoJob && execucao?.phase === 'saida' && ['completed', 'failed', 'aborted'].includes(execucao.status)) {
+        execucaoFinal = execucao;
+        return;
+      }
+
       if (!execucao || execucao.status !== 'running' && execucao.status !== 'suspended') {
         this.logger.warn(`Execução ${executionId} não está pendente - ignorando job`);
         return;
       }
 
-      if (!await this.supportChatsService.bloquearParaExecucaoBot(execucao.support_chat_id, manager)) {
+      if (!await this.supportChatsService.bloquearParaExecucaoBot(execucao.support_chat_id, manager, execucao.phase ?? 'entrada')) {
         await this.executionsRepository.abortarDoAtendimento(execucao.support_chat_id, manager);
         return;
       }
@@ -83,7 +90,14 @@ export class ExecutionEngine {
       if (trigger.kind === 'timeout' && (espera.reply || !espera.timeout_at
         || Date.parse(espera.timeout_at) > Date.now())) return;
 
-      const resultado = await this.runLoop(execucao, trigger, manager);
+      let resultado: Awaited<ReturnType<ExecutionEngine['runLoop']>>;
+      try {
+        resultado = await this.runLoop(execucao, trigger, manager);
+      } catch (erro) {
+        // Limites de transição e fluxos ausentes também precisam liberar o protocolo.
+        const falha = await this.persisteFalha(execucao, erro.message, manager);
+        resultado = { ...falha, encerrarAtendimento: false, enviarDespedida: false };
+      }
       effects = resultado.effects;
       execucaoFinal = resultado.execucao;
       encerrarAtendimento = resultado.encerrarAtendimento;
@@ -108,14 +122,15 @@ export class ExecutionEngine {
         await this.executionsRepository.renovarPrazoAposEnvio(execucaoFinal.id, espera.token, espera.timeout_minutes);
       }
 
-      if (encerrarAtendimento && execucaoFinal.support_chat_id) {
+      if (encerrarAtendimento && execucaoFinal.support_chat_id && execucaoFinal.phase !== 'saida') {
         await this.supportChatsService.encerrarPorChatbot(execucaoFinal.support_chat_id, enviarDespedida);
       }
     } finally {
       // Mantém o cliente no bot até o último envio. O UPDATE condicional não
       // desfaz uma atribuição humana nem reabre o nó Encerrar atendimento.
-      if (execucaoFinal.status === 'completed' || execucaoFinal.status === 'failed') {
-        await this.supportChatsService.devolverBotParaEspera(execucaoFinal.support_chat_id);
+      if (['completed', 'failed', 'aborted'].includes(execucaoFinal.status)) {
+        if (execucaoFinal.phase === 'saida') await this.supportChatsService.concluirPosAtendimento(execucaoFinal.support_chat_id);
+        else await this.supportChatsService.devolverBotParaEspera(execucaoFinal.support_chat_id);
       }
     }
   }
@@ -170,7 +185,7 @@ export class ExecutionEngine {
       let resultado: NodeResult;
 
       try {
-        resultado = await handler.execute({ node, variables, budget, resumePayload });
+        resultado = await handler.execute({ node, variables, budget, resumePayload, flowVersionId: currentFlowVersionId });
       } catch (err) {
         const falha = await this.persisteFalha(execucao, err.message, manager);
         return { ...falha, encerrarAtendimento: false, enviarDespedida: false };
@@ -433,7 +448,10 @@ export class ExecutionEngine {
       // A chamada ao provider ocorre fora da transação; alguém pode assumir
       // a conversa entre dois envios acumulados pelo mesmo passo do fluxo.
       const atual = await this.supportChatsService.findParaEnvioBot(execucao.support_chat_id);
-      if (atual?.support_chat_status_id !== SupportChatStatusId.EM_FILA || atual.user_id) return;
+      const permitido = execucao.phase === 'saida'
+        ? atual?.support_chat_status_id === SupportChatStatusId.FINALIZADO && atual.pos_atendimento_ativo
+        : atual?.support_chat_status_id === SupportChatStatusId.EM_FILA && !atual.user_id;
+      if (!permitido || atual.channel?.chatbot_habilitado === false) return;
       if (effect.type === 'send_text') {
         const enviadoEm = new Date();
         const enviada = await this.whatsappService.sendMessage(

@@ -30,15 +30,14 @@ Authorization: Bearer {{authToken}}
 
 ###
 
-#### 4) Criar chatbot de entrada (troque channel_id por um canal existente)
+#### 4) Criar chatbot de entrada (o vínculo é escolhido na edição do canal)
 POST {{url}}{{endpoint}}
 Content-Type: application/json
 Authorization: Bearer {{authToken}}
 
 {
   "name": "Atendimento inicial",
-  "type": "entrada",
-  "channel_id": 1
+  "type": "entrada"
 }
 
 ###
@@ -55,15 +54,14 @@ Authorization: Bearer {{authToken}}
 
 ###
 
-#### 6) Tentar criar 2º chatbot de entrada no mesmo canal -> deve recusar
+#### 6) Criar outro fluxo de entrada, ainda sem vínculo com canal
 POST {{url}}{{endpoint}}
 Content-Type: application/json
 Authorization: Bearer {{authToken}}
 
 {
   "name": "Outro fluxo de entrada",
-  "type": "entrada",
-  "channel_id": 1
+  "type": "entrada"
 }
 
 ###

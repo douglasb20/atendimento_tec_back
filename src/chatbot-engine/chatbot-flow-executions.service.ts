@@ -35,6 +35,7 @@ export class ChatbotFlowExecutionsService {
     supportChatId: number,
     chatbot: Chatbots,
     manager: EntityManager,
+    phase: 'entrada' | 'saida' = 'entrada',
   ): Promise<ChatbotFlowExecutions> {
     if (!chatbot.current_published_version_id) {
       throw new Error(`Chatbot ${chatbot.id} não tem versão publicada`);
@@ -47,6 +48,7 @@ export class ChatbotFlowExecutionsService {
       flow_version_id: chatbot.current_published_version_id,
       current_flow_version_id: chatbot.current_published_version_id,
       status: 'running',
+      phase,
     });
 
     this.logger.log(`Execução ${execucao.id} criada para o chatbot ${chatbot.id}`);
@@ -56,14 +58,12 @@ export class ChatbotFlowExecutionsService {
 
   /** Enfileira o job do motor - chamado só depois do commit. */
   async enfileirar(executionId: number, trigger: ChatbotFlowExecutionJob['trigger']): Promise<void> {
-    // O BullMQ recusa `:` e não adiciona outro job com um id que já foi
-    // concluído. Uma mesma execução tem, no mínimo, um job de início e outro
-    // a cada resposta do contato; por isso cada disparo precisa de um id
-    // próprio. Duplicatas de webhook continuam seguras: o motor encontra a
-    // execução já concluída/suspensa em outro nó e ignora o job excedente.
+    // Identidade fixa para o início impede API e recuperação de iniciarem
+    // juntos. Retomadas usam um token por espera, sem reutilizar o job inicial.
     const token = trigger.kind !== 'start' ? trigger.waitingToken : undefined;
     await this.queue.add('process', { executionId, trigger }, {
-      jobId: token ? `${trigger.kind}-${executionId}-${token}` : `execution-${executionId}-${randomUUID()}`,
+      jobId: trigger.kind === 'start' ? `inicio-${executionId}`
+        : token ? `${trigger.kind}-${executionId}-${token}` : `execution-${executionId}-${randomUUID()}`,
       attempts: 3, backoff: { type: 'exponential', delay: 1000 }, removeOnComplete: true, removeOnFail: true,
     });
   }
@@ -71,6 +71,9 @@ export class ChatbotFlowExecutionsService {
   @Cron('*/10 * * * * *', { waitForCompletion: true })
   async recuperarRetomadasPendentes(): Promise<void> {
     try {
+      for (const execucao of await this.executionsRepository.buscarIniciosPendentes()) {
+        await this.enfileirar(execucao.id, { kind: 'start' });
+      }
       for (const execucao of await this.executionsRepository.buscarRetomadasPendentes()) {
         const espera = execucao.waiting_for;
         if (!espera?.token) continue;

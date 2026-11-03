@@ -40,7 +40,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       // Quem assumiu a conversa, para a lista poder separar "meus atendimentos".
       .leftJoinAndSelect('sc.user', 'u')
       .innerJoin('support_chat_status', 'scs', 'scs.id = sc.support_chat_status_id')
-      .andWhere('scs.is_final = false');
+      .andWhere('(scs.is_final = false OR sc.pos_atendimento_ativo = true)');
 
     await this.acesso.filtrar(query, usuarioId);
 
@@ -194,7 +194,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
     department_id?: number | null,
     started_by_agent = false,
   ): Promise<{ supportChat: SupportChats; criada: boolean }> {
-    const existente = await this.buscaAberta(contact_id, channel_id);
+    const existente = await this.buscaAberta(contact_id, channel_id, manager);
     if (existente) return { supportChat: existente, criada: false };
 
     return {
@@ -223,16 +223,17 @@ export class SupportChatsRepository extends Repository<SupportChats> {
   }
 
   /** A conversa ainda não finalizada deste contato neste canal, se houver. */
-  async buscaAberta(contact_id: number, channel_id: number): Promise<SupportChats | null> {
-    return this.createQueryBuilder('sc')
+  async buscaAberta(contact_id: number, channel_id: number, manager?: EntityManager): Promise<SupportChats | null> {
+    const query = (manager ? manager.getRepository(SupportChats) : this).createQueryBuilder('sc')
       .innerJoin('support_chat_status', 'scs', 'scs.id = sc.support_chat_status_id')
       .leftJoinAndSelect('sc.contact', 'c')
       .leftJoinAndSelect('sc.channel', 'ch')
       .leftJoinAndSelect('sc.supportChatStatus', 'ms')
       .where('sc.contact_id = :contact_id', { contact_id })
       .andWhere('sc.channel_id = :channel_id', { channel_id })
-      .andWhere('scs.is_final = false')
-      .getOne();
+      .andWhere('(scs.is_final = false OR sc.pos_atendimento_ativo = true)');
+    if (manager) query.setLock('pessimistic_write', undefined, ['sc']);
+    return query.getOne();
   }
 
   private async abre(

@@ -6,6 +6,12 @@ import { ChatbotFlowExecutions } from './entities/chatbot-flow-executions.entity
 
 @Injectable()
 export class ChatbotFlowExecutionsRepository extends Repository<ChatbotFlowExecutions> {
+  /** Recupera um início cujo enfileiramento após o commit falhou. */
+  async buscarIniciosPendentes(): Promise<Pick<ChatbotFlowExecutions, 'id'>[]> {
+    return this.dataSource.query(`SELECT id FROM chatbot_flow_executions WHERE phase = 'saida'
+      AND status = 'running' AND current_node_id IS NULL AND created_at < NOW() - INTERVAL '30 seconds'
+      ORDER BY created_at LIMIT 100`);
+  }
   constructor(protected dataSource: DataSource) {
     super(ChatbotFlowExecutions, dataSource.manager);
   }

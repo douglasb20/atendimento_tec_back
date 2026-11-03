@@ -105,6 +105,9 @@ export class AttendanceSettingsService {
         const [chats] = await manager.query(`UPDATE support_chats SET support_chat_status_id = 1
           WHERE support_chat_status_id = 3 AND user_id IS NULL RETURNING id`);
         encaminhados.push(...chats.map((chat: { id: number }) => chat.id));
+        const [posAtendimentos] = await manager.query(`UPDATE support_chats SET pos_atendimento_ativo = false
+          WHERE pos_atendimento_ativo = true RETURNING id`);
+        encaminhados.push(...posAtendimentos.map((chat: { id: number }) => chat.id));
         await manager.query(`UPDATE chatbot_flow_executions SET status = 'aborted', waiting_for = NULL,
           finished_at = NOW(), updated_at = NOW(), version = version + 1
           WHERE status IN ('running', 'suspended')`);

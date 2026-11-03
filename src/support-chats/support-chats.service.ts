@@ -54,6 +54,9 @@ import { AttendanceSettingsService } from '@/attendance-settings/attendance-sett
 import { ChannelsService } from '@/channels/channels.service';
 import { AcessoAtendimentoService } from '@/permissions/acesso-atendimento.service';
 import { DisponibilidadeSetorService } from '@/departments/disponibilidade-setor.service';
+import { validarFluxoSaida } from '@/chatbots/validar-fluxo-saida';
+import { ChatbotFlowVersions } from '@/chatbots/entities/chatbot-flow-versions.entity';
+import { PermissionService } from '@/permissions/permission.service';
 
 /**
  * Tipo de mídia do envio → tipo interno persistido, o mesmo que o webhook
@@ -94,6 +97,7 @@ export class SupportChatsService {
     private readonly channelsService: ChannelsService,
     private readonly acessoAtendimento: AcessoAtendimentoService,
     private readonly disponibilidadeSetor: DisponibilidadeSetorService,
+    private readonly permissionService: PermissionService,
   ) {}
 
   /**
@@ -537,12 +541,22 @@ export class SupportChatsService {
   }
 
   /** Mesmo lock da atribuição humana: o bot não avança após alguém assumir. */
-  async bloquearParaExecucaoBot(id: number, manager: EntityManager): Promise<boolean> {
+  async bloquearParaExecucaoBot(id: number, manager: EntityManager, phase: 'entrada' | 'saida' = 'entrada'): Promise<boolean> {
     if (!await this.attendanceSettingsService.chatbotHabilitado(manager)) return false;
-    const chat = await manager.findOne(SupportChats, {
-      where: { id }, lock: { mode: 'pessimistic_write' },
-    });
-    return chat?.support_chat_status_id === SupportChatStatusId.EM_FILA && !chat.user_id;
+    const chat = await manager.getRepository(SupportChats).createQueryBuilder('sc')
+      .leftJoinAndSelect('sc.channel', 'canal').where('sc.id = :id', { id })
+      .setLock('pessimistic_write', undefined, ['sc']).getOne();
+    if (chat?.channel?.chatbot_habilitado === false) return false;
+    return phase === 'saida'
+      ? chat?.support_chat_status_id === SupportChatStatusId.FINALIZADO && chat.pos_atendimento_ativo
+      : chat?.support_chat_status_id === SupportChatStatusId.EM_FILA && !chat.user_id;
+  }
+
+  /** Fecha apenas a automação, preservando dono, setor, relato e término humano. */
+  async concluirPosAtendimento(id: number): Promise<void> {
+    const [linhas] = await this.dataSource.query(`UPDATE support_chats SET pos_atendimento_ativo = false, unread_count = 0
+      WHERE id = $1 AND pos_atendimento_ativo = true AND support_chat_status_id = 5 RETURNING id`, [id]);
+    if (linhas.length) await this.recarregaEEmiteEstado(id);
   }
 
   @OnEvent('atendimento.ajustes-atualizados')
@@ -1124,7 +1138,7 @@ export class SupportChatsService {
     chatbotHabilitado: boolean,
   ): Promise<{ executionId: number; trigger: 'start' | 'resume'; resumeText?: string; waitingToken?: string } | null> {
     if (!chatbotHabilitado) return null;
-    if (!conversaCriada && supportChat.support_chat_status_id !== SupportChatStatusId.EM_FILA) return null;
+    if (!conversaCriada && supportChat.support_chat_status_id !== SupportChatStatusId.EM_FILA && !supportChat.pos_atendimento_ativo) return null;
     const execucaoSuspensa = await this.chatbotFlowExecutionsRepository.findSuspendedAwaitingReply(
       contactId,
       supportChat.id,
@@ -1813,6 +1827,15 @@ export class SupportChatsService {
       );
     }
 
+    const configuracaoSaida = await this.configuracaoSaidaParaFinalizacao(supportChat, user_id, podeEncerrarQualquer);
+    const executarSaida = dto.executar_fluxo_saida ?? configuracaoSaida?.executar_por_padrao ?? false;
+    if (configuracaoSaida && !configuracaoSaida.pode_alterar && executarSaida !== configuracaoSaida.executar_por_padrao) {
+      throw new ForbiddenException('Você não tem permissão para alterar a execução do fluxo de saída definida no canal');
+    }
+    if (executarSaida) {
+      return this.finalizarComFluxoSaida(supportChat, user_id, dto, podeEncerrarQualquer);
+    }
+
     // ⚠️ **Antes de finalizar, e isto não é preferência.** Enviada depois, a
     // despedida volta pelo webhook para uma conversa já `is_final`, e o
     // `findOrOpen` - que filtra por `is_final = false` - não a encontra e abre
@@ -1847,6 +1870,60 @@ export class SupportChatsService {
     }
 
     return this.recarregaEEmiteEstado(id);
+  }
+
+  async fluxoSaidaDisponivel(id: number, usuarioId: number, superusuario = false) {
+    const chat = await this.supportChatsRepository.findParaEstado(id);
+    return this.configuracaoSaidaParaFinalizacao(chat, usuarioId, superusuario);
+  }
+
+  private async configuracaoSaidaParaFinalizacao(chat: SupportChats | null, usuarioId: number, superusuario: boolean) {
+    if (!chat || chat.support_chat_status_id !== SupportChatStatusId.EM_ANDAMENTO
+      || !await this.attendanceSettingsService.chatbotHabilitado()) return null;
+    const fluxo = await this.chatbotsRepository.findSaidaAtivoDoCanal(chat.channel_id);
+    if (!fluxo?.current_published_version_id) return null;
+    return { id: fluxo.id, name: fluxo.name, executar_por_padrao: chat.channel?.chatbot_saida_por_padrao ?? true,
+      pode_alterar: superusuario || await this.permissionService.hasPermission(usuarioId, ['support.chat:change_exit_flow']) };
+  }
+
+  private async finalizarComFluxoSaida(
+    chat: SupportChats, usuarioId: number, dto: FinalizarAtendimentoDto, podeEncerrarQualquer: boolean,
+  ): Promise<SupportChats> {
+    const execucao = await runInTransaction(this.dataSource, async manager => {
+      if (!await this.attendanceSettingsService.chatbotHabilitado(manager)) {
+        throw new BadRequestException('O módulo Chatbot está desabilitado');
+      }
+      const [atual] = await manager.query(`SELECT support_chat_status_id, user_id, paused_at FROM support_chats WHERE id = $1 FOR UPDATE`, [chat.id]);
+      if (!atual || atual.support_chat_status_id !== SupportChatStatusId.EM_ANDAMENTO || atual.paused_at
+        || !podeEncerrarQualquer && Number(atual.user_id) !== Number(usuarioId)) {
+        throw new ConflictException('O atendimento mudou de estado durante a finalização');
+      }
+      const fluxo = await this.chatbotsRepository.findSaidaAtivoDoCanal(chat.channel_id, manager);
+      if (!fluxo?.current_published_version_id) throw new BadRequestException('Não há fluxo de saída ativo e publicado neste canal');
+      const versao = await manager.findOneBy(ChatbotFlowVersions, { id: fluxo.current_published_version_id });
+      if (!versao) throw new BadRequestException('A versão publicada do fluxo de saída não foi encontrada');
+      validarFluxoSaida(versao.graph);
+      const afetadas = await this.supportChatsRepository.finalizar(chat.id, new Date(), dto.observation_user?.trim() || null, manager);
+      if (!afetadas) throw new ConflictException('O atendimento mudou de estado durante a finalização');
+      await manager.update(SupportChats, chat.id, { pos_atendimento_ativo: true });
+      await this.chatbotFlowExecutionsRepository.abortarDoAtendimento(chat.id, manager);
+      return this.chatbotFlowExecutionsService.iniciar(chat.contact_id, chat.id, fluxo, manager, 'saida');
+    });
+
+    // O protocolo fica reservado desde o commit, inclusive durante a despedida.
+    // A automação não deve ficar presa se o provider ou a fila falharem aqui.
+    try {
+      if (!dto.sem_despedida) await this.enviaMensagemAutomatica(chat, chat.channel?.mensagem_despedida,
+        () => this.channelsService.copiaAnexoDespedidaParaEnvio(chat.channel_id));
+    } catch (erro) {
+      this.logger.warn(`Atendimento ${chat.id} finalizado, mas a despedida falhou: ${erro.message}`);
+    }
+    try {
+      await this.chatbotFlowExecutionsService.enfileirar(execucao.id, { kind: 'start' });
+    } catch (erro) {
+      this.logger.warn(`Fluxo de saída ${execucao.id} aguardando recuperação do enfileiramento: ${erro.message}`);
+    }
+    return this.recarregaEEmiteEstado(chat.id);
   }
 
   /**

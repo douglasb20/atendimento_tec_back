@@ -6,6 +6,9 @@ import { SupportChatStatusId } from '@/@types';
 import { Contacts } from '@/contacts/entities/contacts.entity';
 import { SupportChats } from '@/support-chats/entities/support-chats.entity';
 import { FUSO_EXIBICAO } from '@/core/fuso-exibicao';
+import { PeriodoMovimento } from './dto/movimento-por-semana.dto';
+
+export type PontoDiaSemana = { diaSemana: number; total: number };
 
 /** Os quatro números dos cards da home. */
 export type ResumoDashboard = {
@@ -40,6 +43,30 @@ export class DashboardService {
     @InjectRepository(SupportChats)
     private readonly supportChatsRepository: Repository<SupportChats>,
   ) {}
+
+  /** Quantidade de aberturas, como no gráfico por hora; domingo é 0.
+   * Semana começa no domingo. Seis meses inclui o atual e os cinco anteriores. */
+  async movimentoPorSemana(periodo: PeriodoMovimento = 'esta_semana'): Promise<PontoDiaSemana[]> {
+    return this.supportChatsRepository.query(`
+      WITH referencia AS (
+        SELECT NOW() AS agora, NOW() AT TIME ZONE $1 AS local
+      ), limites AS (
+        SELECT agora, (CASE $2
+          WHEN 'esta_semana' THEN date_trunc('day', local) - EXTRACT(DOW FROM local)::int * INTERVAL '1 day'
+          WHEN 'este_mes' THEN date_trunc('month', local)
+          WHEN 'ultimos_seis_meses' THEN date_trunc('month', local) - INTERVAL '5 months'
+        END) AT TIME ZONE $1 AS inicio FROM referencia
+      ), contagens AS (
+        SELECT EXTRACT(DOW FROM (sc.created_at AT TIME ZONE $1))::int AS dia, COUNT(*)::int AS total
+        FROM support_chats sc CROSS JOIN limites l
+        WHERE sc.created_at >= l.inicio AND sc.created_at <= l.agora
+        GROUP BY dia
+      )
+      SELECT d.dia::int AS "diaSemana", COALESCE(c.total, 0)::int AS total
+      FROM generate_series(0, 6) AS d(dia)
+      LEFT JOIN contagens c ON c.dia = d.dia ORDER BY d.dia
+    `, [FUSO_EXIBICAO, periodo]);
+  }
 
   /**
    * Os quatro números de uma vez.

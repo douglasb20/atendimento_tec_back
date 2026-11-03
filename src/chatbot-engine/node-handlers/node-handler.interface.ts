@@ -42,6 +42,8 @@ export type NodeExecutionContext = {
   node: ChatbotFlowNode;
   variables: VariableStore;
   budget: ExecutionBudget;
+  /** Evita compartilhar contagem entre nós com o mesmo id em grafos diferentes. */
+  flowVersionId?: number;
   /** Presente só quando a execução está retomando (resume) por este nó. */
   resumePayload?: Record<string, unknown>;
 };

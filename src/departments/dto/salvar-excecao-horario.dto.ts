@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, Min, ValidateNested } from 'class-validator';
 import type { ModoExcecao } from '../entities/department-schedule-exceptions.entity';
 
 export class IntervaloExcecaoDto {
@@ -14,6 +14,10 @@ export class SalvarExcecaoHorarioDto {
   @IsDateString({ strict: true }, { message: 'Informe uma data válida' })
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Use uma data completa no formato AAAA-MM-DD' })
   date: string;
+
+  @IsOptional()
+  @IsBoolean({ message: 'Informe se a exceção se repete todos os anos' })
+  recurring?: boolean = false;
 
   @IsString()
   @IsNotEmpty()

@@ -163,6 +163,23 @@ por outro mecanismo.
 
 ## Tempo limite de resposta no chatbot
 
+Os vínculos de entrada/saída são editados pelo canal, não pelo cadastro do
+chatbot. A tabela continua `channel_x_chatbot`; `channels.chatbot_habilitado`
+controla o uso naquele canal sem apagar vínculos. Desabilitar aborta pendências
+e devolve a fila do bot à espera. O cadastro do chatbot admite zero canais.
+O modal de finalização envia `executar_fluxo_saida`, independente de
+`sem_despedida`. Só a finalização humana normal inicia saída; descarte,
+inatividade e Encerrar atendimento do bot não a disparam. A saída usa status 5
+com `pos_atendimento_ativo = true` e execução `phase = 'saida'`. Preserve dono,
+setor, relato e `finished_at` da etapa humana. `buscaAberta` reaproveita esse
+protocolo enquanto a reserva está ativa; o fim da saída apenas libera a reserva,
+sem despedida nem reabertura. Nós que aguardam resposta exigem prazo conectado.
+`channels.chatbot_saida_por_padrao` define a escolha inicial (true por padrão).
+`support.chat:change_exit_flow` permite alterar essa escolha; sem ela, a API
+recusa inversões e aplica o padrão se o campo for omitido. Isso só vale com
+saída ativa/publicada disponível; não impede finalizar canais sem automação.
+O endpoint `/:id/fluxo-saida` retorna `executar_por_padrao` e `pode_alterar`.
+
 Mensagem (`continueOn: after_reply`) e Menu aceitam `replyTimeoutEnabled` e
 `replyTimeoutMinutes` (1–10080). Publicar exige ligar a saída `sem-resposta`.
 Cada suspensão ganha um token em `chatbot_flow_executions.waiting_for`; prazo e
@@ -171,6 +188,28 @@ resposta recebida ficam nesse JSONB, não em temporizadores em memória.
 retomadas deduplicadas por token. O motor relê a execução após bloquear o chat:
 resposta gravada tem prioridade sobre timeout; jobs de outro token são ignorados.
 Assumir/descartar/desabilitar já abortam as execuções e invalidam os prazos.
+
+## Tentativas inválidas do Menu
+
+`invalidAttemptLimitEnabled` (padrão false) e `maxInvalidAttempts` (1–10)
+controlam a saída `limite-tentativas` (rótulo Excesso de tentativas).
+`invalidOptionAction` escolhe `repeat_menu`, `wait_reply` ou `follow_output`.
+Ausente preserva `follow_output` nos grafos antigos; menus novos usam reenvio.
+Reenvio/espera suspendem no mesmo nó sem exigir ligação de retorno. O excesso
+prevalece sobre essas ações. `validarTentativasMenu`
+confere as ligações na publicação. A contagem fica em
+`variables._menu_tentativas_invalidas`, por versão + node id, e não deve ser
+zerada ao reenviar o menu. Escolha válida ou limite atingido limpa a contagem.
+`flowVersionId` é passado ao contexto do handler para evitar misturar subfluxos.
+
+## Exceções de horário do setor
+
+`department_schedule_exceptions.recurring = false` usa a data completa;
+`true` usa dia/mês e uma data canônica com ano 2000 (inclusive 29/02).
+Uma exceção pontual tem prioridade sobre a anual; ambas passam à frente dos
+feriados e da semana, desde que `schedule_enabled` esteja ligado.
+A exceção anual não deve copiar o horário para cada ano nem mover 29/02 para
+outro dia. O cadastro de feriados de ano específico não aceita vínculo anual.
 
 ## Providers
 

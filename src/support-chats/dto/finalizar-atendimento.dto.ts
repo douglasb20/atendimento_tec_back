@@ -1,6 +1,11 @@
 import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class FinalizarAtendimentoDto {
+  /** Independente da despedida. Ausente aplica o padrão do canal; alterar exige permissão própria. */
+  @IsOptional()
+  @IsBoolean()
+  executar_fluxo_saida?: boolean;
+
   /** Relato do atendente sobre o atendimento. Opcional por decisão de produto. */
   @IsOptional()
   @IsString()
