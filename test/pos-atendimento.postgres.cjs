@@ -8,6 +8,8 @@ const { DataSource } = require('typeorm');
 const { SupportChats } = require('../dist/support-chats/entities/support-chats.entity');
 const { SupportChatsRepository } = require('../dist/support-chats/support-chats.repository');
 const { SupportChatsService } = require('../dist/support-chats/support-chats.service');
+const { ContactsRepository } = require('../dist/contacts/contacts.repository');
+const { ContactsService } = require('../dist/contacts/contacts.service');
 const { SupportChatEventsRepository } = require('../dist/support-chats/support-chat-events.repository');
 const { ChatbotsRepository } = require('../dist/chatbots/chatbots.repository');
 const { ChatbotsService } = require('../dist/chatbots/chatbots.service');
@@ -39,7 +41,7 @@ async function testar() {
       const [existe] = await qr.query('SELECT to_regclass($1) AS nome', [`public.${tabela}`]);
       if (existe.nome) await qr.query(`CREATE TEMP TABLE "${tabela}" (LIKE public."${tabela}" INCLUDING DEFAULTS INCLUDING CONSTRAINTS INCLUDING INDEXES)`);
     }
-    for (const tabela of ['support_chats', 'chatbot_flow_executions', 'support_chat_events', 'chatbot_flow_versions']) {
+    for (const tabela of ['support_chats', 'chatbot_flow_executions', 'support_chat_events', 'chatbot_flow_versions', 'contacts']) {
       await qr.query(`CREATE TEMP SEQUENCE teste_${tabela}_id START 1000`);
       await qr.query(`ALTER TABLE pg_temp.${tabela} ALTER COLUMN id SET DEFAULT nextval('pg_temp.teste_${tabela}_id')`);
     }
@@ -72,12 +74,13 @@ async function testar() {
         rollbackTransaction: async () => { await qr.query(`ROLLBACK TO SAVEPOINT ${nome}`); await qr.query(`RELEASE SAVEPOINT ${nome}`); } };
     } };
     let protocolosNovos = 0;
-    const repo = new SupportChatsRepository(banco, { generateProtocol: async () => `NOVO-${++protocolosNovos}` }, {});
+    const repo = new SupportChatsRepository(banco, { generateProtocol: async () => `NOVO-${++protocolosNovos}` }, { filtrar: async () => {} });
     const execucoesRepo = new ChatbotFlowExecutionsRepository(banco);
     const execucoes = new ChatbotFlowExecutionsService({ add: async () => {} }, execucoesRepo);
     const fluxos = new ChatbotsRepository(banco);
     const ajustes = { chatbotHabilitado: async manager => (await (manager ?? banco).query("SELECT valor FROM attendance_settings WHERE chave='chatbot_habilitado'"))[0].valor === 'true' };
     const servico = Object.assign(Object.create(SupportChatsService.prototype), { dataSource:banco, supportChatsRepository:repo,
+      contactsRepository:new ContactsRepository(banco),
       attendanceSettingsService:ajustes, chatbotsRepository:fluxos, chatbotFlowExecutionsService:execucoes,
       permissionService:{hasPermission:async()=>true},
       supportChatEventsRepository:new SupportChatEventsRepository(banco),
@@ -250,6 +253,13 @@ async function testar() {
       await criarMotor().step(exec.id,{kind:'start'});
       const apos=await repo.findParaEstado(conversa.id,qr.manager);
       assert.equal(apos.protocol,`ENCAMINHAMENTO-${indice}`); assert.equal(apos.department_id,dados.department_id);
+      assert.equal(apos.channel.name,'Canal fictício');
+      assert.equal(apos.department.name,dados.department_id===10?'Setor fictício A':'Setor fictício B');
+      const itemLista=(await repo.findAllSupportChats(false,7)).find(item=>String(item.id)===String(conversa.id));
+      assert.equal(itemLista.channel.name,apos.channel.name);assert.equal(itemLista.department.name,apos.department.name);
+      if (dados.user_id) assert.equal(itemLista.user.id,dados.user_id);
+      const detalhe=await repo.findSupportChatsById(conversa.id);
+      assert.equal(detalhe.department.name,apos.department.name);
       assert.equal(apos.user_id,dados.user_id??null); assert.equal(apos.support_chat_status_id,dados.user_id?2:1);
       assert.equal(apos.finished_at,null); assert.equal(apos.pos_atendimento_ativo,false);
       assert.equal(Boolean(apos.answered_at),Boolean(dados.user_id));
@@ -325,6 +335,126 @@ async function testar() {
     await assert.rejects(execucoes.iniciar(3,execNova.support_chat_id,await fluxos.findEntradaAtivoDoCanal(4,qr.manager),qr.manager),/versão publicada/);
     assert.deepEqual((await qr.query('SELECT graph FROM chatbot_flow_versions WHERE id=101'))[0].graph,anterior);
     console.log('PostgreSQL: salvar rascunho mantém a publicação; publicar alterações preserva execução antiga e novas usam a versão nova; publicação idêntica não duplica versão; despublicar preserva rascunho e conversas em andamento.');
+
+    const contatoRepo=new ContactsRepository(banco);
+    const eventosPolitica=[];
+    const contatos=new ContactsService(contatoRepo,{}, {},{getPublicUrl:key=>key},{},banco,
+      {emit:(nome,dados)=>eventosPolitica.push({nome,dados})});
+    const criadoHumano=await contatos.createContact({name:'Humano fictício',automation_disabled:true});
+    assert.equal(criadoHumano.automation_disabled,true);assert.equal(criadoHumano.ignore_support,false);
+    await qr.query("INSERT INTO clients (id,nome) VALUES (900,'Cliente fictício')");
+    await contatos.updateContact({client_id:900,has_no_client:false},criadoHumano.id,900);
+    const vinculoPreservado=await contatos.updateContact({name:'Contato vinculado'},criadoHumano.id);
+    assert.equal(vinculoPreservado.client_id,900);
+    assert.equal(vinculoPreservado.client.nome,'Cliente fictício');
+    // Formulário antigo omitia client_id ao marcar sem cliente.
+    const semCliente=await contatos.updateContact({has_no_client:true},criadoHumano.id);
+    assert.equal(semCliente.has_no_client,true);assert.equal(semCliente.client_id,null);
+    assert.equal(semCliente.client,null);
+    const vinculadoNovamente=await contatos.updateContact({client_id:900,has_no_client:false},criadoHumano.id,900);
+    assert.equal(vinculadoNovamente.client.nome,'Cliente fictício');
+    const removidoExplicitamente=await contatos.updateContact({client_id:null},criadoHumano.id);
+    assert.equal(removidoExplicitamente.client_id,null);assert.equal(removidoExplicitamente.client,null);
+    // Sem cliente prevalece mesmo se uma tela enviar os dois campos conflitantes.
+    const conflitante=await contatos.updateContact({client_id:900,has_no_client:true},criadoHumano.id,900);
+    assert.equal(conflitante.client_id,null);assert.equal(conflitante.client,null);
+    const criadoIgnorado=await contatos.createContact({name:'Ignorado fictício',ignore_support:true});
+    assert.equal(criadoIgnorado.ignore_support,true);assert.equal(criadoIgnorado.automation_disabled,false);
+    await contatos.updateContact({name:'Alteração sem mudar modo'},criadoHumano.id);
+    assert.equal((await contatoRepo.findById(criadoHumano.id)).automation_disabled,true);
+    // Uma busca de foto iniciada antes da mudança não pode restaurar o modo antigo.
+    await contatos.updateContact({automation_disabled:false},criadoHumano.id);
+    contatos.channelsRepository={findQualquerConectado:async()=>({session_id:'ficticia'})};
+    contatos.whatsappService={getProfilePicUrl:async()=>{
+      await contatos.updateContact({automation_disabled:true},criadoHumano.id);
+      return 'https://example.invalid/avatar.png';
+    }};
+    await contatos.buscarFotoDoWhatsapp(criadoHumano.id);
+    assert.equal((await contatoRepo.findById(criadoHumano.id)).automation_disabled,true);
+    await publicar.publish(80);
+    await qr.query('UPDATE support_chats SET support_chat_status_id=5,finished_at=NOW() WHERE support_chat_status_id IN (1,2,3)');
+    const execPolitica=await abrirExecucao('POLITICA-HUMANO');
+    const esperaPolitica=(await execucoesRepo.findById(execPolitica.id,qr.manager)).waiting_for;
+    const totalAntesPolitica=mensagens.length;
+    await contatos.updateContact({automation_disabled:true,ignore_support:false},3);
+    const interrompida=await execucoesRepo.findById(execPolitica.id,qr.manager);
+    assert.equal(interrompida.status,'aborted');assert.equal(interrompida.waiting_for,null);
+    const emEspera=await repo.findParaEstado(execPolitica.support_chat_id,qr.manager);
+    assert.equal(emEspera.support_chat_status_id,1);assert.equal(emEspera.protocol,'POLITICA-HUMANO');
+    assert.equal(await contatoRepo.permiteAutomacao(3,qr.manager),false);
+    assert.ok(eventosPolitica.some(evento=>evento.nome==='contato.automacao-interrompida'));
+    await criarMotor().step(execPolitica.id,{kind:'timeout',waitingToken:esperaPolitica.token});
+    assert.equal(mensagens.length,totalAntesPolitica);
+    assert.equal(await servico.decideAcaoDoChatbot(3,emEspera,{id:4},true,'Olá',qr.manager,true),null);
+
+    // Um início antigo enfileirado também precisa respeitar a nova política.
+    await qr.query('UPDATE support_chats SET support_chat_status_id=3 WHERE id=$1',[emEspera.id]);
+    const inicioAntigo=await execucoes.iniciar(3,emEspera.id,await fluxos.findEntradaAtivoDoCanal(4,qr.manager),qr.manager);
+    await criarMotor().step(inicioAntigo.id,{kind:'start'});
+    assert.equal((await execucoesRepo.findById(inicioAntigo.id,qr.manager)).status,'aborted');
+    assert.equal((await repo.findParaEstado(emEspera.id,qr.manager)).support_chat_status_id,1);
+    assert.equal(mensagens.length,totalAntesPolitica);
+
+    // Interromper uma saída libera a reserva sem reabrir o protocolo finalizado.
+    await contatos.updateContact({automation_disabled:false,ignore_support:false},3);
+    servico.permissionService.hasPermission=async()=>true;
+    const humanoPos=await qr.manager.save(SupportChats,{channel_id:4,contact_id:3,user_id:7,support_chat_status_id:2,protocol:'POLITICA-SAIDA'});
+    conversasPermitidas.add(String(humanoPos.id));
+    const fechadoPos=await servico.finalizarAtendimento(humanoPos.id,7,{sem_despedida:true,executar_fluxo_saida:true});
+    const [saidaPolitica]=await qr.query("SELECT id FROM chatbot_flow_executions WHERE support_chat_id=$1 AND phase='saida'",[humanoPos.id]);
+    await criarMotor().step(saidaPolitica.id,{kind:'start'});
+    await contatos.updateContact({automation_disabled:true},3);
+    const posInterrompido=await repo.findParaEstado(humanoPos.id,qr.manager);
+    assert.equal(posInterrompido.pos_atendimento_ativo,false);assert.equal(posInterrompido.support_chat_status_id,5);
+    assert.equal(posInterrompido.user_id,7);assert.equal(posInterrompido.finished_at.toISOString(),fechadoPos.finished_at.toISOString());
+    assert.equal((await execucoesRepo.findById(saidaPolitica.id,qr.manager)).status,'aborted');
+
+    // O envio manual continua permitido, enquanto todas as mensagens automáticas são barradas.
+    const humanoManual=await qr.manager.save(SupportChats,{channel_id:4,contact_id:3,user_id:7,support_chat_status_id:2,protocol:'HUMANO-MANUAL'});
+    let enviosManuais=0,copiasAnexo=0;
+    servico.whatsappService={sendMessage:async()=>{enviosManuais++;return {messageId:'manual-ficticia'};},emitSupportChatMessage:async()=>{}};
+    servico.registraEnvio=async()=>{};
+    await servico.sendMessage(humanoManual.id,7,'teste@invalid','Resposta humana fictícia');
+    assert.equal(enviosManuais,1);
+    servico.enviaMensagemAutomatica=SupportChatsService.prototype.enviaMensagemAutomatica;
+    const manualAtual=await repo.findParaEstado(humanoManual.id,qr.manager);
+    await servico.enviaMensagemAutomatica(manualAtual,'Automática',async()=>{copiasAnexo++;});
+    await servico.enviaMensagemDeRejeicao(manualAtual,'Automática');
+    await servico.enviarAvisoInatividade(manualAtual,'Automática');
+    await servico.finalizarPorInatividade(manualAtual);
+    assert.equal(enviosManuais,1);assert.equal(copiasAnexo,0);
+    assert.equal((await repo.findParaEstado(humanoManual.id,qr.manager)).support_chat_status_id,2);
+    assert.equal(await servico.fluxoSaidaDisponivel(humanoManual.id,7),null);
+    await servico.finalizarAtendimento(humanoManual.id,7,{executar_fluxo_saida:true});
+    assert.equal(enviosManuais,1);
+    assert.equal((await qr.query("SELECT COUNT(*)::int total FROM chatbot_flow_executions WHERE support_chat_id=$1 AND phase='saida'",[humanoManual.id]))[0].total,0);
+
+    // Ignorar entradas mantém a regra existente, antes de criar conversa ou mensagem.
+    await contatos.updateContact({automation_disabled:false,ignore_support:true},3);
+    servico.channelsRepository={findBySessionId:async()=>({id:4})};
+    servico.contactsService={findOrCreateByRemoteJid:async()=>contatoRepo.findById(3)};
+    const contagemAntes=(await qr.query('SELECT COUNT(*)::int total FROM support_chats'))[0].total;
+    await servico.onMessageCreate({sessionId:'teste',data:{message:{id:{remote:'teste@invalid',fromMe:false},_data:{notifyName:'Fictício'}}}});
+    assert.equal((await qr.query('SELECT COUNT(*)::int total FROM support_chats'))[0].total,contagemAntes);
+    await contatos.updateContact({automation_disabled:true,ignore_support:false},3);
+    await qr.query('UPDATE support_chats SET support_chat_status_id=5,finished_at=NOW() WHERE contact_id=3 AND support_chat_status_id IN (1,2,3)');
+    const recebidas=[];
+    servico.messagesService={saveIncoming:async(_canal,chat)=>{
+      recebidas.push(String(chat.id));return {id:'entrada-ficticia',from_me:false,content:'Entrada humana fictícia',type:'text'};
+    },comUrlPublica:mensagem=>mensagem};
+    const execucoesAntesEntrada=(await qr.query('SELECT COUNT(*)::int total FROM chatbot_flow_executions'))[0].total;
+    const entradaHumana={sessionId:'teste',data:{message:{id:{remote:'teste@invalid',fromMe:false},_data:{notifyName:'Fictício'}}}};
+    await servico.onMessageCreate(entradaHumana);
+    const chatRecebido=await repo.buscaAberta(3,4,qr.manager);
+    assert.equal(chatRecebido.support_chat_status_id,1);assert.equal(chatRecebido.user_id,null);
+    assert.equal(recebidas[0],String(chatRecebido.id));
+    await servico.onMessageCreate(entradaHumana);
+    assert.equal(recebidas[1],String(chatRecebido.id));assert.equal(enviosManuais,1);
+    assert.equal((await qr.query('SELECT COUNT(*)::int total FROM chatbot_flow_executions'))[0].total,execucoesAntesEntrada);
+    await contatos.updateContact({automation_disabled:false,ignore_support:false},3);
+    assert.equal(await contatoRepo.permiteAutomacao(3,qr.manager),true);
+    assert.equal((await execucoesRepo.findById(execPolitica.id,qr.manager)).status,'aborted');
+    console.log('PostgreSQL: criação e edição dos modos; interrupção imediata de entrada/saída e jobs antigos; protocolo preservado; envio manual permitido; automações e inatividade bloqueadas; ignorar entrada preservado e reativação não ressuscita execuções antigas.');
   } finally {
     await qr.rollbackTransaction(); await qr.release(); await conexao.destroy();
   }

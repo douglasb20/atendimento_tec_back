@@ -13,10 +13,8 @@ export class HolidaysController {
 
   @Get()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  // O nó Feriados do chatbot vai consultar isso em runtime - quando o motor
-  // ganhar esse nó, adicionar aqui a permissão que ele usa (ou liberar via
-  // chamada interna do service, sem passar pelo controller).
-  @Permissions('holiday:view', 'department:view', 'department:update')
+  // A agenda consulta o calendário, sem conceder acesso à edição de feriados.
+  @Permissions('holiday:view', 'department:view', 'department:update', 'schedule:view')
   @HttpCode(HttpStatus.OK)
   findAll() {
     return this.holidaysService.findAll();

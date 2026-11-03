@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { UpdateContactsDto } from 'contacts/dto/update-contacts.dto';
 import { Contacts } from 'contacts/entities/contacts.entity';
+import { permiteAutomacaoContato } from './politica-atendimento';
 
 @Injectable()
 export class ContactsRepository extends Repository<Contacts> {
@@ -12,6 +13,13 @@ export class ContactsRepository extends Repository<Contacts> {
 
   async findActives() {
     return this.findBy({ status: 1 });
+  }
+
+  async permiteAutomacao(id: number, manager?: EntityManager): Promise<boolean> {
+    const contato = await (manager ?? this.manager).findOne(Contacts, {
+      where: { id }, select: { id: true, ignore_support: true, automation_disabled: true },
+    });
+    return permiteAutomacaoContato(contato);
   }
 
   async findById(id: number) {
@@ -40,11 +48,17 @@ export class ContactsRepository extends Repository<Contacts> {
       throw new BadRequestException('Contato não localizado com este id');
     }
     const updateContact = this.create({
-      ...contact,
+      id,
       ...updateContactDto,
       ...(client_id !== null && { client_id: client_id }),
+      // Marcar sem cliente precisa remover o vínculo, inclusive em formulários
+      // antigos que omitem client_id ao limpar a seleção.
+      ...(updateContactDto.has_no_client === true && { client_id: null }),
     });
-    return await manager.save(Contacts, updateContact);
+    // PATCH de foto/nome não pode regravar uma política antiga lida antes
+    // de outra edição concorrente. Só os campos enviados são persistidos.
+    await manager.save(Contacts, updateContact);
+    return manager.findOneBy(Contacts, { id });
   }
 
   /**

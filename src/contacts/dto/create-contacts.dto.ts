@@ -42,6 +42,10 @@ export class CreateContactsDto {
   @IsBoolean()
   ignore_support?: boolean;
 
+  @IsOptional()
+  @IsBoolean()
+  automation_disabled?: boolean;
+
   /** Key do bucket (upload manual) ou `null` para remover a foto manual e
    * voltar a buscar do WhatsApp. Ausente: nada muda. */
   @IsOptional()

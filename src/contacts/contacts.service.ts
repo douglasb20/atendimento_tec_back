@@ -12,6 +12,8 @@ import { CreateContactsDto } from './dto/create-contacts.dto';
 import { UpdateContactsDto } from './dto/update-contacts.dto';
 import { SignContactAvatarDto } from './dto/sign-contact-avatar.dto';
 import { Contacts } from './entities/contacts.entity';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { interromperAutomacoesContato, permiteAutomacaoContato } from './politica-atendimento';
 
 /** Prefixo fixo no servidor - nunca vindo do body, mesmo padrão do
  * `sign-media` do chatbot (mais seguro que aceitar prefixo do cliente). */
@@ -53,6 +55,7 @@ export class ContactsService {
     private storageService: StorageService,
     private channelsRepository: ChannelsRepository,
     private dataSource: DataSource,
+    private readonly eventos: EventEmitter2,
   ) {}
 
   /**
@@ -142,6 +145,8 @@ export class ContactsService {
 
       const novo = manager.create(Contacts, {
         name: createContactDto.name,
+        ignore_support: createContactDto.ignore_support ?? false,
+        automation_disabled: createContactDto.automation_disabled ?? false,
         phone: numeroCanonico || null,
         client_id: createContactDto.client_id ?? null,
         remote_jid: jid,
@@ -200,7 +205,8 @@ export class ContactsService {
     contact_id: number,
     client_id: number = null,
   ) {
-    return runInTransaction(this.dataSource, async (manager) => {
+    let conversasAtualizadas: number[] = [];
+    const salvo = await runInTransaction(this.dataSource, async (manager) => {
       try {
         const atual = await this.contactRepository.findById(contact_id);
 
@@ -237,6 +243,11 @@ export class ContactsService {
           client_id,
         );
 
+        if (('automation_disabled' in updateContactDto || 'ignore_support' in updateContactDto)
+          && !permiteAutomacaoContato(contact)) {
+          conversasAtualizadas = await interromperAutomacoesContato(contact.id, manager);
+        }
+
         // Só mexe nos campos quando vêm no corpo: um PATCH que não os mencione
         // deixa os valores como estão.
         if (updateContactDto.campos) {
@@ -265,6 +276,8 @@ export class ContactsService {
         throw new BadRequestException(err.message);
       }
     });
+    if (conversasAtualizadas.length) this.eventos.emit('contato.automacao-interrompida', { ids: conversasAtualizadas });
+    return salvo;
   }
 
   async getAllContactsByClients(client_id: number) {
@@ -344,7 +357,7 @@ export class ContactsService {
       const emUso = await manager.existsBy(Contacts, { lid: lidRecebido });
       if (!emUso) {
         contact.lid = lidRecebido;
-        await manager.save(Contacts, contact);
+        await manager.update(Contacts, contact.id, { lid: lidRecebido });
         this.logger.log(`LID ${lidRecebido} associado ao contato ${contact.id}`);
       }
     }
@@ -368,7 +381,7 @@ export class ContactsService {
       if (profilePicUrl) {
         contact.avatar_url = profilePicUrl;
         contact.is_avatar_external = true;
-        await manager.save(Contacts, contact);
+        await manager.update(Contacts, contact.id, { avatar_url: profilePicUrl, is_avatar_external: true });
         this.logger.log(`Foto de perfil preenchida para o contato ${contact.id}`);
       }
     }
@@ -388,11 +401,12 @@ export class ContactsService {
     ) {
       contact.name = name;
       contact.last_name = last_name ?? null;
-      await manager.save(Contacts, contact);
+      await manager.update(Contacts, contact.id, { name, last_name: last_name ?? null });
       this.logger.log(`Nome preenchido para o contato ${contact.id} (${name})`);
     }
 
-    return contact;
+    // Foto e nome podem ter aguardado a rede enquanto a política foi editada.
+    return await manager.findOneBy(Contacts, { id: contact.id }) ?? contact;
   }
 
   /**
@@ -512,7 +526,11 @@ export class ContactsService {
       contact.is_avatar_external = Boolean(profilePicUrl);
       contact.avatar_is_manual = false;
 
-      await manager.save(Contacts, contact);
+      await manager.update(Contacts, contact.id, {
+        avatar_url: contact.avatar_url,
+        is_avatar_external: contact.is_avatar_external,
+        avatar_is_manual: false,
+      });
 
       const recarregado =
         (await this.contactRepository.findByIdComCliente(contact.id, manager)) ?? contact;

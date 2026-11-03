@@ -9,6 +9,7 @@ import { ChatbotFlowVersionsRepository } from '@/chatbots/chatbot-flow-versions.
 import { ChatbotFlowGraph } from '@/chatbots/entities/chatbot-flow-versions.entity';
 import { Chatbots } from '@/chatbots/entities/chatbots.entity';
 import type { DestinoEncaminhamento } from '@/chatbots/encaminhamento-atendimento';
+import { permiteAutomacaoContato } from '@/contacts/politica-atendimento';
 import { WhatsappService } from '@/whatsapp/whatsapp.service';
 import { SupportChatsService, TIPO_INTERNO_POR_MIDIA } from '@/support-chats/support-chats.service';
 import { SendMediaType } from '@/support-chats/dto/send-media.dto';
@@ -62,6 +63,7 @@ export class ExecutionEngine {
     let enviarDespedida = false;
     let executarFluxoSaida = false;
     let encaminhamento: DestinoEncaminhamento | undefined;
+    let atendimentoInterrompido: number | null = null;
 
     await runInTransaction(this.dataSource, async (manager) => {
       let execucao = await this.executionsRepository.findById(executionId, manager);
@@ -80,6 +82,7 @@ export class ExecutionEngine {
 
       if (!await this.supportChatsService.bloquearParaExecucaoBot(execucao.support_chat_id, manager, execucao.phase ?? 'entrada')) {
         await this.executionsRepository.abortarDoAtendimento(execucao.support_chat_id, manager);
+        atendimentoInterrompido = execucao.support_chat_id;
         return;
       }
 
@@ -112,6 +115,10 @@ export class ExecutionEngine {
     // Fora da transação, de propósito: chamadas ao provider do WhatsApp
     // prendem a conexão do banco pelo tempo da rede - mesmo padrão de
     // `enviaMensagemAutomatica` em `SupportChatsService`.
+    if (atendimentoInterrompido) {
+      await this.supportChatsService.devolverBotParaEspera(atendimentoInterrompido);
+      await this.supportChatsService.concluirPosAtendimento(atendimentoInterrompido);
+    }
     if (!execucaoFinal) return;
 
     if (execucaoFinal.support_chat_id) {
@@ -483,7 +490,7 @@ export class ExecutionEngine {
       const permitido = execucao.phase === 'saida'
         ? [SupportChatStatusId.FINALIZADO, SupportChatStatusId.FINALIZADO_PELO_CHATBOT].includes(atual?.support_chat_status_id) && atual?.pos_atendimento_ativo
         : atual?.support_chat_status_id === SupportChatStatusId.EM_FILA && !atual.user_id;
-      if (!permitido || atual.channel?.chatbot_habilitado === false) return;
+      if (!permitido || atual.channel?.chatbot_habilitado === false || !permiteAutomacaoContato(atual.contact)) return;
       if (effect.type === 'send_text') {
         const enviadoEm = new Date();
         const enviada = await this.whatsappService.sendMessage(
