@@ -251,6 +251,21 @@ describe('Separação da fila do chatbot e espera humana', () => {
     expect(whatsapp.sendMessage).not.toHaveBeenCalled();
   });
 
+  it.each([{ automation_disabled: true }, { ignore_support: true }])('não envia um efeito já calculado quando a política do contato mudou: %j', politica => {
+    const { motor, atendimentos, whatsapp, chat } = preparar({ kind: 'finish', effects: [{ type: 'send_text', text: 'Não enviar' }] });
+    atendimentos.findParaEnvioBot.mockResolvedValue({ ...chat, contact: { ...chat.contact, ...politica } } as never);
+    return motor.step(10, { kind: 'start' }).then(() => expect(whatsapp.sendMessage).not.toHaveBeenCalled());
+  });
+
+  it('um job interrompido libera as filas do bot e do pós-atendimento sem enviar mensagens', async () => {
+    const { motor, atendimentos, whatsapp } = preparar();
+    atendimentos.bloquearParaExecucaoBot.mockResolvedValue(false);
+    await motor.step(10, { kind: 'start' });
+    expect(atendimentos.devolverBotParaEspera).toHaveBeenCalledWith(20);
+    expect(atendimentos.concluirPosAtendimento).toHaveBeenCalledWith(20);
+    expect(whatsapp.sendMessage).not.toHaveBeenCalled();
+  });
+
   it('só devolve à espera depois do envio da última mensagem', async () => {
     const { motor, atendimentos, whatsapp } = preparar({ kind: 'finish', effects: [{ type: 'send_text', text: 'Teste' }] });
     await motor.step(10, { kind: 'start' });

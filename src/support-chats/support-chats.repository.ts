@@ -35,6 +35,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       // .select('sc.*')
       .leftJoinAndSelect('sc.contact', 'c')
       .leftJoinAndSelect('sc.channel', 'ch')
+      .leftJoinAndSelect('sc.department', 'd')
       .leftJoinAndSelect('c.client', 'cl')
       .leftJoinAndSelect('sc.supportChatStatus', 'ms')
       // Quem assumiu a conversa, para a lista poder separar "meus atendimentos".
@@ -83,6 +84,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
         'contact.camposPersonalizados',
         'contact.client.camposPersonalizados',
         'channel',
+        'department',
         'supportChatMessages',
         'user',
         // O front decide pelo id do status, mas a relação traz o rótulo legível.
@@ -292,6 +294,7 @@ export class SupportChatsRepository extends Repository<SupportChats> {
         'contact.camposPersonalizados',
         'contact.client.camposPersonalizados',
         'channel',
+        'department',
         'supportChatStatus',
         'user',
       ],

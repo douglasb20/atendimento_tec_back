@@ -46,6 +46,7 @@ describe('Pós-atendimento no mesmo protocolo', () => {
       dataSource: { manager, query: jest.fn().mockResolvedValue([[{ id: 42 }], 1]) },
       supportChatsRepository: repo, attendanceSettingsService: ajustes, chatbotsRepository: fluxos,
       permissionService: permissoes,
+      contactsRepository: { permiteAutomacao: jest.fn().mockResolvedValue(true) },
       chatbotFlowExecutionsService: execucoes, chatbotFlowExecutionsRepository: suspensas,
       channelsService: { copiaAnexoDespedidaParaEnvio: jest.fn() }, logger: { warn: jest.fn(), log: jest.fn() },
     }) as SupportChatsService;
@@ -152,6 +153,29 @@ describe('Pós-atendimento no mesmo protocolo', () => {
     const consulta = (servico as unknown as { dataSource: { query: jest.Mock } }).dataSource.query.mock.calls[0][0];
     expect(consulta).toContain('pos_atendimento_ativo = false');
     expect(consulta).not.toMatch(/SET finished_at|user_id\s*=|observation_user\s*=|INSERT/i);
+  });
+
+  it.each([{ automation_disabled: true }, { ignore_support: true }])('o modo do contato impede a saída mesmo com padrão obrigatório e pedido explícito: %j', async politica => {
+    const { servico, chat, execucoes, repo, permissoes } = preparar();
+    Object.assign(chat.contact, politica);
+    permissoes.hasPermission.mockResolvedValue(false);
+    expect(await servico.fluxoSaidaDisponivel(42, 7)).toBeNull();
+    await servico.finalizarAtendimento(42, 7, { executar_fluxo_saida: true, sem_despedida: true });
+    expect(execucoes.iniciar).not.toHaveBeenCalled();
+    expect(repo.finalizar).toHaveBeenCalledTimes(1);
+  });
+
+  it('bloqueia a mensagem automática antes de copiar anexos ou chamar o WhatsApp', async () => {
+    const copiar = jest.fn();
+    const servico = Object.assign(Object.create(SupportChatsService.prototype), {
+      contactsRepository: { permiteAutomacao: jest.fn().mockResolvedValue(false) },
+      whatsappService: { sendMessage: jest.fn(), sendMedia: jest.fn() },
+    });
+    await servico.enviaMensagemAutomatica({ contact_id: 3 }, 'Não enviar', copiar);
+    await servico.enviaMensagemDeRejeicao({ contact_id: 3 }, 'Não enviar');
+    expect(copiar).not.toHaveBeenCalled();
+    expect(servico.whatsappService.sendMessage).not.toHaveBeenCalled();
+    expect(servico.whatsappService.sendMedia).not.toHaveBeenCalled();
   });
 
   function prepararBot() {

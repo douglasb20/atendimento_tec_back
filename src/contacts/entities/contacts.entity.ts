@@ -67,6 +67,10 @@ export class Contacts {
   @Column({ type: 'boolean', default: false })
   ignore_support: boolean;
 
+  /** Recebe mensagens e atendimento manual, sem automações. */
+  @Column({ type: 'boolean', default: false })
+  automation_disabled: boolean;
+
   /** JID do contato (`5564...@s.whatsapp.net`), usado no envio e no recebimento. */
   @Column({ type: 'varchar', length: 60, nullable: false })
   remote_jid: string;

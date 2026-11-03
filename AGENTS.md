@@ -3,6 +3,12 @@
 Guia do backend. O `AGENTS.md` da raiz do workspace cobre a visão geral e os
 outros subprojetos; aqui está o que é específico desta API.
 
+## Política de atendimento por contato
+
+`contacts.ignore_support` descarta entradas antes de abrir conversa. `contacts.automation_disabled` mantém entradas e atendimento manual, mas impede chatbot, mensagens automáticas e encerramento por inatividade. Ambos começam falsos. Nenhum bloqueia envio manual.
+
+Ao restringir automação na edição, `ContactsService` aborta execuções pendentes, devolve Chatbot para Espera e libera reservas de pós-atendimento sem reabrir protocolos finalizados. Motor e envios automáticos consultam a política para barrar jobs antigos. Voltar a Normal não retoma execuções abortadas. Atualizações de foto/nome devem persistir somente seus campos, sem sobrescrever uma política lida antes de uma chamada de rede.
+
 NestJS 11 · TypeORM 0.3 · PostgreSQL · Redis (BullMQ + cache) · Socket.IO ·
 S3-compatible (Backblaze B2).
 

@@ -58,6 +58,7 @@ import { validarFluxoSaida } from '@/chatbots/validar-fluxo-saida';
 import { DestinoEncaminhamento, validarDestinoEncaminhamento } from '@/chatbots/encaminhamento-atendimento';
 import { ChatbotFlowVersions } from '@/chatbots/entities/chatbot-flow-versions.entity';
 import { PermissionService } from '@/permissions/permission.service';
+import { permiteAutomacaoContato } from '@/contacts/politica-atendimento';
 
 /**
  * Tipo de mídia do envio → tipo interno persistido, o mesmo que o webhook
@@ -136,7 +137,7 @@ export class SupportChatsService {
    * aqui não pode derrubar o processamento da mensagem do cliente.
    */
   private async enviaAvisosAtivos(supportChat: SupportChats): Promise<void> {
-    if (!supportChat?.channel_id) return;
+    if (!supportChat?.channel_id || !permiteAutomacaoContato(supportChat.contact)) return;
 
     try {
       const avisos = await this.serviceAlertsService.ativosParaCanal(supportChat.channel_id);
@@ -216,6 +217,7 @@ export class SupportChatsService {
     texto: string | null | undefined,
     copiaAnexo?: () => ReturnType<ChannelsService['copiaAnexoSaudacaoParaEnvio']>,
   ): Promise<void> {
+    if (!await this.contactsRepository.permiteAutomacao(supportChat.contact_id)) return;
     const mensagem = montaMensagemAutomatica(texto, supportChat);
     // Anexo sumido do bucket não pode derrubar quem chamou: a despedida roda
     // dentro da finalização e a saudação dentro da fila de mensagens. Sem o
@@ -546,8 +548,9 @@ export class SupportChatsService {
     if (!await this.attendanceSettingsService.chatbotHabilitado(manager)) return false;
     const chat = await manager.getRepository(SupportChats).createQueryBuilder('sc')
       .leftJoinAndSelect('sc.channel', 'canal').where('sc.id = :id', { id })
+      .leftJoinAndSelect('sc.contact', 'contato')
       .setLock('pessimistic_write', undefined, ['sc']).getOne();
-    if (chat?.channel?.chatbot_habilitado === false) return false;
+    if (chat?.channel?.chatbot_habilitado === false || !permiteAutomacaoContato(chat?.contact)) return false;
     return phase === 'saida'
       ? [SupportChatStatusId.FINALIZADO, SupportChatStatusId.FINALIZADO_PELO_CHATBOT].includes(chat?.support_chat_status_id) && chat?.pos_atendimento_ativo
       : chat?.support_chat_status_id === SupportChatStatusId.EM_FILA && !chat.user_id;
@@ -567,6 +570,14 @@ export class SupportChatsService {
       for (const id of encaminhados) await this.recarregaEEmiteEstado(id);
     } catch (erro) {
       this.logger.warn(`Configurações salvas, mas houve falha ao atualizar as telas: ${erro.message}`);
+    }
+  }
+
+  @OnEvent('contato.automacao-interrompida')
+  async notificarAutomacaoContatoInterrompida({ ids }: { ids: number[] }): Promise<void> {
+    for (const id of ids) {
+      try { await this.recarregaEEmiteEstado(id); }
+      catch (erro) { this.logger.warn(`Automação interrompida no atendimento ${id}, mas a atualização da tela falhou: ${erro.message}`); }
     }
   }
 
@@ -597,11 +608,12 @@ export class SupportChatsService {
   async encaminharPorChatbot(id: number, destino: DestinoEncaminhamento): Promise<void> {
     const encaminhou = await runInTransaction(this.dataSource, async manager => {
       if (!await this.attendanceSettingsService.chatbotHabilitado(manager)) return false;
-      const [chat] = await manager.query(`SELECT sc.channel_id, sc.department_id, sc.user_id, sc.support_chat_status_id,
+      const [chat] = await manager.query(`SELECT sc.channel_id, sc.contact_id, sc.department_id, sc.user_id, sc.support_chat_status_id,
         c.chatbot_habilitado FROM support_chats sc JOIN channels c ON c.id = sc.channel_id
         WHERE sc.id = $1 FOR UPDATE OF sc`, [id]);
       // Uma atribuição humana concorrente sempre prevalece sobre a automação.
       if (!chat || chat.support_chat_status_id !== SupportChatStatusId.EM_FILA || chat.user_id || !chat.chatbot_habilitado) return false;
+      if (!await this.contactsRepository.permiteAutomacao(chat.contact_id, manager)) return false;
       await validarDestinoEncaminhamento(manager, destino, chat.channel_id);
       await manager.query(`UPDATE support_chats SET department_id = $2, user_id = $3,
         support_chat_status_id = $4, is_waiting = $5,
@@ -921,6 +933,7 @@ export class SupportChatsService {
     supportChat: SupportChats,
     texto: string | null,
   ): Promise<void> {
+    if (!await this.contactsRepository.permiteAutomacao(supportChat.contact_id)) return;
     const mensagem = montaMensagemAutomatica(texto, supportChat);
     const destino = supportChat.contact?.remote_jid;
     if (!mensagem || !destino) return;
@@ -1134,7 +1147,7 @@ export class SupportChatsService {
       // usuário, para não disparar as duas mensagens de abertura. Sem
       // chatbot, o texto ainda pode ser trocado pela mensagem de ausência de
       // um setor fora do horário (ver `decideMensagemDeAbertura`).
-      if (!chatbotParaEnfileirar) {
+      if (!chatbotParaEnfileirar && permiteAutomacaoContato(conversa.contact)) {
         const { texto, comAnexo } = await this.decideMensagemDeAbertura(conversa.channel);
         await this.enviaMensagemAutomatica(
           conversa,
@@ -1172,7 +1185,7 @@ export class SupportChatsService {
     manager: EntityManager,
     chatbotHabilitado: boolean,
   ): Promise<{ executionId: number; trigger: 'start' | 'resume'; resumeText?: string; waitingToken?: string } | null> {
-    if (!chatbotHabilitado) return null;
+    if (!chatbotHabilitado || !await this.contactsRepository.permiteAutomacao(contactId, manager)) return null;
     if (!conversaCriada && supportChat.support_chat_status_id !== SupportChatStatusId.EM_FILA && !supportChat.pos_atendimento_ativo) return null;
     const execucaoSuspensa = await this.chatbotFlowExecutionsRepository.findSuspendedAwaitingReply(
       contactId,
@@ -1863,7 +1876,8 @@ export class SupportChatsService {
     }
 
     const configuracaoSaida = await this.configuracaoSaidaParaFinalizacao(supportChat, user_id, podeEncerrarQualquer);
-    const executarSaida = dto.executar_fluxo_saida ?? configuracaoSaida?.executar_por_padrao ?? false;
+    const executarSaida = permiteAutomacaoContato(supportChat.contact)
+      && (dto.executar_fluxo_saida ?? configuracaoSaida?.executar_por_padrao ?? false);
     if (configuracaoSaida && !configuracaoSaida.pode_alterar && executarSaida !== configuracaoSaida.executar_por_padrao) {
       throw new ForbiddenException('Você não tem permissão para alterar a execução do fluxo de saída definida no canal');
     }
@@ -1913,7 +1927,7 @@ export class SupportChatsService {
   }
 
   private async configuracaoSaidaParaFinalizacao(chat: SupportChats | null, usuarioId: number, superusuario: boolean) {
-    if (!chat || chat.support_chat_status_id !== SupportChatStatusId.EM_ANDAMENTO
+    if (!chat || !permiteAutomacaoContato(chat.contact) || chat.support_chat_status_id !== SupportChatStatusId.EM_ANDAMENTO
       || !await this.attendanceSettingsService.chatbotHabilitado()) return null;
     const fluxo = await this.chatbotsRepository.findSaidaAtivoDoCanal(chat.channel_id);
     if (!fluxo?.current_published_version_id) return null;
@@ -1925,6 +1939,9 @@ export class SupportChatsService {
     chat: SupportChats, usuarioId: number, dto: FinalizarAtendimentoDto, podeEncerrarQualquer: boolean,
   ): Promise<SupportChats> {
     const execucao = await runInTransaction(this.dataSource, async manager => {
+      if (!await this.contactsRepository.permiteAutomacao(chat.contact_id, manager)) {
+        throw new BadRequestException('As automações estão desabilitadas para este contato');
+      }
       if (!await this.attendanceSettingsService.chatbotHabilitado(manager)) {
         throw new BadRequestException('O módulo Chatbot está desabilitado');
       }
@@ -1988,6 +2005,7 @@ export class SupportChatsService {
    * - **desligado**: a `mensagem_despedida`, com o anexo dela.
    */
   async finalizarPorInatividade(supportChat: SupportChats): Promise<void> {
+    if (!await this.contactsRepository.permiteAutomacao(supportChat.contact_id)) return;
     if (supportChat.channel?.inatividade_enviar_despedida) {
       const usaTextoProprio = supportChat.channel?.inatividade_usar_mensagem_propria;
 
@@ -2020,6 +2038,7 @@ export class SupportChatsService {
    * aviso para o cron não repeti-lo a cada tick.
    */
   async enviarAvisoInatividade(supportChat: SupportChats, texto: string): Promise<void> {
+    if (!await this.contactsRepository.permiteAutomacao(supportChat.contact_id)) return;
     await this.enviaMensagemAutomatica(supportChat, texto);
     await this.supportChatsRepository.marcaAvisoInatividade(supportChat.id, new Date());
   }
@@ -2090,6 +2109,7 @@ export class SupportChatsService {
   async encerrarPorChatbot(id: number, enviarDespedida: boolean, executarFluxoSaida = false): Promise<void> {
     const supportChat = await this.supportChatsRepository.findParaEstado(id);
     if (!supportChat || supportChat.support_chat_status_id !== SupportChatStatusId.EM_FILA || supportChat.user_id) return;
+    if (!await this.contactsRepository.permiteAutomacao(supportChat.contact_id)) return;
 
     if (executarFluxoSaida && await this.encerrarComFluxoSaidaPorChatbot(supportChat, enviarDespedida)) return;
 
@@ -2124,6 +2144,7 @@ export class SupportChatsService {
   /** A escolha pertence ao autor do fluxo, independente do padrão da finalização humana. */
   private async encerrarComFluxoSaidaPorChatbot(chat: SupportChats, enviarDespedida: boolean): Promise<boolean> {
     const resultado = await runInTransaction(this.dataSource, async manager => {
+      if (!await this.contactsRepository.permiteAutomacao(chat.contact_id, manager)) return { tratado: true };
       if (!await this.attendanceSettingsService.chatbotHabilitado(manager)) return { tratado: false };
       const [atual] = await manager.query('SELECT support_chat_status_id, user_id FROM support_chats WHERE id = $1 FOR UPDATE', [chat.id]);
       if (!atual || atual.support_chat_status_id !== SupportChatStatusId.EM_FILA || atual.user_id) return { tratado: true };
