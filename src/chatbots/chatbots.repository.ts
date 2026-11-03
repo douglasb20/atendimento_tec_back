@@ -74,29 +74,25 @@ export class ChatbotsRepository extends Repository<Chatbots> {
 
   /** O chatbot de entrada ativo de um canal, se houver - usado pelo motor. */
   async findEntradaAtivoDoCanal(channelId: number, manager?: EntityManager): Promise<Chatbots | null> {
+    return this.findAtivoDoCanal(channelId, 'entrada', manager);
+  }
+
+  async findSaidaAtivoDoCanal(channelId: number, manager?: EntityManager): Promise<Chatbots | null> {
+    return this.findAtivoDoCanal(channelId, 'saida', manager);
+  }
+
+  private async findAtivoDoCanal(channelId: number, tipo: 'entrada' | 'saida', manager?: EntityManager): Promise<Chatbots | null> {
     const repo = manager ? manager.getRepository(Chatbots) : this;
 
     return repo
       .createQueryBuilder('c')
       .innerJoin('channel_x_chatbot', 'cxc', 'cxc.chatbot_id = c.id')
       .where('cxc.channel_id = :channelId', { channelId })
-      .andWhere('c.type = :type', { type: 'entrada' })
+      .andWhere('c.type = :type', { type: tipo })
+      .andWhere('EXISTS (SELECT 1 FROM channels canal WHERE canal.id = cxc.channel_id AND canal.chatbot_habilitado = true AND canal.deleted_at IS NULL)')
       .andWhere('c.active = true')
       .andWhere('c.deleted_at IS NULL')
       .getOne();
-  }
-
-  /** Substitui todos os canais vinculados ao chatbot de uma vez - "Salvar"
-   * sempre manda a lista inteira, mesmo desenho de `substituiSchedule`. */
-  async substituiCanais(chatbotId: number, channelIds: number[], manager: EntityManager): Promise<void> {
-    await manager.query('DELETE FROM channel_x_chatbot WHERE chatbot_id = $1', [chatbotId]);
-
-    for (const channelId of channelIds) {
-      await manager.query(
-        'INSERT INTO channel_x_chatbot (chatbot_id, channel_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-        [chatbotId, channelId],
-      );
-    }
   }
 
   /** Os canais vinculados ao chatbot - usado pela validação de conflito ao salvar. */

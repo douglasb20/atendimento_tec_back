@@ -1,9 +1,10 @@
-import { Controller, Get, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 
 import { PermissionGuard } from 'permissions/permissions.guard';
 import { SemPermissao } from 'permissions/sem-permissao.decorator';
 import { DashboardService } from './dashboard.service';
+import { MovimentoPorSemanaDto } from './dto/movimento-por-semana.dto';
 
 /**
  * Os números da home.
@@ -15,6 +16,14 @@ import { DashboardService } from './dashboard.service';
 @Controller('dashboard')
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
+
+  @Get('movimento-por-semana')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @SemPermissao()
+  @HttpCode(HttpStatus.OK)
+  async movimentoPorSemana(@Query() filtro: MovimentoPorSemanaDto) {
+    return this.dashboardService.movimentoPorSemana(filtro.periodo);
+  }
 
   @Get('resumo')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)

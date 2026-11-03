@@ -29,13 +29,17 @@ export class ExcecoesHorarioService {
     catch (erro) { throw new BadRequestException(erro.message); }
     if (dto.holiday_id) {
       const feriado = await this.feriados.findById(dto.holiday_id);
+      if (dto.recurring && !feriado.recurring) {
+        throw new BadRequestException('Um feriado de ano específico não pode gerar uma exceção que se repete todos os anos');
+      }
       const [ano, mes, dia] = dto.date.split('-').map(Number);
       if (feriado.month !== mes || feriado.day !== dia || !feriado.recurring && feriado.year !== ano) {
         throw new BadRequestException('A data não corresponde ao feriado selecionado');
       }
     }
     try {
-      const dados = { department_id: setorId, date: dto.date, description: descricao,
+      const dados = { department_id: setorId, date: dto.recurring ? `2000-${dto.date.slice(5)}` : dto.date,
+        recurring: dto.recurring ?? false, description: descricao,
         mode: dto.mode, intervals: intervalos, holiday_id: dto.holiday_id ?? null };
       if (id) {
         const alteracao = await repo.update({ id, department_id: setorId }, dados);
@@ -44,7 +48,9 @@ export class ExcecoesHorarioService {
       }
       return await repo.save(repo.create(dados));
     } catch (erro) {
-      if (erro.code === '23505') throw new ConflictException('Já existe uma exceção para esta data neste setor');
+      if (erro.code === '23505') throw new ConflictException(dto.recurring
+        ? 'Já existe uma exceção anual para este dia e mês neste setor'
+        : 'Já existe uma exceção para esta data neste setor');
       throw erro;
     }
   }

@@ -18,10 +18,19 @@ import { PermissionGuard } from 'permissions/permissions.guard';
 import { ChannelsService } from './channels.service';
 import { AssinarAnexoCanalDto } from './dto/assinar-anexo-canal.dto';
 import { CreateOrChannelDto } from './dto/create-or-channel.dto';
+import { ChatbotsDoCanalService } from './chatbots-do-canal.service';
 
 @Controller('channels')
 export class ChannelsController {
-  constructor(private readonly channelsService: ChannelsService) {}
+  constructor(private readonly channelsService: ChannelsService, private readonly chatbotsDoCanal: ChatbotsDoCanalService) {}
+
+  /** Apenas os dados necessários à escolha dos fluxos, sem conceder edição do chatbot. */
+  @Get('/chatbots/opcoes')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('channel:view', 'channel:add', 'channel:update')
+  opcoesChatbot() {
+    return this.chatbotsDoCanal.opcoes();
+  }
 
   @Get()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)

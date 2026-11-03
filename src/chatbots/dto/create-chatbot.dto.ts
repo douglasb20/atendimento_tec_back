@@ -1,6 +1,6 @@
-import { ArrayMinSize, IsIn, IsInt, IsNotEmpty, IsString, MaxLength, ValidateIf } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
-import { ChatbotType } from '../entities/chatbots.entity';
+import type { ChatbotType } from '../entities/chatbots.entity';
 
 const TIPOS_VALIDOS: ChatbotType[] = ['entrada', 'saida', 'agendamento', 'complementar'];
 
@@ -13,14 +13,9 @@ export class CreateChatbotDto {
   @IsIn(TIPOS_VALIDOS, { message: 'Tipo de chatbot inválido' })
   type: ChatbotType;
 
-  /**
-   * Canais em que este chatbot roda - M:N (migration `1790020000000`), o
-   * mesmo chatbot pode ficar ligado a vários. Obrigatório (ao menos um) para
-   * entrada/saída/agendamento; ausente/vazio para complementar (subfluxo não
-   * amarra a canal nenhum).
-   */
-  @ValidateIf((dto: CreateChatbotDto) => dto.type !== 'complementar')
-  @IsInt({ each: true, message: 'Selecione ao menos um canal válido' })
-  @ArrayMinSize(1, { message: 'Selecione ao menos um canal' })
+  /** Compatibilidade com clientes antigos: vínculos agora são editados no canal. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(0, { message: 'Configure os fluxos na edição do canal, na aba Chatbot' })
   channel_ids?: number[];
 }

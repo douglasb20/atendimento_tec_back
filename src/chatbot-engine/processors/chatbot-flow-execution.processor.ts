@@ -26,7 +26,7 @@ export class ChatbotFlowExecutionProcessor extends WorkerHost {
 
     try {
       this.logger.log(`Processando execução ${executionId} (${trigger.kind})`);
-      await this.executionEngine.step(executionId, trigger);
+      await this.executionEngine.step(executionId, trigger, job.attemptsMade > 0 || job.stalledCounter > 0 || job.attemptsStarted > 1);
       return true;
     } catch (error) {
       this.logger.error(`Erro ao processar execução ${executionId}:`, error);

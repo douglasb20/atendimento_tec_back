@@ -12,7 +12,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 
-import { TipoAnexoChannel } from '../entities/channels.entity';
+import type { TipoAnexoChannel } from '../entities/channels.entity';
 
 /**
  * Teto das mensagens automáticas.
@@ -26,6 +26,24 @@ const LIMITE_MENSAGEM = 1000;
 const TIPOS_ANEXO: TipoAnexoChannel[] = ['image', 'video', 'audio', 'document'];
 
 export class CreateOrChannelDto {
+  @IsOptional()
+  @IsBoolean()
+  chatbot_habilitado?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  chatbot_saida_por_padrao?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  chatbot_entrada_id?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  chatbot_saida_id?: number | null;
+
   @IsOptional()
   @IsInt()
   @Min(1)

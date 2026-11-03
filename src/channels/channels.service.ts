@@ -11,6 +11,8 @@ import { ChannelsRepository } from './channels.repository';
 import { AssinarAnexoCanalDto } from './dto/assinar-anexo-canal.dto';
 import { CreateOrChannelDto } from './dto/create-or-channel.dto';
 import { Channels } from './entities/channels.entity';
+import { ChatbotsDoCanalService } from './chatbots-do-canal.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 /** Onde os anexos de saudação/despedida vivem. O cron de retenção não varre este prefixo. */
 const PREFIXO_ANEXO = 'channels';
@@ -24,6 +26,8 @@ export class ChannelsService {
     private readonly departmentsRepository: DepartmentsRepository,
     private readonly storageService: StorageService,
     private dataSource: DataSource,
+    private readonly chatbotsDoCanal: ChatbotsDoCanalService,
+    private readonly eventos: EventEmitter2,
   ) {}
 
   async getActiveChannels(): Promise<Channels[]> {
@@ -81,7 +85,7 @@ export class ChannelsService {
   async createChannel(createChannelDto: CreateOrChannelDto): Promise<Channels> {
     this.validaInatividade(createChannelDto);
     createChannelDto.default_department_id = await this.validaSetorPadrao(createChannelDto);
-    const { department_ids, ...dadosDoCanal } = createChannelDto;
+    const { department_ids, chatbot_entrada_id: _entrada, chatbot_saida_id: _saida, ...dadosDoCanal } = createChannelDto;
 
     const channel = this.channelsRepository.create({
       ...dadosDoCanal,
@@ -90,6 +94,7 @@ export class ChannelsService {
     await runInTransaction(this.dataSource, async (manager) => {
       await manager.save(channel);
       if (department_ids !== undefined) await this.gravaSetores(channel.id, department_ids, manager);
+      await this.chatbotsDoCanal.salvar(channel.id, createChannelDto, manager);
     });
 
     return channel;
@@ -99,7 +104,7 @@ export class ChannelsService {
     this.validaInatividade(createChannelDto);
     const channel = await this.findChannel(channelId);
     createChannelDto.default_department_id = await this.validaSetorPadrao(createChannelDto, channelId);
-    const { department_ids, ...dadosDoCanal } = createChannelDto;
+    const { department_ids, chatbot_entrada_id: _entrada, chatbot_saida_id: _saida, ...dadosDoCanal } = createChannelDto;
 
     // O anexo antigo sai do storage quando é trocado ou removido: sem isto o
     // bucket acumularia arquivos que nada mais referencia.
@@ -110,10 +115,18 @@ export class ChannelsService {
       ...channel,
       ...dadosDoCanal,
     });
+    let encaminhados: number[] = [];
     await runInTransaction(this.dataSource, async (manager) => {
-      await manager.save(channelUpdated);
+      await manager.query('SELECT id FROM channels WHERE id = $1 FOR UPDATE', [channelId]);
+      // O lock serializa os vínculos; a atualização parcial preserva campos omitidos.
+      await manager.update(Channels, channelId, { ...dadosDoCanal, updated_at: new Date() });
       if (department_ids !== undefined) await this.gravaSetores(channelId, department_ids, manager);
+      await this.chatbotsDoCanal.salvar(channelId, createChannelDto, manager);
+      if (createChannelDto.chatbot_habilitado === false) encaminhados = await this.chatbotsDoCanal.desabilitar(channelId, manager);
     });
+    if (createChannelDto.chatbot_habilitado === false) {
+      await this.eventos.emitAsync('atendimento.ajustes-atualizados', { encaminhados });
+    }
 
     // A rejeição de chamadas vive no provider (setting da instância): sem
     // reaplicar aqui, a mudança só valeria na próxima reconexão do canal.
@@ -210,7 +223,7 @@ export class ChannelsService {
       .of(channelId)
       .loadMany();
 
-    return this.comUrlDosAnexos(channel);
+    return this.comUrlDosAnexos(await this.chatbotsDoCanal.carregar(channel));
   }
 
   /**

@@ -7,8 +7,8 @@ jest.mock('./processors/chatbot-flow-execution.processor', () => ({}));
 describe('Recuperação de prazos e respostas do chatbot', () => {
   function preparar(pendentes: object[]) {
     const fila = { add: jest.fn() };
-    const repositorio = { buscarRetomadasPendentes: jest.fn().mockResolvedValue(pendentes) };
-    return { fila, servico: new ChatbotFlowExecutionsService(fila as never, repositorio as never) };
+    const repositorio = { buscarRetomadasPendentes: jest.fn().mockResolvedValue(pendentes), buscarIniciosPendentes: jest.fn().mockResolvedValue([]) };
+    return { fila, repositorio, servico: new ChatbotFlowExecutionsService(fila as never, repositorio as never) };
   }
   it('recupera um prazo vencido e usa identidade única por espera', async () => {
     const { fila, servico } = preparar([{ id: 1, waiting_for: { token: 'espera-1' } }]);
@@ -25,5 +25,11 @@ describe('Recuperação de prazos e respostas do chatbot', () => {
     const { fila, servico } = preparar([]);
     await servico.recuperarRetomadasPendentes();
     expect(fila.add).not.toHaveBeenCalled();
+  });
+  it('recupera o início do pós-atendimento após falha entre commit e fila', async () => {
+    const { fila, repositorio, servico } = preparar([]);
+    repositorio.buscarIniciosPendentes.mockResolvedValue([{ id: 42 }] as never);
+    await servico.recuperarRetomadasPendentes();
+    expect(fila.add).toHaveBeenCalledWith('process', { executionId: 42, trigger: { kind: 'start' } }, expect.anything());
   });
 });

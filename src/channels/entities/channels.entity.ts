@@ -27,6 +27,16 @@ export class Channels {
   @Column({ type: 'varchar', length: 100, nullable: false })
   name: string;
 
+  @Column({ type: 'boolean', default: false })
+  chatbot_habilitado: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  chatbot_saida_por_padrao: boolean;
+
+  /** Projeções da associação M:N; a gravação acontece somente pelo canal. */
+  chatbot_entrada_id?: number | null;
+  chatbot_saida_id?: number | null;
+
   @Column({ type: 'varchar', length: 20, nullable: true })
   phone_number: string;
 

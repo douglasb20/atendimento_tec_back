@@ -21,8 +21,9 @@ export type ChatbotType = 'entrada' | 'saida' | 'agendamento' | 'complementar';
  * chatbot pode ficar ligado a vários canais (reaproveitar o mesmo fluxo em
  * vários números), decisão que reverteu o `channel_id` único original. A
  * trava "só um chatbot ativo de cada tipo por canal" não é mais constraint de
- * banco - vira "nenhum canal pode ter dois vínculos para chatbots do mesmo
- * tipo", verificada em `ChatbotsService` (ver lá).
+ * banco. Entrada/saída agora são selecionadas pelo canal, em
+ * `ChatbotsDoCanalService`, que substitui somente o vínculo daquele tipo.
+ * O cadastro do chatbot não altera associações com canais.
  */
 @Entity('chatbots')
 export class Chatbots {

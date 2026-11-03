@@ -13,6 +13,7 @@ import { ChannelsController } from './channels.controller';
 import { ChannelsListener } from './channels.listener';
 import { ChannelsRepository } from './channels.repository';
 import { ChannelsService } from './channels.service';
+import { ChatbotsDoCanalService } from './chatbots-do-canal.service';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { ChannelsService } from './channels.service';
     StorageModule,
   ],
   controllers: [ChannelsController],
-  providers: [ChannelsService, ChannelsRepository, ChannelsListener],
+  providers: [ChannelsService, ChannelsRepository, ChannelsListener, ChatbotsDoCanalService],
   exports: [ChannelsService, ChannelsRepository],
 })
 export class ChannelsModule {}

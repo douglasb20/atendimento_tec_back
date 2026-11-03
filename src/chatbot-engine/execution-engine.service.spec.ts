@@ -14,6 +14,7 @@ jest.mock('./node-handlers/node-handlers.registry', () => ({ NodeHandlersRegistr
 describe('Separação da fila do chatbot e espera humana', () => {
   function preparar(resultado: object = { kind: 'finish' }) {
     const execucao = { id: 10, support_chat_id: 20, status: 'running', version: 1,
+      phase: 'entrada' as 'entrada' | 'saida',
       current_flow_version_id: 1, variables: {}, counters: {}, call_stack: [], waiting_for: null as WaitingFor | null };
     const repositorio = { findById: jest.fn().mockResolvedValue(execucao),
       salvarComLockOuFalha: jest.fn(), abortarDoAtendimento: jest.fn(), renovarPrazoAposEnvio: jest.fn() };
@@ -21,7 +22,7 @@ describe('Separação da fila do chatbot e espera humana', () => {
       contact: { remote_jid: 'cliente' }, channel: { session_id: 'canal' } };
     const atendimentos = { bloquearParaExecucaoBot: jest.fn().mockResolvedValue(true),
       findParaEnvioBot: jest.fn().mockResolvedValue(chat), whatsappChatStateEmit: jest.fn(),
-      devolverBotParaEspera: jest.fn(), encerrarPorChatbot: jest.fn() };
+      devolverBotParaEspera: jest.fn(), encerrarPorChatbot: jest.fn(), concluirPosAtendimento: jest.fn() };
     const handler = { execute: jest.fn().mockResolvedValue(resultado) };
     const whatsapp = { sendMessage: jest.fn().mockResolvedValue({ messageId: 'mensagem' }) };
     const graph = { nodes: [{ id: 'inicio', type: 'start' }], edges: [] as { source: string; sourceHandle: string; target: string }[] };
@@ -36,6 +37,74 @@ describe('Separação da fila do chatbot e espera humana', () => {
     const { motor, atendimentos } = preparar();
     await motor.step(10, { kind: 'start' });
     expect(atendimentos.devolverBotParaEspera).toHaveBeenCalledWith(20);
+  });
+
+  it('conclui o pós-atendimento sem reabrir a espera humana', async () => {
+    const { motor, execucao, atendimentos } = preparar();
+    execucao.phase = 'saida';
+    await motor.step(10, { kind: 'start' });
+    expect(atendimentos.concluirPosAtendimento).toHaveBeenCalledWith(20);
+    expect(atendimentos.devolverBotParaEspera).not.toHaveBeenCalled();
+    expect(atendimentos.encerrarPorChatbot).not.toHaveBeenCalled();
+  });
+
+  it('o nó Encerrar no fluxo de saída não repete despedida nem encerra novamente', async () => {
+    const { motor, execucao, atendimentos } = preparar({ kind: 'close_support_chat', enviarDespedida: true });
+    execucao.phase = 'saida';
+    await motor.step(10, { kind: 'start' });
+    expect(atendimentos.encerrarPorChatbot).not.toHaveBeenCalled();
+    expect(atendimentos.concluirPosAtendimento).toHaveBeenCalledWith(20);
+  });
+
+  it('envia no mesmo atendimento finalizado, preservando o atendente histórico', async () => {
+    const { motor, execucao, atendimentos, whatsapp, chat } = preparar({ kind: 'finish', effects: [{ type: 'send_text', text: 'Até logo' }] });
+    execucao.phase = 'saida';
+    atendimentos.findParaEnvioBot.mockResolvedValue({ ...chat, support_chat_status_id: 5, user_id: 7, pos_atendimento_ativo: true } as never);
+    await motor.step(10, { kind: 'start' });
+    expect(whatsapp.sendMessage).toHaveBeenCalled();
+    expect(atendimentos.concluirPosAtendimento.mock.invocationCallOrder[0]).toBeGreaterThan(whatsapp.sendMessage.mock.invocationCallOrder[0]);
+  });
+
+  it('mantém o protocolo reservado enquanto o fluxo de saída aguarda resposta', async () => {
+    const { motor, execucao, atendimentos } = preparar({ kind: 'suspend', waitingFor: { node_id: 'inicio' } });
+    execucao.phase = 'saida';
+    await motor.step(10, { kind: 'start' });
+    expect(atendimentos.concluirPosAtendimento).not.toHaveBeenCalled();
+  });
+
+  it('libera o pós-atendimento mesmo quando o envio final falha', async () => {
+    const { motor, execucao, atendimentos, whatsapp, chat } = preparar({ kind: 'finish', effects: [{ type: 'send_text', text: 'Até logo' }] });
+    execucao.phase = 'saida';
+    atendimentos.findParaEnvioBot.mockResolvedValue({ ...chat, support_chat_status_id: 5, pos_atendimento_ativo: true } as never);
+    whatsapp.sendMessage.mockRejectedValue(new Error('Provider indisponível'));
+    await expect(motor.step(10, { kind: 'start' })).rejects.toThrow('Provider indisponível');
+    expect(atendimentos.concluirPosAtendimento).toHaveBeenCalledWith(20);
+  });
+
+  it('um retry de conclusão libera a reserva sem reenviar mensagens', async () => {
+    const { motor, execucao, atendimentos, handler, whatsapp } = preparar();
+    execucao.phase = 'saida'; execucao.status = 'completed';
+    await motor.step(10, { kind: 'start' }, true);
+    expect(atendimentos.concluirPosAtendimento).toHaveBeenCalledWith(20);
+    expect(handler.execute).not.toHaveBeenCalled(); expect(whatsapp.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('um job duplicado normal não libera a reserva enquanto outro job pode estar enviando', async () => {
+    const { motor, execucao, atendimentos } = preparar();
+    execucao.phase = 'saida'; execucao.status = 'completed';
+    await motor.step(10, { kind: 'start' });
+    expect(atendimentos.concluirPosAtendimento).not.toHaveBeenCalled();
+  });
+
+  it('o prazo Sem resposta conclui a saída sem devolver o atendimento para Espera', async () => {
+    const { motor, execucao, graph, atendimentos } = preparar();
+    execucao.phase = 'saida'; execucao.status = 'suspended';
+    execucao.waiting_for = { type: 'contact_reply', node_id: 'inicio', since: new Date().toISOString(), token: 'prazo',
+      timeout_at: new Date(Date.now() - 1000).toISOString(), timeout_handle: 'sem-resposta' };
+    graph.nodes.push({ id: 'fim', type: 'finish' }); graph.edges.push({ source: 'inicio', target: 'fim', sourceHandle: 'sem-resposta' });
+    await motor.step(10, { kind: 'timeout', waitingToken: 'prazo' });
+    expect(atendimentos.concluirPosAtendimento).toHaveBeenCalledWith(20);
+    expect(atendimentos.devolverBotParaEspera).not.toHaveBeenCalled();
   });
 
   it('devolve para Espera quando o último nó não tem conexão de saída', async () => {
@@ -76,6 +145,13 @@ describe('Separação da fila do chatbot e espera humana', () => {
   it('não envia efeitos se um atendente assumir após o processamento', async () => {
     const { motor, atendimentos, whatsapp, chat } = preparar({ kind: 'finish', effects: [{ type: 'send_text', text: 'Teste' }] });
     atendimentos.findParaEnvioBot.mockResolvedValue({ ...chat, support_chat_status_id: 2 });
+    await motor.step(10, { kind: 'start' });
+    expect(whatsapp.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('não envia efeitos após desabilitar o chatbot no canal', async () => {
+    const { motor, atendimentos, whatsapp, chat } = preparar({ kind: 'finish', effects: [{ type: 'send_text', text: 'Teste' }] });
+    atendimentos.findParaEnvioBot.mockResolvedValue({ ...chat, channel: { ...chat.channel, chatbot_habilitado: false } } as never);
     await motor.step(10, { kind: 'start' });
     expect(whatsapp.sendMessage).not.toHaveBeenCalled();
   });

@@ -294,6 +294,13 @@ export class SupportChatsController {
     );
   }
 
+  @Get('/:id/fluxo-saida')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
+  @Permissions('support.chat:update')
+  fluxoSaida(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
+    return this.supportChatsService.fluxoSaidaDisponivel(id, req.user['id'], Boolean(req.user['is_superuser']));
+  }
+
   @Post('/:id/finalizar')
   @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:update')
