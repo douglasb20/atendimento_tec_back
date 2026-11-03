@@ -9,6 +9,15 @@ export class ChatbotsRepository extends Repository<Chatbots> {
     super(Chatbots, dataSource.manager);
   }
 
+  async idsComAlteracoesNaoPublicadas(ids: number[], manager?: EntityManager): Promise<number[]> {
+    if (!ids.length) return [];
+    const linhas = await (manager ?? this.manager).query(`SELECT c.id FROM chatbots c
+      JOIN chatbot_flow_versions p ON p.id = c.current_published_version_id
+      JOIN chatbot_flow_versions d ON d.chatbot_id = c.id AND d.status = 'draft'
+      WHERE c.id = ANY($1::int[]) AND d.graph IS DISTINCT FROM p.graph`, [ids]);
+    return linhas.map((linha: { id: number }) => Number(linha.id));
+  }
+
   /**
    * Os chatbots ativos, exceto os fluxos complementares - a listagem
    * principal não é o lugar deles (ver `findAllComplementares`).

@@ -46,7 +46,7 @@ export class SupportChats {
   @Column({ name: 'support_chat_status_id', type: 'int' })
   support_chat_status_id: number;
 
-  /** A etapa humana já terminou; respostas do fluxo de saída ainda usam este protocolo. */
+  /** Atendimento encerrado por humano ou bot; respostas da saída ainda usam este protocolo. */
   @Column({ type: 'boolean', default: false })
   pos_atendimento_ativo: boolean;
 

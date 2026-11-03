@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager, IsNull } from 'typeorm';
 
 import { runInTransaction } from '@/Utils';
 import { PresignedUpload, StorageService } from '@/storage/storage.service';
@@ -17,6 +18,8 @@ import { Chatbots } from './entities/chatbots.entity';
 import { validarTemposDeResposta } from './tempo-resposta';
 import { validarFluxoSaida } from './validar-fluxo-saida';
 import { validarTentativasMenu } from './tentativas-menu';
+import { validarInicioFixo } from './inicio-fixo';
+import { lerDestinoEncaminhamento, validarDestinoEncaminhamento } from './encaminhamento-atendimento';
 
 /**
  * Onde os anexos do nó Mensagem vivem - permanentes, presos ao cadastro do
@@ -39,15 +42,41 @@ export class ChatbotsService {
   ) {}
 
   async findAll(): Promise<Chatbots[]> {
-    return this.chatbotsRepository.findAllActive();
+    return this.comEstadoPublicacao(await this.chatbotsRepository.findAllActive());
   }
 
   async findAllComplementares(): Promise<Chatbots[]> {
-    return this.chatbotsRepository.findAllComplementares();
+    return this.comEstadoPublicacao(await this.chatbotsRepository.findAllComplementares());
+  }
+
+  private async comEstadoPublicacao(chatbots: Chatbots[], manager?: EntityManager) {
+    const alterados = new Set(await this.chatbotsRepository.idsComAlteracoesNaoPublicadas(chatbots.map(c => c.id), manager));
+    return chatbots.map(chatbot => ({ ...chatbot, has_unpublished_changes: alterados.has(Number(chatbot.id)) }));
+  }
+
+  /** Serializa salvar/publicar/despublicar sem alterar versões em execução. */
+  private async bloquearChatbot(id: number, manager: EntityManager): Promise<Chatbots> {
+    const chatbot = await manager.findOne(Chatbots, {
+      where: { id, deleted_at: IsNull() }, lock: { mode: 'pessimistic_write' },
+    });
+    if (!chatbot) throw new NotFoundException('Chatbot não encontrado');
+    return chatbot;
+  }
+
+  /** Opções do editor sem expor cadastro completo ou e-mail dos atendentes. */
+  async destinosAtendimento() {
+    const [setores, atendentes] = await Promise.all([
+      this.dataSource.query('SELECT id, name FROM departments WHERE deleted_at IS NULL ORDER BY name'),
+      this.dataSource.query(`SELECT u.id, u.name, u.last_name, ud.department_id FROM users u
+        JOIN user_x_department ud ON ud.user_id = u.id JOIN departments d ON d.id = ud.department_id
+        WHERE u.status = 1 AND d.deleted_at IS NULL ORDER BY u.name, u.last_name`),
+    ]);
+    return { setores, atendentes };
   }
 
   async findOne(id: number): Promise<Chatbots> {
-    return this.chatbotsRepository.findById(id);
+    const chatbot = await this.chatbotsRepository.findById(id);
+    return (await this.comEstadoPublicacao([chatbot]))[0];
   }
 
   async create(dto: CreateChatbotDto): Promise<Chatbots> {
@@ -94,13 +123,15 @@ export class ChatbotsService {
     }
 
     return runInTransaction(this.dataSource, async (manager) => {
-      await manager.save(Chatbots, {
-        ...chatbot,
+      // Não regrava o ponteiro de publicação lido antes da transação:
+      // uma publicação simultânea não pode ser desfeita ao editar o nome.
+      const alteracoes = {
         ...(name && { name }),
         ...(dto.type !== undefined && { type: dto.type }),
         ...(dto.active !== undefined && { active: dto.active }),
         ...(dto.settings !== undefined && { settings: dto.settings }),
-      });
+      };
+      if (Object.keys(alteracoes).length) await manager.update(Chatbots, id, alteracoes);
 
       this.logger.log(`Chatbot atualizado: id ${id}`);
 
@@ -146,7 +177,10 @@ export class ChatbotsService {
   async findDraft(chatbotId: number): Promise<ChatbotFlowVersions> {
     await this.chatbotsRepository.findById(chatbotId); // 404 se o chatbot não existir
 
-    return this.chatbotFlowVersionsRepository.findDraft(chatbotId);
+    const draft = await this.chatbotFlowVersionsRepository.findDraft(chatbotId);
+    if (!draft) throw new NotFoundException('Rascunho do fluxo não encontrado');
+    const alterados = await this.chatbotsRepository.idsComAlteracoesNaoPublicadas([chatbotId]);
+    return { ...draft, has_unpublished_changes: alterados.includes(Number(chatbotId)) } as ChatbotFlowVersions;
   }
 
   /**
@@ -164,38 +198,23 @@ export class ChatbotsService {
     return this.storageService.createPresignedPost(key, dto.fileType);
   }
 
-  /**
-   * Uma versão publicada é imutável do ponto de vista do editor. `active`
-   * controla somente se o motor pode iniciar novas execuções; não é uma
-   * ferramenta de edição e, portanto, não participa desta decisão.
-   */
-  private emProducao(chatbot: Chatbots): boolean {
-    return chatbot.current_published_version_id != null;
-  }
-
-  private assertNaoEmProducao(chatbot: Chatbots): void {
-    if (this.emProducao(chatbot)) {
-      throw new BadRequestException(
-        'Este chatbot está publicado - despublique-o antes de editar ou publicar o fluxo.',
-      );
-    }
-  }
-
   /** Substitui o grafo do rascunho inteiro - não há edição parcial de nó. */
   async saveFlow(chatbotId: number, dto: SaveFlowDto): Promise<ChatbotFlowVersions> {
-    const chatbot = await this.chatbotsRepository.findById(chatbotId);
-    this.assertNaoEmProducao(chatbot);
-
     return runInTransaction(this.dataSource, async (manager) => {
+      await this.bloquearChatbot(chatbotId, manager);
       const draft = await this.chatbotFlowVersionsRepository.findDraft(chatbotId, manager);
+      if (!draft) throw new NotFoundException('Rascunho do fluxo não encontrado');
 
+      validarInicioFixo(dto, draft.graph);
       await manager.update(ChatbotFlowVersions, draft.id, {
         graph: { nodes: dto.nodes, edges: dto.edges, viewport: dto.viewport },
       });
 
       this.logger.log(`Fluxo salvo: chatbot ${chatbotId}, draft ${draft.id}`);
 
-      return manager.findOne(ChatbotFlowVersions, { where: { id: draft.id } });
+      const salvo = await manager.findOne(ChatbotFlowVersions, { where: { id: draft.id } });
+      const alterados = await this.chatbotsRepository.idsComAlteracoesNaoPublicadas([chatbotId], manager);
+      return { ...salvo, has_unpublished_changes: alterados.includes(Number(chatbotId)) } as ChatbotFlowVersions;
     });
   }
 
@@ -203,25 +222,31 @@ export class ChatbotsService {
    * Congela o draft atual numa nova versão `published` e aponta
    * `Chatbots.current_published_version_id` para ela - é só a partir daqui
    * que o motor de execução (`findEntradaAtivoDoCanal`) passa a enxergar o
-   * fluxo. O draft não é alterado por esta operação; para voltar a editá-lo,
-   * é necessário despublicar, sem alterar o status ativo/inativo do chatbot.
+   * fluxo. O draft continua editável enquanto a publicação anterior atende.
+   * Execuções existentes mantêm a versão que já carregaram.
    */
   async publish(chatbotId: number): Promise<Chatbots> {
-    const chatbot = await this.chatbotsRepository.findById(chatbotId);
-    this.assertNaoEmProducao(chatbot);
-
     return runInTransaction(this.dataSource, async (manager) => {
+      const chatbot = await this.bloquearChatbot(chatbotId, manager);
       const draft = await this.chatbotFlowVersionsRepository.findDraft(chatbotId, manager);
 
       if (!draft) {
         throw new NotFoundException('Rascunho do fluxo não encontrado');
       }
 
+      validarInicioFixo(draft.graph);
       validarTemposDeResposta(draft.graph);
       validarTentativasMenu(draft.graph);
       if (chatbot.type === 'saida') validarFluxoSaida(draft.graph);
 
-      for (const no of draft.graph.nodes.filter((no) => ['set_department', 'business_hours'].includes(no.type))) {
+      for (const no of draft.graph.nodes.filter(no => no.type === 'handoff')) {
+        if (draft.graph.edges.some(edge => edge.source === no.id)) {
+          throw new BadRequestException('O nó Encaminhar para atendimento termina o chatbot e não pode ter ligações de saída');
+        }
+        await validarDestinoEncaminhamento(manager, lerDestinoEncaminhamento(no.data));
+      }
+
+      for (const no of draft.graph.nodes.filter((no) => ['set_department', 'business_hours', 'handoff'].includes(no.type))) {
         const setorId = Number(no.data.department_id);
         if (!Number.isSafeInteger(setorId) || setorId <= 0) throw new BadRequestException('Escolha o setor em todos os nós de definição de setor ou verificação de horário');
         const [setor] = await manager.query('SELECT id FROM departments WHERE id = $1 AND deleted_at IS NULL', [setorId]);
@@ -229,6 +254,11 @@ export class ChatbotsService {
         const invalidos = await manager.query(`SELECT c.name FROM channels c JOIN channel_x_chatbot cc ON cc.channel_id = c.id
           WHERE cc.chatbot_id = $1 AND NOT EXISTS (SELECT 1 FROM channel_x_department cd WHERE cd.channel_id = c.id AND cd.department_id = $2)`, [chatbotId, setorId]);
         if (invalidos.length) throw new BadRequestException(`O setor do fluxo precisa estar vinculado aos canais: ${invalidos.map((c: { name: string }) => c.name).join(', ')}`);
+      }
+      const vigente = chatbot.current_published_version_id
+        ? await this.chatbotFlowVersionsRepository.findById(chatbot.current_published_version_id, manager) : null;
+      if (vigente && isDeepStrictEqual(vigente.graph, draft.graph)) {
+        return { ...chatbot, has_unpublished_changes: false };
       }
       const publicada = await this.chatbotFlowVersionsRepository.publicarDraft(draft, manager);
 
@@ -238,7 +268,7 @@ export class ChatbotsService {
         `Fluxo publicado: chatbot ${chatbotId}, versão ${publicada.version_number} (id ${publicada.id})`,
       );
 
-      return manager.findOne(Chatbots, { where: { id: chatbotId } });
+      return { ...await manager.findOne(Chatbots, { where: { id: chatbotId } }), has_unpublished_changes: false };
     });
   }
 
@@ -249,16 +279,14 @@ export class ChatbotsService {
    * versão.
    */
   async unpublish(chatbotId: number): Promise<Chatbots> {
-    const chatbot = await this.chatbotsRepository.findById(chatbotId);
-
-    if (!chatbot.current_published_version_id) return chatbot;
-
     return runInTransaction(this.dataSource, async (manager) => {
+      const chatbot = await this.bloquearChatbot(chatbotId, manager);
+      if (!chatbot.current_published_version_id) return { ...chatbot, has_unpublished_changes: false };
       await manager.update(Chatbots, chatbotId, { current_published_version_id: null });
 
       this.logger.log(`Fluxo despublicado: chatbot ${chatbotId}`);
 
-      return manager.findOne(Chatbots, { where: { id: chatbotId } });
+      return { ...await manager.findOne(Chatbots, { where: { id: chatbotId } }), has_unpublished_changes: false };
     });
   }
 }

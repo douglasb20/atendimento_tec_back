@@ -41,6 +41,13 @@ export class ChatbotsController {
     return this.chatbotsService.findAll();
   }
 
+  @Get('/destinos-atendimento')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('chatbot:view', 'chatbot:update', 'chatbot:publish')
+  destinosAtendimento() {
+    return this.chatbotsService.destinosAtendimento();
+  }
+
   @Get('/:id')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('chatbot:view')

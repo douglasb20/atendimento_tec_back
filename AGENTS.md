@@ -168,8 +168,12 @@ chatbot. A tabela continua `channel_x_chatbot`; `channels.chatbot_habilitado`
 controla o uso naquele canal sem apagar vínculos. Desabilitar aborta pendências
 e devolve a fila do bot à espera. O cadastro do chatbot admite zero canais.
 O modal de finalização envia `executar_fluxo_saida`, independente de
-`sem_despedida`. Só a finalização humana normal inicia saída; descarte,
-inatividade e Encerrar atendimento do bot não a disparam. A saída usa status 5
+`sem_despedida`. A finalização humana normal inicia saída; o nó Encerrar
+atendimento também pode iniciá-la com `executarFluxoSaida = true` (padrão false),
+independente da preferência/permissão da finalização humana. Sem saída ativa e
+publicada ou módulo/canal habilitado, apenas encerra. Descarte e inatividade não
+a disparam. O nó na própria saída nunca inicia outra saída nem envia despedida.
+A saída usa status 5 (humano) ou 7 (bot)
 com `pos_atendimento_ativo = true` e execução `phase = 'saida'`. Preserve dono,
 setor, relato e `finished_at` da etapa humana. `buscaAberta` reaproveita esse
 protocolo enquanto a reserva está ativa; o fim da saída apenas libera a reserva,
@@ -188,6 +192,31 @@ resposta recebida ficam nesse JSONB, não em temporizadores em memória.
 retomadas deduplicadas por token. O motor relê a execução após bloquear o chat:
 resposta gravada tem prioridade sobre timeout; jobs de outro token são ignorados.
 Assumir/descartar/desabilitar já abortam as execuções e invalidam os prazos.
+
+## Rascunho e publicação do chatbot
+
+O rascunho permanece editável com uma versão publicada. Salvar altera somente
+a linha `draft`; publicar cria uma nova versão imutável e troca o ponteiro para
+novas execuções. Execuções existentes preservam seus ids de versão. Publicar
+um grafo idêntico ao vigente não cria versão extra. As três ações salvar,
+publicar e despublicar bloqueiam a mesma linha do chatbot para serializar a
+troca de versão. Atualizar metadados não deve regravar um ponteiro antigo.
+`has_unpublished_changes` é calculado pela comparação JSONB entre rascunho e
+publicação vigente, não é coluna. Despublicar retira novas entradas, preservando
+o rascunho e as execuções em andamento. Permissões de editar e publicar seguem
+independentes.
+
+## Encaminhamento para atendimento humano
+
+O nó `handoff` (Encaminhar para atendimento) termina a automação e entrega no
+mesmo protocolo. `destination = 'department'` usa `department_id` e coloca em
+Espera; `destination = 'user'` exige também `user_id`, atribui e coloca em
+Em atendimento, iniciando `answered_at` como na atribuição manual. Publicação
+e execução validam setor ativo, vínculo ao canal, atendente ativo e membro do
+setor. Mensagens anteriores saem antes da atribuição; falha de envio não impede
+a entrega ao humano. O histórico usa evento `encaminhamento`, sem usuário de
+origem. Saída não permite esse nó, inclusive quando ele vem de um subfluxo.
+Definir setor continua a automação, sem entregar à equipe por si só.
 
 ## Tentativas inválidas do Menu
 

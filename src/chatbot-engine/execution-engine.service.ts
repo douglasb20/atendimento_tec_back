@@ -8,6 +8,7 @@ import { runInTransaction } from '@/Utils';
 import { ChatbotFlowVersionsRepository } from '@/chatbots/chatbot-flow-versions.repository';
 import { ChatbotFlowGraph } from '@/chatbots/entities/chatbot-flow-versions.entity';
 import { Chatbots } from '@/chatbots/entities/chatbots.entity';
+import type { DestinoEncaminhamento } from '@/chatbots/encaminhamento-atendimento';
 import { WhatsappService } from '@/whatsapp/whatsapp.service';
 import { SupportChatsService, TIPO_INTERNO_POR_MIDIA } from '@/support-chats/support-chats.service';
 import { SendMediaType } from '@/support-chats/dto/send-media.dto';
@@ -59,6 +60,8 @@ export class ExecutionEngine {
     let execucaoFinal: ChatbotFlowExecutions;
     let encerrarAtendimento = false;
     let enviarDespedida = false;
+    let executarFluxoSaida = false;
+    let encaminhamento: DestinoEncaminhamento | undefined;
 
     await runInTransaction(this.dataSource, async (manager) => {
       let execucao = await this.executionsRepository.findById(executionId, manager);
@@ -102,6 +105,8 @@ export class ExecutionEngine {
       execucaoFinal = resultado.execucao;
       encerrarAtendimento = resultado.encerrarAtendimento;
       enviarDespedida = resultado.enviarDespedida;
+      executarFluxoSaida = resultado.executarFluxoSaida ?? false;
+      encaminhamento = resultado.encaminhamento;
     });
 
     // Fora da transação, de propósito: chamadas ao provider do WhatsApp
@@ -115,7 +120,17 @@ export class ExecutionEngine {
     }
 
     try {
-      await this.dispararEfeitos(execucaoFinal, effects);
+      try {
+        await this.dispararEfeitos(execucaoFinal, effects);
+      } catch (erro) {
+        if (!encaminhamento) throw erro;
+        // Uma mensagem anterior indisponível não deve impedir a entrega ao humano.
+        this.logger.warn(`Execução ${executionId}: falha no envio antes do encaminhamento: ${erro.message}`);
+      }
+
+      if (encaminhamento && execucaoFinal.phase !== 'saida') {
+        await this.supportChatsService.encaminharPorChatbot(execucaoFinal.support_chat_id, encaminhamento);
+      }
 
       const espera = execucaoFinal.waiting_for;
       if (execucaoFinal.status === 'suspended' && espera?.timeout_minutes) {
@@ -123,7 +138,7 @@ export class ExecutionEngine {
       }
 
       if (encerrarAtendimento && execucaoFinal.support_chat_id && execucaoFinal.phase !== 'saida') {
-        await this.supportChatsService.encerrarPorChatbot(execucaoFinal.support_chat_id, enviarDespedida);
+        await this.supportChatsService.encerrarPorChatbot(execucaoFinal.support_chat_id, enviarDespedida, executarFluxoSaida);
       }
     } finally {
       // Mantém o cliente no bot até o último envio. O UPDATE condicional não
@@ -144,6 +159,8 @@ export class ExecutionEngine {
     effects: NodeEffect[];
     encerrarAtendimento: boolean;
     enviarDespedida: boolean;
+    executarFluxoSaida?: boolean;
+    encaminhamento?: DestinoEncaminhamento;
   }> {
     let execucao = execucaoInicial;
     let currentFlowVersionId = execucao.current_flow_version_id;
@@ -226,6 +243,16 @@ export class ExecutionEngine {
         continue;
       }
 
+      if (resultado.kind === 'handoff') {
+        if (execucao.phase === 'saida') throw new Error('O pós-atendimento não pode encaminhar para atendimento humano');
+        const destino = { departmentId: resultado.departmentId, userId: resultado.userId };
+        await this.supportChatsService.validarEncaminhamentoPorChatbot(execucao.support_chat_id, destino, manager);
+        const concluida = await this.persisteConcluida(execucao, {
+          variables, budget, effects: effectsAcumulados, manager,
+        });
+        return { ...concluida, encerrarAtendimento: false, enviarDespedida: false, encaminhamento: destino };
+      }
+
       if (resultado.kind === 'finish') {
         if (callStack.length > 0) {
           const frame = callStack.pop();
@@ -256,6 +283,7 @@ export class ExecutionEngine {
           ...concluida,
           encerrarAtendimento: true,
           enviarDespedida: resultado.enviarDespedida,
+          executarFluxoSaida: resultado.executarFluxoSaida,
         };
       }
 
@@ -303,8 +331,12 @@ export class ExecutionEngine {
     fromNodeId: string,
     outputHandle: string | null,
   ): string | null {
+    // As duas posições do nó Mensagem representam a mesma continuação.
+    // Grafos antigos salvam null; o editor atual identifica a posição visual.
+    const saidaDaMensagem = outputHandle == null && graph.nodes.some(n => n.id === fromNodeId && n.type === 'message');
     const edge = graph.edges.find(
-      (e) => e.source === fromNodeId && (e.sourceHandle ?? null) === (outputHandle ?? null),
+      (e) => e.source === fromNodeId && ((e.sourceHandle ?? null) === (outputHandle ?? null)
+        || saidaDaMensagem && ['saida-direita', 'saida-inferior'].includes(e.sourceHandle)),
     );
 
     return edge?.target ?? null;
@@ -449,7 +481,7 @@ export class ExecutionEngine {
       // a conversa entre dois envios acumulados pelo mesmo passo do fluxo.
       const atual = await this.supportChatsService.findParaEnvioBot(execucao.support_chat_id);
       const permitido = execucao.phase === 'saida'
-        ? atual?.support_chat_status_id === SupportChatStatusId.FINALIZADO && atual.pos_atendimento_ativo
+        ? [SupportChatStatusId.FINALIZADO, SupportChatStatusId.FINALIZADO_PELO_CHATBOT].includes(atual?.support_chat_status_id) && atual?.pos_atendimento_ativo
         : atual?.support_chat_status_id === SupportChatStatusId.EM_FILA && !atual.user_id;
       if (!permitido || atual.channel?.chatbot_habilitado === false) return;
       if (effect.type === 'send_text') {

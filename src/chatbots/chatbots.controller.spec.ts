@@ -46,4 +46,11 @@ describe('Permissões das operações de chatbot', () => {
     expect(await validar('unpublish')).toBe(true);
     await expect(validar('saveFlow')).rejects.toThrow();
   });
+
+  it('as opções de encaminhamento usam permissões do chatbot, sem exigir acesso ao cadastro de usuários', async () => {
+    for (const permissao of ['chatbot:view', 'chatbot:update', 'chatbot:publish']) {
+      expect(await acesso([permissao])('destinosAtendimento')).toBe(true);
+    }
+    await expect(acesso(['user:view'])('destinosAtendimento')).rejects.toThrow();
+  });
 });

@@ -8,6 +8,7 @@ import { Departments } from '@/departments/entities/departments.entity';
  * que tem na transferência). */
 export enum SupportChatEventType {
   TRANSFERENCIA = 'transferencia',
+  ENCAMINHAMENTO = 'encaminhamento',
   PAUSA = 'pausa',
   RETOMADA = 'retomada',
   /** Chamada recebida. `motivo` guarda se foi rejeitada e se era vídeo. */
@@ -31,7 +32,7 @@ export class SupportChatEvents {
   @Column({ name: 'tipo', type: 'varchar', length: 20 })
   tipo: SupportChatEventType;
 
-  /** Quem transferiu; nulo só se o usuário tiver sido removido depois. */
+  /** Quem transferiu; nulo para automação ou se o usuário tiver sido removido. */
   @Column({ name: 'user_origem_id', type: 'int', nullable: true })
   user_origem_id: number | null;
 

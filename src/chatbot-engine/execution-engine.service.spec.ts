@@ -22,6 +22,7 @@ describe('Separação da fila do chatbot e espera humana', () => {
       contact: { remote_jid: 'cliente' }, channel: { session_id: 'canal' } };
     const atendimentos = { bloquearParaExecucaoBot: jest.fn().mockResolvedValue(true),
       findParaEnvioBot: jest.fn().mockResolvedValue(chat), whatsappChatStateEmit: jest.fn(),
+      validarEncaminhamentoPorChatbot: jest.fn(), encaminharPorChatbot: jest.fn(),
       devolverBotParaEspera: jest.fn(), encerrarPorChatbot: jest.fn(), concluirPosAtendimento: jest.fn() };
     const handler = { execute: jest.fn().mockResolvedValue(resultado) };
     const whatsapp = { sendMessage: jest.fn().mockResolvedValue({ messageId: 'mensagem' }) };
@@ -49,7 +50,7 @@ describe('Separação da fila do chatbot e espera humana', () => {
   });
 
   it('o nó Encerrar no fluxo de saída não repete despedida nem encerra novamente', async () => {
-    const { motor, execucao, atendimentos } = preparar({ kind: 'close_support_chat', enviarDespedida: true });
+    const { motor, execucao, atendimentos } = preparar({ kind: 'close_support_chat', enviarDespedida: true, executarFluxoSaida: true });
     execucao.phase = 'saida';
     await motor.step(10, { kind: 'start' });
     expect(atendimentos.encerrarPorChatbot).not.toHaveBeenCalled();
@@ -119,6 +120,35 @@ describe('Separação da fila do chatbot e espera humana', () => {
     expect(atendimentos.devolverBotParaEspera).not.toHaveBeenCalled();
   });
 
+  it.each([null, 'saida-direita', 'saida-inferior'])('avança da Mensagem ao Menu pela ligação %s', async sourceHandle => {
+    const { motor, graph, handler, atendimentos } = preparar();
+    graph.nodes.push({ id: 'mensagem', type: 'message' }, { id: 'menu', type: 'menu' });
+    graph.edges.push({ source: 'inicio', target: 'mensagem', sourceHandle: null },
+      { source: 'mensagem', target: 'menu', sourceHandle });
+    handler.execute.mockImplementation(async ({ node }) => node.id === 'menu'
+      ? { kind: 'suspend', waitingFor: { type: 'contact_reply', node_id: 'menu' } }
+      : { kind: 'continue', outputHandle: null });
+    await motor.step(10, { kind: 'start' });
+    expect(handler.execute.mock.calls.map(([ctx]) => ctx.node.id)).toEqual(['inicio', 'mensagem', 'menu']);
+    expect(atendimentos.devolverBotParaEspera).not.toHaveBeenCalled();
+  });
+
+  it.each(['saida-direita', 'saida-inferior'])('retoma Mensagem após resposta pela ligação %s, sem confundir com timeout', async sourceHandle => {
+    const { motor, graph, execucao, handler, atendimentos } = preparar();
+    graph.nodes.push({ id: 'mensagem', type: 'message' }, { id: 'menu', type: 'menu' }, { id: 'prazo', type: 'finish' });
+    graph.edges.push({ source: 'mensagem', target: 'prazo', sourceHandle: 'sem-resposta' },
+      { source: 'mensagem', target: 'menu', sourceHandle });
+    Object.assign(execucao, { status: 'suspended', current_node_id: 'mensagem', waiting_for: {
+      type: 'contact_reply', node_id: 'mensagem', token: 'mensagem-1', since: new Date().toISOString(),
+    } });
+    handler.execute.mockImplementation(async ({ node }) => node.id === 'menu'
+      ? { kind: 'suspend', waitingFor: { type: 'contact_reply', node_id: 'menu' } }
+      : { kind: 'continue', outputHandle: null });
+    await motor.step(10, { kind: 'resume', waitingToken: 'mensagem-1', resumePayload: { text: 'Oi' } });
+    expect(handler.execute.mock.calls.map(([ctx]) => ctx.node.id)).toEqual(['mensagem', 'menu']);
+    expect(atendimentos.devolverBotParaEspera).not.toHaveBeenCalled();
+  });
+
   it('libera a fila do bot se o nó falhar', async () => {
     const { motor, atendimentos, handler } = preparar();
     handler.execute.mockRejectedValue(new Error('Falha simulada'));
@@ -126,10 +156,59 @@ describe('Separação da fila do chatbot e espera humana', () => {
     expect(atendimentos.devolverBotParaEspera).toHaveBeenCalledWith(20);
   });
 
+  it.each([null, 7])('o encaminhamento encerra o bot para setor/atendente %s sem fechar o protocolo', async userId => {
+    const { motor, atendimentos, repositorio } = preparar({ kind: 'handoff', departmentId: 10, userId });
+    await motor.step(10, { kind: 'start' });
+    expect(atendimentos.validarEncaminhamentoPorChatbot).toHaveBeenCalledWith(20, { departmentId: 10, userId }, expect.anything());
+    expect(atendimentos.encaminharPorChatbot).toHaveBeenCalledWith(20, { departmentId: 10, userId });
+    expect(repositorio.salvarComLockOuFalha).toHaveBeenCalledWith(10, 1, expect.objectContaining({ status: 'completed' }), expect.anything());
+    expect(atendimentos.encerrarPorChatbot).not.toHaveBeenCalled();
+  });
+
+  it('envia a mensagem anterior antes de entregar ao atendente', async () => {
+    const { motor, graph, handler, whatsapp, atendimentos } = preparar();
+    graph.nodes.push({ id: 'entrega', type: 'handoff' });
+    graph.edges.push({ source: 'inicio', target: 'entrega', sourceHandle: null });
+    handler.execute.mockResolvedValueOnce({ kind: 'continue', outputHandle: null, effects: [{ type: 'send_text', text: 'Vou encaminhar' }] })
+      .mockResolvedValueOnce({ kind: 'handoff', departmentId: 10, userId: 7 });
+    await motor.step(10, { kind: 'start' });
+    expect(whatsapp.sendMessage.mock.invocationCallOrder[0]).toBeLessThan(atendimentos.encaminharPorChatbot.mock.invocationCallOrder[0]);
+  });
+
+  it('a falha de uma mensagem anterior não impede o encaminhamento', async () => {
+    const { motor, graph, handler, whatsapp, atendimentos } = preparar();
+    graph.nodes.push({ id: 'entrega', type: 'handoff' });
+    graph.edges.push({ source: 'inicio', target: 'entrega', sourceHandle: null });
+    handler.execute.mockResolvedValueOnce({ kind: 'continue', outputHandle: null, effects: [{ type: 'send_text', text: 'Vou encaminhar' }] })
+      .mockResolvedValueOnce({ kind: 'handoff', departmentId: 10, userId: 7 });
+    whatsapp.sendMessage.mockRejectedValue(new Error('Provider indisponível'));
+    await motor.step(10, { kind: 'start' });
+    expect(atendimentos.encaminharPorChatbot).toHaveBeenCalledWith(20, { departmentId: 10, userId: 7 });
+  });
+
+  it('não entrega a humanos se um subfluxo tentar encaminhar durante a saída', async () => {
+    const { motor, execucao, atendimentos, repositorio } = preparar({ kind: 'handoff', departmentId: 10, userId: 7 });
+    execucao.phase = 'saida';
+    await motor.step(10, { kind: 'start' });
+    expect(atendimentos.encaminharPorChatbot).not.toHaveBeenCalled();
+    expect(repositorio.salvarComLockOuFalha).toHaveBeenCalledWith(10, 1, expect.objectContaining({ status: 'failed' }), expect.anything());
+    expect(atendimentos.concluirPosAtendimento).toHaveBeenCalledWith(20);
+  });
+
+  it('o destino inválido falha antes de enviar ou encaminhar', async () => {
+    const { motor, atendimentos, repositorio, whatsapp } = preparar({ kind: 'handoff', departmentId: 10, userId: 7 });
+    atendimentos.validarEncaminhamentoPorChatbot.mockRejectedValue(new Error('Atendente inativo'));
+    await motor.step(10, { kind: 'start' });
+    expect(atendimentos.encaminharPorChatbot).not.toHaveBeenCalled();
+    expect(whatsapp.sendMessage).not.toHaveBeenCalled();
+    expect(repositorio.salvarComLockOuFalha).toHaveBeenCalledWith(10, 1, expect.objectContaining({ status: 'failed' }), expect.anything());
+    expect(atendimentos.devolverBotParaEspera).toHaveBeenCalledWith(20);
+  });
+
   it('encerra pelo nó próprio antes da devolução condicional à espera', async () => {
     const { motor, atendimentos } = preparar({ kind: 'close_support_chat', enviarDespedida: false });
     await motor.step(10, { kind: 'start' });
-    expect(atendimentos.encerrarPorChatbot).toHaveBeenCalledWith(20, false);
+    expect(atendimentos.encerrarPorChatbot).toHaveBeenCalledWith(20, false, false);
     expect(atendimentos.encerrarPorChatbot.mock.invocationCallOrder[0])
       .toBeLessThan(atendimentos.devolverBotParaEspera.mock.invocationCallOrder[0]);
   });
@@ -140,6 +219,22 @@ describe('Separação da fila do chatbot e espera humana', () => {
     await motor.step(10, { kind: 'start' });
     expect(repositorio.abortarDoAtendimento).toHaveBeenCalledWith(20, expect.anything());
     expect(handler.execute).not.toHaveBeenCalled();
+  });
+
+  it('encaminha a decisão do nó de entrada para iniciar a saída', async () => {
+    const { motor, atendimentos } = preparar({ kind: 'close_support_chat', enviarDespedida: false, executarFluxoSaida: true });
+    await motor.step(10, { kind: 'start' });
+    expect(atendimentos.encerrarPorChatbot).toHaveBeenCalledWith(20, false, true);
+  });
+
+  it('envia os efeitos da saída após encerramento pelo bot com a reserva ativa', async () => {
+    const { motor, execucao, atendimentos, whatsapp, chat } = preparar({ kind: 'finish', effects: [{ type: 'send_text', text: 'Pós-atendimento' }] });
+    execucao.phase = 'saida';
+    atendimentos.findParaEnvioBot.mockResolvedValue({ ...chat, support_chat_status_id: 7, pos_atendimento_ativo: true } as never);
+    await motor.step(10, { kind: 'start' });
+    expect(whatsapp.sendMessage).toHaveBeenCalledTimes(1);
+    expect(atendimentos.concluirPosAtendimento).toHaveBeenCalledWith(20);
+    expect(atendimentos.encerrarPorChatbot).not.toHaveBeenCalled();
   });
 
   it('não envia efeitos se um atendente assumir após o processamento', async () => {

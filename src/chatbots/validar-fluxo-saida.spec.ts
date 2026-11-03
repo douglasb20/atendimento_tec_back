@@ -23,4 +23,7 @@ describe('Validação do fluxo de saída', () => {
   it('não permite reescrever o setor do atendimento humano encerrado', () => {
     expect(() => validarFluxoSaida(grafo('set_department', { department_id: 1 }))).toThrow('setor');
   });
+  it('não permite devolver um protocolo encerrado ao atendimento humano', () => {
+    expect(() => validarFluxoSaida(grafo('handoff', { destination: 'department', department_id: 1 }))).toThrow('atendimento humano');
+  });
 });
