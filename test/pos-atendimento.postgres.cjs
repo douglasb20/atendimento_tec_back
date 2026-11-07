@@ -45,7 +45,7 @@ async function testar() {
       await qr.query(`CREATE TEMP SEQUENCE teste_${tabela}_id START 1000`);
       await qr.query(`ALTER TABLE pg_temp.${tabela} ALTER COLUMN id SET DEFAULT nextval('pg_temp.teste_${tabela}_id')`);
     }
-    await qr.query(`INSERT INTO support_chat_status (id, name, is_final) VALUES (1,'Aguardando',false),(2,'Em atendimento',false),(3,'Em chatbot',false),(5,'Finalizado',true),(7,'Finalizado pelo chatbot',true);
+    await qr.query(`INSERT INTO support_chat_status (id, name, is_final) VALUES (1,'Aguardando',false),(2,'Em atendimento',false),(3,'Em chatbot',false),(4,'Finalizado sem atendimento',true),(5,'Finalizado',true),(7,'Finalizado pelo chatbot',true);
       INSERT INTO channels (id, name, channel_status_id, session_id, chatbot_habilitado) VALUES (4,'Canal fictício',3,'teste-sem-provider',true);
       INSERT INTO contacts (id,name,avatar_url,remote_jid,has_no_client) VALUES (3,'Contato fictício','','teste@invalid',true);
       INSERT INTO support_chats (id,channel_id,contact_id,user_id,protocol,support_chat_status_id,answered_at)
@@ -455,6 +455,31 @@ async function testar() {
     assert.equal(await contatoRepo.permiteAutomacao(3,qr.manager),true);
     assert.equal((await execucoesRepo.findById(execPolitica.id,qr.manager)).status,'aborted');
     console.log('PostgreSQL: criação e edição dos modos; interrupção imediata de entrada/saída e jobs antigos; protocolo preservado; envio manual permitido; automações e inatividade bloqueadas; ignorar entrada preservado e reativação não ressuscita execuções antigas.');
+
+    // Encerrar pausado fecha a pausa aberta, com ou sem pós-atendimento.
+    for (const executarSaida of [false,true]) {
+      const respondidoEm=new Date(Date.now()-20*60*1000),pausadoEm=new Date(Date.now()-5*60*1000);
+      const pausado=await qr.manager.save(SupportChats,{channel_id:4,contact_id:3,user_id:7,support_chat_status_id:2,
+        protocol:`PAUSADO-${executarSaida}`,answered_at:respondidoEm,paused_at:pausadoEm,paused_total_seconds:60});
+      const concluido=await servico.finalizarAtendimento(pausado.id,7,{sem_despedida:true,executar_fluxo_saida:executarSaida});
+      assert.equal(concluido.support_chat_status_id,5);assert.equal(concluido.paused_at,null);
+      assert.equal(concluido.paused_total_seconds,60+Math.max(0,Math.floor((concluido.finished_at-pausadoEm)/1000)));
+      assert.equal(concluido.user_id,7);assert.equal(concluido.protocol,pausado.protocol);
+      assert.equal(concluido.answered_at.toISOString(),respondidoEm.toISOString());
+      assert.equal(concluido.pos_atendimento_ativo,executarSaida);
+    }
+    // A limpeza dos represados não cria uma etapa humana nem dispara saída.
+    const fluxosAntesDescarte=(await qr.query('SELECT COUNT(*)::int total FROM chatbot_flow_executions'))[0].total;
+    for (const status of [1,3]) {
+      const naoIniciado=await qr.manager.save(SupportChats,{channel_id:4,contact_id:criadoHumano.id,user_id:null,
+        support_chat_status_id:status,protocol:`REPRESADO-${status}`});
+      const concluido=await servico.finalizarSemAtendimento(naoIniciado.id,7,{});
+      assert.equal(concluido.support_chat_status_id,4);assert.equal(concluido.user_id,null);
+      assert.equal(concluido.answered_at,null);assert.equal(concluido.pos_atendimento_ativo,false);
+    }
+    assert.equal((await qr.query('SELECT COUNT(*)::int total FROM chatbot_flow_executions'))[0].total,fluxosAntesDescarte);
+    assert.equal(enviosManuais,1);
+    console.log('PostgreSQL: finalização direta de pausados desconta a pausa e preserva protocolo/dono, com ou sem saída; represados encerram sem atendimento, sem mensagens ou nova automação.');
   } finally {
     await qr.rollbackTransaction(); await qr.release(); await conexao.destroy();
   }

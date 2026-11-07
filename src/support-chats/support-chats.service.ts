@@ -1854,10 +1854,6 @@ export class SupportChatsService {
       throw new BadRequestException('Inicie o atendimento antes de finalizá-lo');
     }
 
-    if (supportChat.paused_at) {
-      throw new BadRequestException('Retome o atendimento pausado antes de finalizá-lo');
-    }
-
     // O master (`is_superuser`) encerra atendimento de qualquer atendente -
     // mesma exceção do guard de permissão, replicada aqui porque esta
     // checagem decide algo dentro da rota, não se pode chamá-la.
@@ -1946,7 +1942,7 @@ export class SupportChatsService {
         throw new BadRequestException('O módulo Chatbot está desabilitado');
       }
       const [atual] = await manager.query(`SELECT support_chat_status_id, user_id, paused_at FROM support_chats WHERE id = $1 FOR UPDATE`, [chat.id]);
-      if (!atual || atual.support_chat_status_id !== SupportChatStatusId.EM_ANDAMENTO || atual.paused_at
+      if (!atual || atual.support_chat_status_id !== SupportChatStatusId.EM_ANDAMENTO
         || !podeEncerrarQualquer && Number(atual.user_id) !== Number(usuarioId)) {
         throw new ConflictException('O atendimento mudou de estado durante a finalização');
       }

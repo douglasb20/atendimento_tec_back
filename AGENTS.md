@@ -113,6 +113,10 @@ dois cliques simultâneos é arbitrada pelo banco: o UPDATE tem
 `WHERE ... AND support_chat_status_id IN (AGUARDANDO, EM_FILA)`, e `affected = 0`
 vira conflito.
 
+A finalização normal aceita atendimento pausado: o UPDATE acumula a pausa aberta
+até `finished_at` e limpa `paused_at`, preservando o desconto da duração humana.
+Não exige retomar. As regras de dono, cliente e fluxo de saída continuam valendo.
+
 `finalizarAtendimento(id, user_id, dto)` — valida nesta ordem: existe →
 não finalizado → está EM_ANDAMENTO → **é o dono** (`ForbiddenException`) →
 **contato tem cliente** (`BadRequestException`). A última é reforço da regra do
