@@ -35,7 +35,7 @@ describe('Pós-atendimento no mesmo protocolo', () => {
     const manager = { query: jest.fn().mockResolvedValue([{ support_chat_status_id: 2, user_id: 7, paused_at: null }]),
       findOneBy: jest.fn().mockResolvedValue({ graph: { nodes: [{ id: 'fim', type: 'finish', data: {} }], edges: [] } }), update: jest.fn() };
     const repo = { findParaEstado: jest.fn().mockResolvedValue(chat), finalizar: jest.fn().mockResolvedValue(1),
-      finalizarPorChatbot: jest.fn().mockResolvedValue(1) };
+      finalizarPorChatbot: jest.fn().mockResolvedValue(1), finalizarSemAtendimento: jest.fn().mockResolvedValue(1) };
     const ajustes = { chatbotHabilitado: jest.fn().mockResolvedValue(true) };
     const permissoes = { hasPermission: jest.fn().mockResolvedValue(true) };
     const fluxos = { findSaidaAtivoDoCanal: jest.fn().mockResolvedValue({ id: 8, current_published_version_id: 9, name: 'Pós-atendimento' }) };
@@ -70,6 +70,34 @@ describe('Pós-atendimento no mesmo protocolo', () => {
     const { servico, execucoes, despedida } = preparar();
     await servico.finalizarAtendimento(42, 7, { executar_fluxo_saida: false, sem_despedida: true });
     expect(execucoes.iniciar).not.toHaveBeenCalled(); expect(despedida).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('finaliza pausado diretamente com saída=%s', async executar_fluxo_saida => {
+    const { servico, chat, manager, repo, execucoes } = preparar();
+    chat.paused_at = '2026-11-06T10:00:00Z';
+    manager.query.mockResolvedValue([{ support_chat_status_id: 2, user_id: 7, paused_at: chat.paused_at }]);
+    await servico.finalizarAtendimento(42, 7, { executar_fluxo_saida, sem_despedida: true });
+    expect(repo.finalizar).toHaveBeenCalledTimes(1);
+    expect(execucoes.iniciar).toHaveBeenCalledTimes(executar_fluxo_saida ? 1 : 0);
+  });
+
+  it('mantém a exigência de responsável ao finalizar pausado', async () => {
+    const { servico, chat, repo } = preparar();
+    chat.paused_at = '2026-11-06T10:00:00Z';
+    await expect(servico.finalizarAtendimento(42, 8, {})).rejects.toThrow('Somente quem assumiu');
+    expect(repo.finalizar).not.toHaveBeenCalled();
+  });
+
+  it.each([1, 3])('encerra status %s sem atendimento, sem despedida nem saída', async status => {
+    const { servico, chat, repo, execucoes, suspensas, despedida } = preparar();
+    chat.support_chat_status_id = status;
+    chat.user_id = null;
+    chat.contact.client_id = null;
+    await servico.finalizarSemAtendimento(42, 7, {});
+    expect(repo.finalizarSemAtendimento).toHaveBeenCalledTimes(1);
+    expect(suspensas.abortarDoAtendimento).toHaveBeenCalledWith(42, expect.anything());
+    expect(despedida).not.toHaveBeenCalled();
+    expect(execucoes.iniciar).not.toHaveBeenCalled();
   });
 
   it.each([true, false])('sem permissão não consegue inverter o padrão %s pela API', async padrao => {

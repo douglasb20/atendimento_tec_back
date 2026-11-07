@@ -129,7 +129,9 @@ export class ClientService {
   private async gravaEtiquetas(client: Clients, tagIds: number[], manager: EntityManager) {
     const tags = await this.tagsRepository.findByIds(tagIds, manager);
 
-    await manager.save(Clients, { ...client, tags });
+    // O cliente pode ter sido renomeado antes nesta mesma transação.
+    // Regravar o snapshot inteiro aqui desfazia nome e CNPJ recém-salvos.
+    await manager.save(Clients, { id: client.id, tags });
   }
 
   async removeClient(client_id: number) {

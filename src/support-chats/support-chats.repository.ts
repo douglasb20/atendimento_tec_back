@@ -531,11 +531,16 @@ export class SupportChatsRepository extends Repository<SupportChats> {
         is_waiting: false,
         unread_count: 0,
         support_chat_status_id: SupportChatStatusId.FINALIZADO,
+        // Encerrar pausado fecha a pausa sem criar uma retomada artificial.
+        // O período até finished_at fica descontado da duração humana.
+        paused_total_seconds: () => 'COALESCE(paused_total_seconds, 0) + CASE WHEN paused_at IS NULL THEN 0 ELSE GREATEST(FLOOR(EXTRACT(EPOCH FROM (CAST(:finalizado_em AS timestamptz) - paused_at)))::int, 0) END',
+        paused_at: null,
       })
       .where('id = :id AND support_chat_status_id = :emAndamento', {
         id,
         emAndamento: SupportChatStatusId.EM_ANDAMENTO,
       })
+      .setParameter('finalizado_em', finished_at)
       .execute();
 
     return resultado.affected ?? 0;
