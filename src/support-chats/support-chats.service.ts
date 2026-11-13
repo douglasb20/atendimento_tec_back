@@ -145,7 +145,8 @@ export class SupportChatsService {
       // Sequencial, não `Promise.all`: o WhatsApp entrega na ordem em que
       // recebe, e em paralelo os avisos chegariam embaralhados entre si.
       for (const aviso of avisos) {
-        await this.enviaMensagemAutomatica(supportChat, aviso.mensagem);
+        await this.enviaMensagemAutomatica(supportChat, aviso.mensagem,
+          aviso.anexo_key ? () => this.serviceAlertsService.copiaAnexoParaEnvio(aviso) : undefined);
       }
 
       if (avisos.length) {

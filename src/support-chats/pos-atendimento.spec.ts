@@ -206,6 +206,30 @@ describe('Pós-atendimento no mesmo protocolo', () => {
     expect(servico.whatsappService.sendMedia).not.toHaveBeenCalled();
   });
 
+  it('envia avisos em sequência usando a cópia de anexo do aviso correspondente', async () => {
+    const avisos = [{ id: 1, mensagem: 'Com arquivo', anexo_key: 'service-alerts/arquivo.pdf' },
+      { id: 2, mensagem: 'Só texto', anexo_key: null }];
+    const ordem: string[] = [];
+    const copiar = jest.fn(async aviso => { ordem.push(`cópia:${aviso.id}`); return { media_key: 'chat/media/copia.pdf' }; });
+    const consultar = jest.fn(async () => avisos);
+    const enviar = jest.fn(async (_chat, texto, copia) => {
+      if (copia) await copia();
+      ordem.push(texto);
+    });
+    const servico = Object.assign(Object.create(SupportChatsService.prototype), {
+      serviceAlertsService: { ativosParaCanal: consultar, copiaAnexoParaEnvio: copiar },
+      enviaMensagemAutomatica: enviar, logger: { log() {}, warn() {} },
+    });
+    await servico.enviaAvisosAtivos({ id: 3, channel_id: 1, contact: {} });
+    expect(ordem).toEqual(['cópia:1', 'Com arquivo', 'Só texto']);
+    expect(copiar).toHaveBeenCalledTimes(1);
+    expect(copiar).toHaveBeenCalledWith(avisos[0]);
+    expect(enviar.mock.calls[1][2]).toBeUndefined();
+    consultar.mockClear();
+    await servico.enviaAvisosAtivos({ channel_id: 1, contact: { automation_disabled: true } });
+    expect(consultar).not.toHaveBeenCalled();
+  });
+
   function prepararBot() {
     const estado = preparar();
     estado.chat.support_chat_status_id = 3;
