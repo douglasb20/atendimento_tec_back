@@ -30,6 +30,18 @@ export class ServiceAlerts {
   @Column({ type: 'text' })
   mensagem: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  anexo_key: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  anexo_nome: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  anexo_mimetype: string | null;
+
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  anexo_tipo: string | null;
+
   @Column({ type: 'boolean', default: true })
   ativo: boolean;
 

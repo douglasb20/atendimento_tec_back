@@ -71,21 +71,9 @@ export class UsersService {
 
   async signAvatar(signAvatarDto: SignAvatarDto): Promise<PresignedUpload> {
     try {
-      let user: Users;
-      let avatarName: string;
-
-      if (signAvatarDto?.user_id) {
-        user = await this.usersRepository.findById(signAvatarDto.user_id);
-      }
-
-      // Reaproveitar a key só faz sentido se já existir uma: usuário sem avatar
-      // (ou com o campo limpo) precisa de key nova, senão a URL assinada sai
-      // apontando para "null" e o upload falha.
-      if (user?.avatar_url) {
-        avatarName = user.avatar_url;
-      } else {
-        avatarName = `${signAvatarDto.key}/${randomUUID()}.${signAvatarDto.fileType.split('/')[1]}`;
-      }
+      // Cada troca precisa de URL própria: sobrescrever a mesma key deixa o
+      // navegador/CDN exibindo a foto antiga e altera o perfil antes de Salvar.
+      const avatarName = `${signAvatarDto.key}/${randomUUID()}.${signAvatarDto.fileType.split('/')[1]}`;
 
       const avatar_url = await this.storageService.createPresignedPost(
         avatarName,

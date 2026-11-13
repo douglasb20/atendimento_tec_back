@@ -19,10 +19,19 @@ import { AlternarAtivoDto } from './dto/alternar-ativo.dto';
 import { CreateServiceAlertDto } from './dto/create-service-alert.dto';
 import { UpdateServiceAlertDto } from './dto/update-service-alert.dto';
 import { ServiceAlertsService } from './service-alerts.service';
+import { AssinarAnexoAvisoDto } from './dto/assinar-anexo-aviso.dto';
 
 @Controller('service-alerts')
 export class ServiceAlertsController {
   constructor(private readonly serviceAlertsService: ServiceAlertsService) {}
+
+  @Post('assinar-anexo')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('service.alert:add', 'service.alert:update')
+  @HttpCode(HttpStatus.OK)
+  async assinarAnexo(@Body() dto: AssinarAnexoAvisoDto) {
+    return this.serviceAlertsService.assinarAnexo(dto);
+  }
 
   @Get()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
