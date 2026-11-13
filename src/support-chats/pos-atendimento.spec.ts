@@ -255,3 +255,28 @@ describe('Pós-atendimento no mesmo protocolo', () => {
     expect(execucoes.enfileirar).toHaveBeenCalledTimes(1);
   });
 });
+
+
+describe('Download autorizado de mídia', () => {
+  const mensagem = { support_chat_id: 42, has_media: true, media_url: 'chat/imagem.png', file_name: 'Foto técnica.png' };
+  function preparar(valor: object | null = mensagem) {
+    const servico = Object.assign(Object.create(SupportChatsService.prototype), {
+      messagesService: { findByMessageId: jest.fn().mockResolvedValue(valor) },
+      storageService: { generateViewUrl: jest.fn().mockResolvedValue('https://storage/assinada') },
+    });
+    return servico;
+  }
+  it('assina apenas a mídia da mensagem pertencente ao atendimento autorizado', async () => {
+    const servico = preparar();
+    await expect(servico.baixarMidia(42, 'WA-ID')).resolves.toEqual({ url: 'https://storage/assinada' });
+    expect(servico.storageService.generateViewUrl).toHaveBeenCalledWith('chat/imagem.png', 5 / 60, true, 'Foto técnica.png');
+  });
+  it.each([null, { ...mensagem, support_chat_id: 43 }, { ...mensagem, has_media: false },
+    { ...mensagem, media_expired: true }, { ...mensagem, media_url: '' },
+    { ...mensagem, is_system_hidden: true }, { ...mensagem, hidden_at: new Date() }])(
+    'recusa mídia inexistente, alheia, expirada ou oculta (%j)', async valor => {
+      const servico = preparar(valor);
+      await expect(servico.baixarMidia(42, 'WA-ID')).rejects.toMatchObject({ status: 404 });
+      expect(servico.storageService.generateViewUrl).not.toHaveBeenCalled();
+    });
+});

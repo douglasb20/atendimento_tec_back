@@ -151,6 +151,14 @@ export class SupportChatsController {
     return this.supportChatsService.findMensagemCitata(id, messageId);
   }
 
+  @Get('/:id/messages/:messageId/download')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
+  @Permissions('support.chat:view', 'support.chat:history')
+  @HttpCode(HttpStatus.OK)
+  async baixarMidia(@Param('id', ParseIntPipe) id: number, @Param('messageId') messageId: string) {
+    return this.supportChatsService.baixarMidia(id, messageId);
+  }
+
   /**
    * Quantos atendimentos anteriores este contato tem.
    *

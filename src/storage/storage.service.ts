@@ -98,12 +98,16 @@ export class StorageService {
    * URL assinada. Mantida apenas para downloads forçados (Content-Disposition
    * attachment), que a URL pública não oferece.
    */
-  async generateViewUrl(key: string, durationHours = 1, asAttachment = true): Promise<string> {
+  async generateViewUrl(key: string, durationHours = 1, asAttachment = true, fileName?: string): Promise<string> {
+    const nome = (fileName || key.split('/').pop() || 'arquivo').replace(/[\r\n]/g, '');
+    const nomeAscii = nome.replace(/[^\x20-\x7e]|["\\]/g, '_');
+    const nomeCodificado = encodeURIComponent(nome).replace(/['()*]/g,
+      caractere => `%${caractere.charCodeAt(0).toString(16).toUpperCase()}`);
     const command = new GetObjectCommand({
       Bucket: process.env.STORAGE_BUCKET!,
       Key: key,
       ...(asAttachment && {
-        ResponseContentDisposition: `attachment; filename="${key.split('/').pop()}"`,
+        ResponseContentDisposition: `attachment; filename="${nomeAscii}"; filename*=UTF-8''${nomeCodificado}`,
       }),
     });
 
