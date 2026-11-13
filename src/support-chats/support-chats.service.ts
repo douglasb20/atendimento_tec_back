@@ -1507,6 +1507,19 @@ export class SupportChatsService {
     return await this.supportChatsRepository.findOrOpen(contact_id, channel_id, manager, user_id);
   }
 
+  /** O guard valida acesso ao atendimento; a mensagem também precisa pertencer a ele. */
+  async baixarMidia(supportChatId: number, messageId: string) {
+    const mensagem = await this.messagesService.findByMessageId(messageId);
+    if (!mensagem || String(mensagem.support_chat_id) !== String(supportChatId)
+      || mensagem.is_system_hidden || mensagem.hidden_at) {
+      throw new NotFoundException('Arquivo não encontrado neste atendimento');
+    }
+    if (!mensagem.has_media || !mensagem.media_url || mensagem.media_expired) {
+      throw new NotFoundException('Arquivo indisponível ou expirado');
+    }
+    return { url: await this.storageService.generateViewUrl(mensagem.media_url, 5 / 60, true, mensagem.file_name) };
+  }
+
   /**
    * Busca a mensagem citada em outro protocolo do mesmo contato. `message_id`
    * é único, mas não pode ser usado sozinho: a conferência evita que uma chave
