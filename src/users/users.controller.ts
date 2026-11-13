@@ -25,6 +25,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { PreferenciasTemaDto } from './dto/preferencias-tema.dto';
 import { Users } from './entities/users.entity';
 import { SignAvatarDto } from './dto/sign-avatar.dto';
+import { AssinarMeuAvatarDto } from './dto/assinar-meu-avatar.dto';
 
 @Controller('users')
 export class UsersController {
@@ -78,6 +79,16 @@ export class UsersController {
     const user = req.user as Users;
 
     return this.usersService.updateUser(user.id, updateUserDto, user);
+  }
+
+  @Post('/meu-perfil/sign-avatar')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('user:profile_update')
+  @HttpCode(HttpStatus.OK)
+  async assinarMeuAvatar(@Body() dados: AssinarMeuAvatarDto, @Req() req: Request) {
+    // Não aceita alvo ou pasta do navegador: a permissão é só para a própria foto.
+    const user = req.user as Users;
+    return this.usersService.signAvatar({ user_id: user.id, key: 'user/avatar', fileType: dados.fileType });
   }
 
   /**
