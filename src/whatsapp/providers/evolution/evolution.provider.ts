@@ -81,7 +81,7 @@ const MEDIA_TYPE_MAP: Record<ProviderMediaType, string> = {
  */
 @Injectable()
 export class EvolutionProvider implements WhatsappProvider {
-  readonly slug = 'evolution';
+  readonly slug = process.env.ZAPO_GATEWAY_BASE_URL ? 'zapo' : 'evolution';
 
   private readonly logger = new Logger(EvolutionProvider.name);
   private readonly http: AxiosInstance;
@@ -89,7 +89,7 @@ export class EvolutionProvider implements WhatsappProvider {
   private readonly webhookSecret: string;
 
   constructor() {
-    const baseUrl = process.env.EVOLUTION_BASE_URL;
+    const baseUrl = process.env.ZAPO_GATEWAY_BASE_URL || process.env.EVOLUTION_BASE_URL;
 
     // Quebra o boot, não uma requisição - mesmo espírito de `CRYPTO_KEY`/
     // `CRYPTO_IV`: um provider parcialmente configurado só explodiria no
@@ -97,8 +97,14 @@ export class EvolutionProvider implements WhatsappProvider {
     if (!baseUrl) {
       throw new Error('EVOLUTION_BASE_URL não configurada.');
     }
+    if (process.env.ZAPO_GATEWAY_BASE_URL &&
+      (!process.env.ZAPO_GATEWAY_API_KEY || !process.env.ZAPO_GATEWAY_WEBHOOK_SECRET)) {
+      throw new Error('Configure ZAPO_GATEWAY_API_KEY e ZAPO_GATEWAY_WEBHOOK_SECRET.');
+    }
 
-    this.webhookSecret = process.env.EVOLUTION_WEBHOOK_SECRET ?? '';
+    this.webhookSecret = process.env.ZAPO_GATEWAY_BASE_URL
+      ? (process.env.ZAPO_GATEWAY_WEBHOOK_SECRET ?? '')
+      : (process.env.EVOLUTION_WEBHOOK_SECRET ?? '');
     this.webhookUrl = this.resolveWebhookUrl();
 
     this.http = axios.create({
@@ -109,7 +115,9 @@ export class EvolutionProvider implements WhatsappProvider {
         // Este é o padrão: a chave **global**, necessária para criar, listar e
         // remover instâncias. As operações sobre uma instância específica o
         // sobrescrevem com o token dela - ver `comToken`.
-        apikey: process.env.EVOLUTION_API_KEY ?? '',
+        apikey: process.env.ZAPO_GATEWAY_BASE_URL
+          ? (process.env.ZAPO_GATEWAY_API_KEY ?? '')
+          : (process.env.EVOLUTION_API_KEY ?? ''),
       },
       timeout: 30_000,
     });
@@ -146,6 +154,9 @@ export class EvolutionProvider implements WhatsappProvider {
    * `/instance/create` e `/instance/fetchInstances` a recusam.
    */
   private comToken(session: ProviderSessionRef) {
+    // O gateway Zapo usa uma chave global; o token antigo da Evolution não
+    // autentica nele durante a migração do canal.
+    if (process.env.ZAPO_GATEWAY_BASE_URL) return undefined;
     if (!session?.instanceToken) return undefined;
 
     return { headers: { apikey: session.instanceToken } };
