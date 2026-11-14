@@ -178,12 +178,13 @@ export class ChannelsService {
 
   async removeChannel(channelId: number): Promise<void> {
     const channel = await this.findChannel(channelId);
-    const channelRemoved = this.channelsRepository.create({
-      ...channel,
+    // `update`, não `save` do canal carregado: ele vem com a relação
+    // `channelStatus`, e o TypeORM grava a relação por cima do
+    // `channel_status_id` - o canal excluído continuava "Conectado".
+    await this.channelsRepository.update(channel.id, {
       channel_status_id: ChannelStatus.DELETED,
       deleted_at: new Date(),
     });
-    await this.channelsRepository.save(channelRemoved);
   }
 
   /**
