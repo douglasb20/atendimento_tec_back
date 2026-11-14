@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ChannelStatus } from '@types';
-import { DataSource, Not, Repository } from 'typeorm';
+import { DataSource, IsNull, Not, Repository } from 'typeorm';
 import { Channels } from './entities/channels.entity';
 
 @Injectable()
@@ -10,9 +10,11 @@ export class ChannelsRepository extends Repository<Channels> {
     super(Channels, dataSource.manager);
   }
 
+  // `deleted_at: null` não filtra nada: o TypeORM 0.3 descarta condições com
+  // valor `null`. Com `IsNull()` o canal excluído some de fato das consultas.
   async findActives() {
     return this.find({
-      where: { channel_status_id: Not(5), deleted_at: null },
+      where: { channel_status_id: Not(5), deleted_at: IsNull() },
       relations: ['channelStatus'],
     });
   }
@@ -21,7 +23,7 @@ export class ChannelsRepository extends Repository<Channels> {
    * `InactivityResolutionService`, a cada tick do cron. */
   async findComInatividadeAtiva() {
     return this.find({
-      where: { inatividade_ativa: true, deleted_at: null },
+      where: { inatividade_ativa: true, deleted_at: IsNull() },
     });
   }
 
@@ -37,7 +39,7 @@ export class ChannelsRepository extends Repository<Channels> {
    */
   async findQualquerConectado(): Promise<Channels | null> {
     return this.findOne({
-      where: { channel_status_id: ChannelStatus.CONNECTED, deleted_at: null },
+      where: { channel_status_id: ChannelStatus.CONNECTED, deleted_at: IsNull() },
       order: { id: 'ASC' },
     });
   }
@@ -50,7 +52,7 @@ export class ChannelsRepository extends Repository<Channels> {
    */
   async findByIdConectado(id: number): Promise<Channels> {
     const channel = await this.findOne({
-      where: { id, channel_status_id: ChannelStatus.CONNECTED, deleted_at: null },
+      where: { id, channel_status_id: ChannelStatus.CONNECTED, deleted_at: IsNull() },
     });
 
     if (!channel) {
