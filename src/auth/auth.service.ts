@@ -57,10 +57,9 @@ export class AuthService {
         // - nada disso vale para o access. Ele também rotaciona a cada uso, de
         // modo que o anterior deixa de servir.
         //
-        // Vem do portal, em dias - a variável de ambiente segue valendo como
-        // padrão, pelo catálogo. `JWT_EXPIRATION` é o nome antigo, mantido
-        // como último recurso: produção ainda o define, e o nome não dizia
-        // qual dos dois tokens configurava.
+        // Vem do portal, em dias ("Duração da sessão", `refresh_expiracao_dias`
+        // no catálogo, padrão 30). Nenhuma variável de ambiente a define mais:
+        // `REFRESH_JWT_EXPIRATION` e `JWT_EXPIRATION` deixaram de ser lidas.
         expiresIn: `${await this.settings.getInteiro('refresh_expiracao_dias')}d` as any,
       },
     );
