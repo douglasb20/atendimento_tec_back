@@ -168,8 +168,9 @@ export class EvolutionWebhookInterpreter {
 
       case DataTypeWhatsapp.QR_RECEIVED: {
         const { code, pairingCode } = EvolutionMapper.mapQrCode(data as never);
-        return code || pairingCode
-          ? EvolutionMapper.toInternalPayload(body, dataType, { qr: code, pairingCode })
+        const pairingError = EvolutionMapper.mapPairingError(data as never);
+        return code || pairingCode || pairingError
+          ? EvolutionMapper.toInternalPayload(body, dataType, { qr: code, pairingCode, pairingError })
           : null;
       }
 

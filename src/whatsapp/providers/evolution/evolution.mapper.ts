@@ -145,6 +145,10 @@ export class EvolutionMapper {
         return (data as EvolutionUpsertData).key?.remoteJid ?? null;
       case EvolutionEvent.MESSAGES_UPDATE:
         return (data as EvolutionUpdateData).remoteJid ?? null;
+      // `messages.edited` (o contato editou) vem no formato do upsert. Faltava
+      // aqui: sem `remoteJid`, o interpretador descartava toda edição do
+      // contato antes de chegar ao handler.
+      case EvolutionEvent.MESSAGES_EDITED:
       case EvolutionEvent.SEND_MESSAGE_UPDATE:
         // Apesar do nome parecido com `messages.update`, este traz a chave
         // aninhada, como o upsert - e não o `remoteJid` no topo.
@@ -457,6 +461,11 @@ export class EvolutionMapper {
    * (`instance.controller.ts:connectToWhatsapp`) que nem sempre é suficiente
    * para o Baileys já ter chamado `requestPairingCode` internamente.
    */
+  /** Recusa do código de pareamento (só o gateway Zapo informa). */
+  static mapPairingError(data: EvolutionQrCodeData): 'limite' | 'erro' | null {
+    return data?.qrcode?.pairingError ?? null;
+  }
+
   static mapQrCode(data: EvolutionQrCodeData): { code: string | null; pairingCode: string | null } {
     return {
       code: data?.qrcode?.code ?? null,

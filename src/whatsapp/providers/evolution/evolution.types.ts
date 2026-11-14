@@ -247,6 +247,11 @@ export type EvolutionQrCodeData = {
   qrcode?: {
     instance?: string;
     pairingCode?: string | null;
+    /**
+     * Só no gateway Zapo: o WhatsApp recusou o pedido de código de pareamento.
+     * `limite` = excesso de tentativas (`429 rate-overlimit`); `erro` = outro.
+     */
+    pairingError?: 'limite' | 'erro' | null;
     /** String crua do QR: é esta que o front renderiza. */
     code?: string;
     /** Data URL (`data:image/png;base64,...`), não base64 puro. */

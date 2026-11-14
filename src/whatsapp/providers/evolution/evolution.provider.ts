@@ -415,7 +415,7 @@ export class EvolutionProvider implements WhatsappProvider {
   }
 
   async getProfilePicUrl(session: ProviderSessionRef, remoteJid: string): Promise<string> {
-    const numero = this.toNumber(remoteJid);
+    const numero = this.toDestino(remoteJid);
 
     try {
       const { data } = await this.http.post<{ profilePictureUrl?: string }>(
@@ -537,7 +537,7 @@ export class EvolutionProvider implements WhatsappProvider {
     try {
       const { data } = await this.http.post<EvolutionSendResponse>(
         `/message/sendText/${session.sessionId}`,
-        { number: this.toNumber(to), text: message, ...(typingDelayMs && { delay: typingDelayMs }) },
+        { number: this.toDestino(to), text: message, ...(typingDelayMs && { delay: typingDelayMs }) },
         this.comToken(session),
       );
       return this.toSentMessage(data);
@@ -556,7 +556,7 @@ export class EvolutionProvider implements WhatsappProvider {
       const { data } = await this.http.post<EvolutionSendResponse>(
         `/message/sendText/${session.sessionId}`,
         {
-          number: this.toNumber(chatId),
+          number: this.toDestino(chatId),
           text: message,
           // Informando só a key.id, a Evolution recupera a mensagem citada.
           quoted: { key: { id: messageId } },
@@ -609,7 +609,7 @@ export class EvolutionProvider implements WhatsappProvider {
       await this.http.post(
         `/chat/updateMessage/${session.sessionId}`,
         {
-          number: this.toNumber(chatId),
+          number: this.toDestino(chatId),
           key: { id: messageId, remoteJid: jid, fromMe: true },
           text: texto,
         },
@@ -686,7 +686,7 @@ export class EvolutionProvider implements WhatsappProvider {
     // Vídeo/áudio/documento são aceitos por URL: a Evolution repassa ao Baileys,
     // que baixa direto - sem trafegar bytes por aqui nem passar por browser.
     const body: Record<string, unknown> = {
-      number: this.toNumber(to),
+      number: this.toDestino(to),
       mediatype: MEDIA_TYPE_MAP[mediaType],
       media,
       ...(mimetype && { mimetype }),
@@ -908,6 +908,21 @@ export class EvolutionProvider implements WhatsappProvider {
   /** Extrai apenas os dígitos do JID - é o formato que o campo `number` espera. */
   private toNumber(jidOrNumber: string): string {
     return (jidOrNumber ?? '').split('@')[0].replace(/\D/g, '');
+  }
+
+  /**
+   * Valor do campo `number` nos envios.
+   *
+   * No gateway Zapo, o `@lid` vai inteiro: os dígitos dele não são um
+   * telefone, e o gateway completaria com `@s.whatsapp.net`, mandando a
+   * mensagem para outro número ou para nenhum. Na Evolution o comportamento
+   * segue o de sempre, só dígitos.
+   */
+  private toDestino(jidOrNumber: string): string {
+    if (process.env.ZAPO_GATEWAY_BASE_URL && jidOrNumber?.endsWith('@lid')) {
+      return jidOrNumber;
+    }
+    return this.toNumber(jidOrNumber);
   }
 
   /** Garante o sufixo de JID individual quando recebe só o número. */
