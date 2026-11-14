@@ -488,13 +488,28 @@ export class ChannelsService {
    * traz o QR renovado.
    */
   async handleQrCodeReceived(
-    payload: WhatsappWebhookPayload<{ qr: string | null; pairingCode?: string | null }>,
+    payload: WhatsappWebhookPayload<{
+      qr: string | null;
+      pairingCode?: string | null;
+      pairingError?: 'limite' | 'erro' | null;
+    }>,
   ): Promise<void> {
     const {
       sessionId,
-      data: { qr, pairingCode },
+      data: { qr, pairingCode, pairingError },
     } = payload;
     const channel = await this.channelsRepository.findBySessionId(sessionId);
+
+    // O WhatsApp recusou o pedido de código: nada a gravar no canal, só avisar
+    // a tela, que senão ficaria em "Aguardando código" para sempre.
+    if (pairingError) {
+      this.logger.warn(`Código de pareamento recusado (${pairingError}) no canal ${channel.id}`);
+      this.whatsappService.emitEvent('whatsapp:pairing_error', {
+        channel_id: channel.id,
+        motivo: pairingError,
+      });
+      return;
+    }
 
     return runInTransaction(this.dataSource, async (manager) => {
       try {

@@ -217,7 +217,7 @@ export class MessagesService {
       has_reaction: Object.keys(reacoes).length > 0,
     });
 
-    return this.saveMessage(updatedMessage, manager);
+    return this.saveMessage(updatedMessage, manager, null, false, true);
   }
 
   async saveMessageEdited(
@@ -689,6 +689,11 @@ export class MessagesService {
      * com a despedida automática.
      */
     ehEnvioNosso: boolean = false,
+    /**
+     * `true` só no handler de reação, que monta o mapa completo. Ali um mapa
+     * vazio é a remoção da última reação, e não pode ser trocado pelo antigo.
+     */
+    reacoesCompletas: boolean = false,
   ): Promise<MessageWithLastMessage> {
     // O envio pelo portal (`saveOutgoing`) e o eco do próprio envio, que volta
     // pelo webhook (`saveIncoming`), gravam o MESMO `message_id` em transações
@@ -737,7 +742,13 @@ export class MessagesService {
         // Reações não vêm nos eventos de mensagem: um `messages.update` traria o
         // mapa vazio e apagaria o que as pessoas já reagiram. Só o handler de
         // reação mexe nelas, e ele monta o mapa completo.
-        if (!message.reaction || Object.keys(message.reaction).length === 0) {
+        //
+        // A exceção é o próprio handler de reação: sem ela, remover a última
+        // reação nunca saía da tela, porque o mapa vazio era trocado pelo antigo.
+        if (
+          !reacoesCompletas &&
+          (!message.reaction || Object.keys(message.reaction).length === 0)
+        ) {
           message.reaction = existente.reaction ?? {};
           message.has_reaction = existente.has_reaction;
         }

@@ -1346,7 +1346,13 @@ export class SupportChatsService {
         // revogada depois (o WhatsApp não permite editar o que já foi
         // apagado), então chegar aqui com `is_edited = true` é sempre esse
         // falso positivo - nunca uma revogação real.
-        if (mensagem.is_edited) {
+        //
+        // ⚠️ A premissa não é toda verdadeira: editar e **depois** apagar é
+        // permitido, e essa revogação real também cai aqui. No gateway Zapo o
+        // falso positivo não existe (ele só emite `messages.delete` para um
+        // REVOKE do protocolo ou um apagar nosso), então a guarda fica só para
+        // a Evolution - senão apagar uma mensagem editada nunca saía da tela.
+        if (mensagem.is_edited && !process.env.ZAPO_GATEWAY_BASE_URL) {
           this.logger.debug(
             `Revogação ignorada: mensagem ${messageId} já foi editada (falso positivo conhecido da Evolution).`,
           );
