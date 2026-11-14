@@ -47,15 +47,17 @@ navegador recusa `Access-Control-Allow-Origin: *`.
 para o domínio-pai (`.automatecsistemasweb.com.br`), o cookie fica preso ao host
 da API e o front nunca o recebe de volta. Em desenvolvimento fica vazia.
 
-**Validade dos tokens:** `ACCESS_JWT_EXPIRATION` (padrão 30min) e
-`REFRESH_JWT_EXPIRATION` (padrão 30d). O access é curto porque viaja em toda
+**Validade dos tokens:** o access vem de `ACCESS_JWT_EXPIRATION` (padrão
+30min). O refresh **não vem de variável de ambiente**: é a configuração
+"Duração da sessão" do portal (`refresh_expiracao_dias`, padrão 30 dias, em
+`system-settings.catalogo.ts`). O access é curto porque viaja em toda
 requisição, fica em cookie legível por JavaScript e **não é revogável**; o
 refresh é longo porque só trafega em `/auth/refresh`, rotaciona a cada uso e fica
 em `user_refresh_tokens`, revogável pelo banco.
 
-⚠️ A variável antiga `JWT_EXPIRATION` configurava o **refresh**, apesar do nome
-— a mesma armadilha do `APP_ENV`. Ela continua funcionando como fallback (a VPS
-ainda a define), mas o nome novo é o que vale.
+⚠️ `REFRESH_JWT_EXPIRATION` e a antiga `JWT_EXPIRATION` não são mais lidas por
+nenhum código. Se ainda estiverem no ambiente (a VPS definia a segunda), podem
+ser removidas.
 
 `CRYPTO_KEY` (64 hex) e `CRYPTO_IV` (32 hex) são lidos no **import** de
 `src/Utils/index.ts` — ausentes, o processo quebra no boot, não em runtime.
