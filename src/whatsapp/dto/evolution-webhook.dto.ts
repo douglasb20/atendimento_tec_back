@@ -46,6 +46,11 @@ export class EvolutionWebhookDto {
   @IsOptional()
   progress?: number;
 
+  /** Id estável do evento emitido pelo gateway Zapo, para deduplicar retries. */
+  @IsOptional()
+  @IsString()
+  gatewayEventId?: string;
+
   @IsOptional()
   @IsObject()
   extra?: Record<string, unknown>;

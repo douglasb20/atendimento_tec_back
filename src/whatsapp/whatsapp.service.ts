@@ -51,7 +51,7 @@ export class WhatsappService {
    * Eventos sem interesse para o domínio são descartados silenciosamente - a
    * Evolution pode enviar mais tipos do que assinamos.
    */
-  async processWebhook(body: EvolutionWebhookBody): Promise<void> {
+  async processWebhook(body: EvolutionWebhookBody & { gatewayEventId?: string }): Promise<void> {
     const { event, instance } = body;
 
     // Quem entende o formato da Evolution é o interpretador, dentro de
@@ -69,8 +69,10 @@ export class WhatsappService {
     const queue = ehEventoDeSessao ? this.sessionQueue : this.messagesQueue;
     const prefix = ehEventoDeSessao ? 'whatsapp-session' : 'whatsapp-message';
 
-    await queue.add(`${prefix}-${instance}`, payload, { jobId: chaveDaFila });
-    this.logger.log(`Evento enfileirado: ${event} -> ${dataType} (job ${chaveDaFila})`);
+    const jobId = body.gatewayEventId && /^[a-f0-9-]{36}$/i.test(body.gatewayEventId)
+      ? `${instance}-${body.gatewayEventId}` : chaveDaFila;
+    await queue.add(`${prefix}-${instance}`, payload, { jobId });
+    this.logger.log(`Evento enfileirado: ${event} -> ${dataType} (job ${jobId})`);
   }
 
   // == Emissão para os clientes ==

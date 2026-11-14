@@ -54,6 +54,7 @@ export class WhatsappController {
       date_time: payload.date_time,
       isLatest: payload.isLatest,
       progress: payload.progress,
+      gatewayEventId: payload.gatewayEventId,
     });
 
     return { status: 'received' };
@@ -65,7 +66,9 @@ export class WhatsappController {
    * padrão.
    */
   private assertAuthorized(receivedSecret?: string): void {
-    const expectedSecret = process.env.EVOLUTION_WEBHOOK_SECRET;
+    const expectedSecret = process.env.ZAPO_GATEWAY_BASE_URL
+      ? process.env.ZAPO_GATEWAY_WEBHOOK_SECRET
+      : process.env.EVOLUTION_WEBHOOK_SECRET;
 
     // Sem segredo configurado no ambiente, não há o que validar.
     if (!expectedSecret) return;
