@@ -23,3 +23,32 @@ Content-Type: application/json
 
 POST {{url}}{{endpoint}}/forgotten_password/douglasdev.cn@gmail.com
 Content-Type: application/json
+
+#### App mobile: tokens no corpo, não em cookie
+
+# @name loginMobile
+POST {{url}}/auth/mobile/signin
+Content-Type: application/json
+
+{
+  "email": "usuario@exemplo.com",
+  "password": "senha"
+}
+
+###
+
+POST {{url}}/auth/mobile/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "{{loginMobile.response.body.$.refresh_token}}"
+}
+
+###
+
+POST {{url}}/auth/mobile/logout
+Content-Type: application/json
+
+{
+  "refresh_token": "{{loginMobile.response.body.$.refresh_token}}"
+}

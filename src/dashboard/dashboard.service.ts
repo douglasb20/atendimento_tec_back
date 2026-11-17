@@ -1,22 +1,33 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 
-import { SupportChatStatusId } from '@/@types';
+import { ChannelStatus, SupportChatStatusId } from '@/@types';
+import { Channels } from '@/channels/entities/channels.entity';
 import { Contacts } from '@/contacts/entities/contacts.entity';
+import { PresencaService } from '@/presenca/presenca.service';
 import { SupportChats } from '@/support-chats/entities/support-chats.entity';
 import { FUSO_EXIBICAO } from '@/core/fuso-exibicao';
 import { PeriodoMovimento } from './dto/movimento-por-semana.dto';
 
 export type PontoDiaSemana = { diaSemana: number; total: number };
 
-/** Os quatro números dos cards da home. */
+/** Os números do Início, no portal e no app mobile. */
 export type ResumoDashboard = {
   contatos: number;
   finalizados: number;
   emAtendimento: number;
   /** Média em segundos; `null` quando ainda não há atendimento finalizado. */
   tempoMedioSegundos: number | null;
+  /** Esperando um atendente humano. A fila do chatbot (`EM_FILA`) não entra. */
+  aguardando: number;
+  /** Usuários com o portal ou o app aberto agora. */
+  atendentesOnline: number;
+  /**
+   * Canais com WhatsApp conectado. Vem aqui, e não de `GET /channels`, porque
+   * aquela rota exige `channel:view`, que o atendente pode não ter.
+   */
+  canaisConectados: { id: number; nome: string }[];
 };
 
 /** Um dia da série do gráfico. */
@@ -42,24 +53,41 @@ export class DashboardService {
     private readonly contactsRepository: Repository<Contacts>,
     @InjectRepository(SupportChats)
     private readonly supportChatsRepository: Repository<SupportChats>,
+    @InjectRepository(Channels)
+    private readonly channelsRepository: Repository<Channels>,
+    private readonly presencaService: PresencaService,
   ) {}
 
   /** Quantidade de aberturas, como no gráfico por hora; domingo é 0.
-   * Semana começa no domingo. Seis meses inclui o atual e os cinco anteriores. */
+   * Semana começa no domingo. Seis meses inclui o atual e os cinco anteriores.
+   *
+   * Semana passada e último mês são períodos fechados: vão do início do
+   * período anterior até o início do atual, exclusive. Os demais seguem até
+   * agora; o fim deles é `infinity` porque nada é criado no futuro, o que
+   * equivale ao antigo `<= agora` com um filtro só para todos. */
   async movimentoPorSemana(periodo: PeriodoMovimento = 'esta_semana'): Promise<PontoDiaSemana[]> {
     return this.supportChatsRepository.query(`
       WITH referencia AS (
         SELECT NOW() AS agora, NOW() AT TIME ZONE $1 AS local
-      ), limites AS (
-        SELECT agora, (CASE $2
+      ), limites_locais AS (
+        SELECT (CASE $2
           WHEN 'esta_semana' THEN date_trunc('day', local) - EXTRACT(DOW FROM local)::int * INTERVAL '1 day'
+          WHEN 'semana_passada' THEN date_trunc('day', local) - EXTRACT(DOW FROM local)::int * INTERVAL '1 day' - INTERVAL '7 days'
           WHEN 'este_mes' THEN date_trunc('month', local)
+          WHEN 'ultimo_mes' THEN date_trunc('month', local) - INTERVAL '1 month'
           WHEN 'ultimos_seis_meses' THEN date_trunc('month', local) - INTERVAL '5 months'
-        END) AT TIME ZONE $1 AS inicio FROM referencia
+        END) AT TIME ZONE $1 AS inicio,
+        (CASE $2
+          WHEN 'semana_passada' THEN date_trunc('day', local) - EXTRACT(DOW FROM local)::int * INTERVAL '1 day'
+          WHEN 'ultimo_mes' THEN date_trunc('month', local)
+          ELSE NULL
+        END) AT TIME ZONE $1 AS fim_fechado FROM referencia
+      ), limites AS (
+        SELECT inicio, COALESCE(fim_fechado, 'infinity'::timestamptz) AS fim FROM limites_locais
       ), contagens AS (
         SELECT EXTRACT(DOW FROM (sc.created_at AT TIME ZONE $1))::int AS dia, COUNT(*)::int AS total
         FROM support_chats sc CROSS JOIN limites l
-        WHERE sc.created_at >= l.inicio AND sc.created_at <= l.agora
+        WHERE sc.created_at >= l.inicio AND sc.created_at < l.fim
         GROUP BY dia
       )
       SELECT d.dia::int AS "diaSemana", COALESCE(c.total, 0)::int AS total
@@ -69,20 +97,46 @@ export class DashboardService {
   }
 
   /**
-   * Os quatro números de uma vez.
+   * Os números do Início de uma vez.
    *
    * Em paralelo porque são consultas independentes: em série, a home esperaria
    * a soma dos quatro tempos.
    */
   async resumo(): Promise<ResumoDashboard> {
-    const [contatos, finalizados, emAtendimento, tempoMedioSegundos] = await Promise.all([
-      this.contarContatos(),
-      this.contarFinalizados(),
-      this.contarEmAtendimento(),
-      this.tempoMedioDeAtendimento(),
-    ]);
+    const [contatos, finalizados, emAtendimento, tempoMedioSegundos, aguardando, canaisConectados] =
+      await Promise.all([
+        this.contarContatos(),
+        this.contarFinalizados(),
+        this.contarEmAtendimento(),
+        this.tempoMedioDeAtendimento(),
+        this.contarAguardando(),
+        this.listarCanaisConectados(),
+      ]);
 
-    return { contatos, finalizados, emAtendimento, tempoMedioSegundos };
+    return {
+      contatos,
+      finalizados,
+      emAtendimento,
+      tempoMedioSegundos,
+      aguardando,
+      atendentesOnline: this.presencaService.online().length,
+      canaisConectados,
+    };
+  }
+
+  private contarAguardando(): Promise<number> {
+    return this.supportChatsRepository.count({
+      where: { support_chat_status_id: SupportChatStatusId.AGUARDANDO },
+    });
+  }
+
+  private async listarCanaisConectados(): Promise<{ id: number; nome: string }[]> {
+    const canais = await this.channelsRepository.find({
+      select: { id: true, name: true },
+      where: { channel_status_id: ChannelStatus.CONNECTED, deleted_at: IsNull() },
+      order: { name: 'ASC' },
+    });
+    return canais.map((canal) => ({ id: canal.id, nome: canal.name }));
   }
 
   /** `status: 1` é o contato ativo - o inativo some das listagens. */

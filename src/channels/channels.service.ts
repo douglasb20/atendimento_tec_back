@@ -620,6 +620,28 @@ export class ChannelsService {
       `Status do canal ${channel.id} dessincronizado: banco=${channel.channel_status_id}, provider=${statusReal}. Corrigindo.`,
     );
 
+    return this.aplicarStatus(channel, statusReal);
+  }
+
+  /**
+   * Marca como desconectado um canal cujo provider parou de responder.
+   *
+   * Chamado pelo `ChannelHealthService` depois de falhas seguidas: com o
+   * gateway fora do ar nenhum `connection.update` chega, e sem isto o portal
+   * seguia mostrando "Conectado" até alguém tentar enviar. Quando o gateway
+   * volta, o webhook de conexão devolve o canal a "Conectado".
+   */
+  async marcarSemResposta(channelId: number): Promise<void> {
+    const channel = await this.findChannel(channelId);
+
+    // Um webhook pode ter mudado o status entre a verificação e aqui.
+    if (channel.channel_status_id !== ChannelStatus.CONNECTED) return;
+
+    this.logger.warn(`Canal ${channel.id}: provider sem resposta, marcado como desconectado.`);
+    await this.aplicarStatus(channel, ChannelStatus.DISCONNECTED);
+  }
+
+  private async aplicarStatus(channel: Channels, statusReal: ChannelStatus): Promise<Channels> {
     const conectou = statusReal === ChannelStatus.CONNECTED;
 
     await this.channelsRepository.update(channel.id, {

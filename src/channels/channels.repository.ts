@@ -27,6 +27,18 @@ export class ChannelsRepository extends Repository<Channels> {
     });
   }
 
+  /** Canais que o portal mostra como conectados - varredura do
+   * `ChannelHealthService`, que confere cada um no provider. */
+  async findConectadosComSessao() {
+    return this.find({
+      where: {
+        channel_status_id: ChannelStatus.CONNECTED,
+        session_id: Not(IsNull()),
+        deleted_at: IsNull(),
+      },
+    });
+  }
+
   /**
    * Um canal conectado, para operações que não partem de uma conversa.
    *

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { Channels } from '@/channels/entities/channels.entity';
 import { Contacts } from '@/contacts/entities/contacts.entity';
 import { SupportChats } from '@/support-chats/entities/support-chats.entity';
 import { DashboardController } from './dashboard.controller';
@@ -17,7 +18,7 @@ import { DashboardService } from './dashboard.service';
  * passa e a primeira consulta quebra.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Contacts, SupportChats])],
+  imports: [TypeOrmModule.forFeature([Contacts, SupportChats, Channels])],
   controllers: [DashboardController],
   providers: [DashboardService],
 })

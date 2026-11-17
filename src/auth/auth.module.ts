@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { AuthMobileController } from './auth-mobile.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Users } from 'users/entities/users.entity';
@@ -26,7 +27,7 @@ import { UserRefreshTokens } from 'users/entities/user-refresh-tokens.entity';
       }),
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, AuthMobileController],
   providers: [AuthService, JwtStrategy, ConfigMailerService, UserRepository],
   exports: [AuthService, JwtModule, PassportModule], // Exporte para ser usado em outros módulos
 })
