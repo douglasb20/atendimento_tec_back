@@ -9,6 +9,7 @@ import { Channels } from './entities/channels.entity';
 import { DepartmentsModule } from '@/departments/departments.module';
 import { StorageModule } from '@/storage/storage.module';
 import { WhatsappModule } from 'whatsapp/whatsapp.module';
+import { ChannelHealthService } from './channel-health.service';
 import { ChannelsController } from './channels.controller';
 import { ChannelsListener } from './channels.listener';
 import { ChannelsRepository } from './channels.repository';
@@ -23,7 +24,13 @@ import { ChatbotsDoCanalService } from './chatbots-do-canal.service';
     StorageModule,
   ],
   controllers: [ChannelsController],
-  providers: [ChannelsService, ChannelsRepository, ChannelsListener, ChatbotsDoCanalService],
+  providers: [
+    ChannelsService,
+    ChannelsRepository,
+    ChannelsListener,
+    ChatbotsDoCanalService,
+    ChannelHealthService,
+  ],
   exports: [ChannelsService, ChannelsRepository],
 })
 export class ChannelsModule {}

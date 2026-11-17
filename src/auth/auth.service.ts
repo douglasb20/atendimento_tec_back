@@ -87,6 +87,9 @@ export class AuthService {
           access_token: token.access_token,
           refresh_token: token.refresh_token,
           expiresAt: token.refresh_expires,
+          // O portal ignora; o app mobile usa para o cartão do usuário quando
+          // não tem a permissão de ler o próprio perfil.
+          usuario: { id: user.id, nome: user.name, sobrenome: user.last_name, email: user.email },
         };
       } catch (err) {
         throw new BadRequestException(err);
@@ -148,6 +151,14 @@ export class AuthService {
       users: user,
     });
     await manager.save(UserRefreshTokens, newUserRefresh);
+  }
+
+  /**
+   * Apaga o refresh de `user_refresh_tokens`: a partir daí ele não renova mais
+   * sessão nenhuma. Token que já não existe não é erro - a saída é idempotente.
+   */
+  async revogarRefresh(refreshToken: string): Promise<void> {
+    await this.dataSource.manager.delete(UserRefreshTokens, { refresh_token: refreshToken });
   }
 
   public async validateRefresh(refreshToken: string): Promise<UserRefreshTokens> {
