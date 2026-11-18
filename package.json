@@ -98,7 +98,8 @@
   "overrides": {
     "uuid": "^14.0.0",
     "tar": "^7.5.20",
-    "minimatch": "^10.2.6",
-    "nodemailer": "^10.0.10"
+    "minimatch": "^11.0.7",
+    "nodemailer": "^10.0.10",
+    "glob": "^14.0.2"
   }
 }
