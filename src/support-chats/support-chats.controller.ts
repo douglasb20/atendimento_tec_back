@@ -21,6 +21,7 @@ import { SupportChatsService } from './support-chats.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { ReplyMessageDto } from './dto/reply-message.dto';
 import { SendMediaDto } from './dto/send-media.dto';
+import { HistoricoDto } from './dto/historico.dto';
 import { SignMediaPostDto } from './dto/sign-media-post.dto';
 import { FinalizarAtendimentoDto } from './dto/finalizar-atendimento.dto';
 import { FinalizarSemAtendimentoDto } from './dto/finalizar-sem-atendimento.dto';
@@ -132,8 +133,9 @@ export class SupportChatsController {
   @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
   @Permissions('support.chat:view', 'support.chat:history')
   @HttpCode(HttpStatus.OK)
-  async findSupportChatById(@Param('id', ParseIntPipe) id: number) {
-    return this.supportChatsService.findSupportChatsById(id);
+  async findSupportChatById(@Param('id', ParseIntPipe) id: number, @Query() pagina: HistoricoDto) {
+    // Sem `limite` (o portal), a conversa inteira, como sempre; o app pagina.
+    return this.supportChatsService.findSupportChatsById(id, pagina);
   }
 
   /**

@@ -59,12 +59,7 @@ export function getExtension(mimeType: string): string {
   return mimeType.split(';')[0].split('/')[1];
 }
 
-export function toMMSS(seconds) {
-  const min = Math.floor(seconds / 60);
-  const sec = seconds % 60;
-
-  return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-}
+export { toMMSS } from './tempo';
 
 /**
  * Duração em formato compacto, pela maior unidade que couber: `45s`, `32min`,

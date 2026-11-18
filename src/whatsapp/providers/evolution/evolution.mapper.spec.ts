@@ -182,6 +182,15 @@ describe('EvolutionMapper', () => {
       expect(audio.type).toBe(MessageTypes.AUDIO);
     });
 
+    it('nota de voz traz a onda que o WhatsApp mandou', () => {
+      const voz = EvolutionMapper.mapUpsert({
+        ...upsertTexto,
+        message: { audioMessage: { mimetype: 'audio/ogg', ptt: true, seconds: 3, waveform: Buffer.from([7, 80]).toString('base64') } },
+        messageType: 'audioMessage',
+      });
+      expect(voz.waveform).toEqual([7, 80]);
+    });
+
     it('resolve a mensagem citada pelo contextInfo', () => {
       const result = EvolutionMapper.mapUpsert({
         ...upsertTexto,

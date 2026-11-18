@@ -131,7 +131,7 @@ export type EvolutionMessageContent = {
   conversation?: string;
   imageMessage?: EvolutionMediaContent;
   videoMessage?: EvolutionMediaContent & { gifPlayback?: boolean };
-  audioMessage?: EvolutionMediaContent & { ptt?: boolean; seconds?: number };
+  audioMessage?: EvolutionMediaContent & { ptt?: boolean; seconds?: number; waveform?: unknown };
   documentMessage?: EvolutionMediaContent & { fileName?: string; title?: string };
   stickerMessage?: EvolutionMediaContent;
   ptvMessage?: EvolutionMediaContent;

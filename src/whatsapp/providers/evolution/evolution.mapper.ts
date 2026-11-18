@@ -1,3 +1,4 @@
+import { decodificarOnda } from '@/whatsapp/onda-audio';
 import {
   DataTypeWhatsapp,
   MessageAck,
@@ -223,6 +224,7 @@ export class EvolutionMapper {
       hasQuotedMsg: Boolean(contextInfo?.stanzaId),
       hasReaction: false,
       duration: String(message?.audioMessage?.seconds ?? mediaContent?.seconds ?? ''),
+      waveform: decodificarOnda(message?.audioMessage?.waveform) ?? undefined,
       id: {
         fromMe: key?.fromMe ?? false,
         remote: remoteJid,

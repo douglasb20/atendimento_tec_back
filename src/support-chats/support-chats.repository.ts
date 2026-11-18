@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { MessageWithLastMessage, SupportChatStatusId } from '@types';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { SupportChats } from './entities/support-chats.entity';
+import { SupportChatMessages } from './messages/entities/support-chat-messages.entity';
 import { ProtocolCountersRepository } from './protocol-counters.repository';
 import { AcessoAtendimentoService } from '@/permissions/acesso-atendimento.service';
 
@@ -65,6 +66,51 @@ export class SupportChatsRepository extends Repository<SupportChats> {
       // NULLS LAST mantém no fim a conversa aberta que ainda não tem mensagem.
       .orderBy('"ultima_mensagem_em"', 'DESC', 'NULLS LAST')
       .getMany();
+  }
+
+  /** A conversa com as mesmas relações de `findSupportChatsById`, sem as mensagens (paginadas à parte). */
+  async findConversaSemMensagens(id: number): Promise<SupportChats> {
+    return this.findOne({
+      where: { id },
+      relations: [
+        'contact',
+        'contact.client',
+        'contact.client.tags',
+        'contact.camposPersonalizados',
+        'contact.client.camposPersonalizados',
+        'channel',
+        'department',
+        'user',
+        'supportChatStatus',
+      ],
+    });
+  }
+
+  /**
+   * Até `quantidade` mensagens visíveis da conversa, da mais nova para a mais
+   * antiga, anteriores a `antesDe` (id da mensagem) quando informado.
+   *
+   * O cursor compara o par `(datetime, id)`, não só o `datetime`: duas
+   * mensagens no mesmo instante na fronteira da página não somem nem repetem.
+   * `antesDe` de outra conversa não acha linha no subselect e a página sai vazia.
+   */
+  async findMensagensAnteriores(
+    id: number,
+    quantidade: number,
+    antesDe?: string,
+  ): Promise<SupportChatMessages[]> {
+    const consulta = this.manager
+      .getRepository(SupportChatMessages)
+      .createQueryBuilder('m')
+      .where('m.support_chat_id = :id', { id })
+      .andWhere('m.is_system_hidden = false');
+    if (antesDe) {
+      consulta.andWhere(
+        '(m.datetime, m.id) < (SELECT r.datetime, r.id FROM support_chat_messages r WHERE r.id = :antesDe AND r.support_chat_id = :id)',
+        { antesDe },
+      );
+    }
+    return consulta.orderBy('m.datetime', 'DESC').addOrderBy('m.id', 'DESC').limit(quantidade).getMany();
   }
 
   async findSupportChatsById(id: number): Promise<SupportChats> {

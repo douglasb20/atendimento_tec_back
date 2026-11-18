@@ -152,6 +152,10 @@ export class SupportChatMessages {
    * mexer nas outras - o WhatsApp dá a cada participante uma reação, que ele
    * pode alterar ou tirar.
    */
+  /** Onda da nota de voz (alturas de 0 a 100); nula quando não veio. */
+  @Column({ name: 'waveform', type: 'jsonb', nullable: true })
+  waveform: number[] | null;
+
   @Column({ name: 'reaction', type: 'jsonb', default: () => "'{}'::jsonb" })
   reaction: Record<string, string>;
 
