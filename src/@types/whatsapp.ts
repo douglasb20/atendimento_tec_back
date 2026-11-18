@@ -232,6 +232,8 @@ export type Message = {
   hasReaction: boolean;
   /** Indicates the duration of the message in seconds */
   duration: string;
+  /** Onda da nota de voz (alturas de 0 a 100), quando o WhatsApp manda. */
+  waveform?: number[];
   /** ID that represents the message */
   id: MessageId;
   /** Indicates if the message was forwarded */

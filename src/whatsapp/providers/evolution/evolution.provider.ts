@@ -1,3 +1,4 @@
+import { decodificarOnda } from '@/whatsapp/onda-audio';
 import {
   BadRequestException,
   Injectable,
@@ -902,6 +903,8 @@ export class EvolutionProvider implements WhatsappProvider {
     return {
       messageId: data?.key?.id ?? '',
       timestamp: Number(data?.messageTimestamp) || undefined,
+      seconds: Number(data?.message?.audioMessage?.seconds) || undefined,
+      waveform: decodificarOnda(data?.message?.audioMessage?.waveform) ?? undefined,
     };
   }
 

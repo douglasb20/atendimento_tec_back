@@ -632,6 +632,8 @@ export class MessagesService {
        * já na gravação, e não num update depois: o eco do webhook chega em
        * milissegundos e a tela receberia a bolha antes da marca existir. */
       isSystemHidden?: boolean;
+      /** Onda do áudio, calculada pelo gateway na conversão. */
+      waveform?: number[];
     },
     manager: EntityManager,
   ): Promise<MessageWithLastMessage> {
@@ -650,6 +652,8 @@ export class MessagesService {
       media_url: dados.mediaUrl ?? null,
       media_type: dados.mediaType ?? null,
       file_name: dados.fileName ?? null,
+      // Só quando veio: no merge com o eco já gravado, ausente não apaga a onda dele.
+      ...(dados.waveform?.length && { waveform: dados.waveform }),
       has_quoted: Boolean(dados.quotedMsgId),
       quoted_msg_id: dados.quotedMsgId ?? null,
       from: dados.channel.phone_number ?? '',
@@ -997,6 +1001,9 @@ export class MessagesService {
       quoted_msg: messagePayload.hasQuotedMsg
         ? (messagePayload._data?.quotedMsg?.body ?? null)
         : null,
+      // Só quando veio: no merge com a linha já gravada, ausente não apaga a
+      // onda que o envio registrou.
+      ...(messagePayload.waveform?.length && { waveform: messagePayload.waveform }),
       raw_payload: JSON.stringify(messagePayload),
     };
 

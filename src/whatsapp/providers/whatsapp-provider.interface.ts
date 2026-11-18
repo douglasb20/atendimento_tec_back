@@ -284,6 +284,9 @@ export type ProviderSentMessage = {
   /** Id da mensagem no WhatsApp, para casar com os eventos de ack. */
   messageId: string;
   timestamp?: number;
+  /** Áudio: duração e onda que o gateway mediu ao converter para nota de voz. */
+  seconds?: number;
+  waveform?: number[];
 };
 
 /** Token de injeção para a implementação resolvida pela factory. */

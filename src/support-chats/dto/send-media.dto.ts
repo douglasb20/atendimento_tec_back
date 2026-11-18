@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export enum SendMediaType {
   IMAGE = 'image',
@@ -44,4 +44,15 @@ export class SendMediaDto {
   @IsOptional()
   @IsString()
   quoted_message_id?: string;
+
+  /**
+   * Duração do áudio em segundos. O app manda (sabe o tempo da gravação) e o
+   * back grava "MM:SS" no `content`, como nos áudios recebidos. O portal não
+   * manda: lê a duração do próprio arquivo.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(86400)
+  duration?: number;
 }

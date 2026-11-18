@@ -8,6 +8,9 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { comGrupo } from './grupo-conversa';
+import { SupportChatMessages } from './messages/entities/support-chat-messages.entity';
+import { HistoricoDto } from './dto/historico.dto';
 import { DataSource, EntityManager } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 import { OnEvent } from '@nestjs/event-emitter';
@@ -35,6 +38,7 @@ import { PresignedUpload, StorageService } from '@/storage/storage.service';
 import { ChannelsRepository } from '@/channels/channels.repository';
 import { SignMediaPostDto } from './dto/sign-media-post.dto';
 import { SendMediaDto, SendMediaType } from './dto/send-media.dto';
+import { toMMSS } from '@/Utils/tempo';
 import { FinalizarAtendimentoDto } from './dto/finalizar-atendimento.dto';
 import { FinalizarSemAtendimentoDto } from './dto/finalizar-sem-atendimento.dto';
 import { TransferirAtendimentoDto } from './dto/transferir-atendimento.dto';
@@ -59,6 +63,15 @@ import { DestinoEncaminhamento, validarDestinoEncaminhamento } from '@/chatbots/
 import { ChatbotFlowVersions } from '@/chatbots/entities/chatbot-flow-versions.entity';
 import { PermissionService } from '@/permissions/permission.service';
 import { permiteAutomacaoContato } from '@/contacts/politica-atendimento';
+
+const ehAudio = (tipo: SendMediaType) => tipo === SendMediaType.VOICE || tipo === SendMediaType.AUDIO;
+
+/**
+ * Áudio guarda a duração em "MM:SS", como os recebidos: a do app (tempo da
+ * gravação) ou, sem ela, a que o gateway mediu. Outras mídias, a legenda.
+ */
+const conteudoDoEnvio = (tipo: SendMediaType, legenda?: string, segundos?: number) =>
+  ehAudio(tipo) ? (segundos != null ? toMMSS(segundos) : '') : (legenda ?? '');
 
 /**
  * Tipo de mídia do envio → tipo interno persistido, o mesmo que o webhook
@@ -309,6 +322,12 @@ export class SupportChatsService {
       throw new NotFoundException('Chat de suporte não encontrado');
     }
 
+    // Antes só o portal impedia; pela API o dono ainda respondia numa conversa
+    // encerrada (finalizar mantém o `user_id`). Ids 4 a 7 são os finais.
+    if (Number(supportChat.support_chat_status_id) >= SupportChatStatusId.FINALIZADO_SEM_RESPOSTA) {
+      throw new BadRequestException('Atendimento finalizado');
+    }
+
     if (supportChat.user_id === null) {
       throw new BadRequestException('Inicie o atendimento antes de responder');
     }
@@ -336,7 +355,7 @@ export class SupportChatsService {
       chat_id,
       message,
     );
-    await this.registraEnvio({
+    const mensagem = await this.registraEnvio({
       messageId: sentMessage.messageId,
       supportChat,
       to: chat_id,
@@ -347,7 +366,7 @@ export class SupportChatsService {
 
     // O id volta para o front casar a mensagem otimista (exibida na hora) com a
     // definitiva, que chega depois pelo webhook.
-    return { status: 'message sent', message_id: sentMessage.messageId };
+    return { status: 'message sent', message_id: sentMessage.messageId, mensagem };
   }
 
   async replyMessage(
@@ -368,7 +387,7 @@ export class SupportChatsService {
       messageId,
       message,
     );
-    await this.registraEnvio({
+    const mensagem = await this.registraEnvio({
       messageId: sentMessage.messageId,
       supportChat,
       to: chat_id,
@@ -378,7 +397,7 @@ export class SupportChatsService {
       sentAt: enviadoEm,
     });
 
-    return { status: 'message sent', message_id: sentMessage.messageId };
+    return { status: 'message sent', message_id: sentMessage.messageId, mensagem };
   }
 
   /**
@@ -389,7 +408,7 @@ export class SupportChatsService {
    * vídeos grandes: nada de base64 no corpo nem browser headless no caminho.
    */
   async sendMedia(id: number, user_id: number, sendMediaDto: SendMediaDto) {
-    const { chat_id, media_key, media_type, mimetype, caption, file_name, quoted_message_id } =
+    const { chat_id, media_key, media_type, mimetype, caption, file_name, quoted_message_id, duration } =
       sendMediaDto;
 
     // `contact` vem junto: é necessário para marcar as lidas no WhatsApp.
@@ -419,11 +438,12 @@ export class SupportChatsService {
       mimetype,
     });
 
-    await this.registraEnvio({
+    const mensagem = await this.registraEnvio({
       messageId: sentMessage.messageId,
       supportChat,
       to: chat_id,
-      content: caption ?? '',
+      content: conteudoDoEnvio(media_type, caption, duration ?? sentMessage.seconds),
+      waveform: sentMessage.waveform,
       type: TIPO_INTERNO_POR_MIDIA[media_type],
       mediaUrl: media_key,
       mediaType: mimetype,
@@ -432,7 +452,7 @@ export class SupportChatsService {
       sentAt: enviadoEm,
     });
 
-    return { status: 'media sent', message_id: sentMessage.messageId };
+    return { status: 'media sent', message_id: sentMessage.messageId, mensagem };
   }
 
   /**
@@ -486,7 +506,9 @@ export class SupportChatsService {
     fileName?: string;
     quotedMsgId?: string;
     sentAt: Date;
-  }) {
+    waveform?: number[];
+  }): Promise<SupportChatMessages | null> {
+    let mensagem: SupportChatMessages | null = null;
     try {
       const salva = await runInTransaction(this.dataSource, async (manager) => {
         const gravada = await this.messagesService.saveOutgoing(
@@ -497,6 +519,10 @@ export class SupportChatsService {
         return gravada;
       });
       await this.emitePreviaDoEnvio(dados.supportChat, salva);
+      // Devolvida a quem enviou (o app troca o balão provisório por ela). Sem o
+      // `lastMessage`, que é só da prévia da lista, e com a URL pública da mídia.
+      const { lastMessage: _prevista, ...gravada } = salva;
+      mensagem = this.messagesService.comUrlPublica(gravada as SupportChatMessages);
     } catch (err) {
       this.logger.warn(`Não foi possível registrar o envio ${dados.messageId}: ${err.message}`);
     }
@@ -515,6 +541,7 @@ export class SupportChatsService {
     } catch (err) {
       this.logger.warn(`Não foi possível zerar as não lidas: ${err.message}`);
     }
+    return mensagem;
   }
 
   async listAllSupportChats(usuarioId: number) {
@@ -529,7 +556,7 @@ export class SupportChatsService {
     // A listagem carrega `user` e `contact`, e as colunas guardam a key. O
     // `<img>` da lista lateral aceita caminho relativo sem reclamar - só nao
     // mostra a foto -, entao a falha aqui era silenciosa.
-    conversas?.forEach((conversa) => this.traduzAvatares(conversa));
+    conversas?.forEach((conversa) => comGrupo(this.traduzAvatares(conversa) ?? conversa));
 
     return conversas;
   }
@@ -634,7 +661,8 @@ export class SupportChatsService {
     });
   }
 
-  async findSupportChatsById(id: number) {
+  async findSupportChatsById(id: number, pagina?: HistoricoDto) {
+    if (pagina?.limite) return this.findHistoricoPaginado(id, pagina.limite, pagina.antes_de);
     const supportChatMessages = await this.supportChatsRepository.findSupportChatsById(id);
     if (!supportChatMessages) {
       throw new NotFoundException('Chat de suporte não encontrado');
@@ -647,10 +675,33 @@ export class SupportChatsService {
     // a transferência aparece intercalada na conversa, na ordem em que
     // aconteceu. Buscá-los à parte exigiria uma segunda chamada para desenhar
     // uma tela só.
-    return {
+    return comGrupo({
       ...comMidia,
       supportChatEvents: await this.supportChatEventsRepository.findPorConversa(id),
-    };
+    });
+  }
+
+  /**
+   * Uma página do histórico, para o app mobile: as `limite` mensagens anteriores
+   * a `antesDe` (ou as últimas), em ordem ascendente, e `tem_mais`. Busca uma a
+   * mais que o limite só para saber se há página anterior.
+   */
+  private async findHistoricoPaginado(id: number, limite: number, antesDe?: string) {
+    const conversa = await this.supportChatsRepository.findConversaSemMensagens(id);
+    if (!conversa) {
+      throw new NotFoundException('Chat de suporte não encontrado');
+    }
+    this.traduzAvatares(conversa);
+
+    const linhas = await this.supportChatsRepository.findMensagensAnteriores(id, limite + 1, antesDe);
+    conversa.supportChatMessages = linhas.slice(0, limite).reverse();
+    const comMidia = this.messagesService.getUrlForMessageMedia(conversa);
+
+    return comGrupo({
+      ...comMidia,
+      supportChatEvents: await this.supportChatEventsRepository.findPorConversa(id),
+      tem_mais: linhas.length > limite,
+    });
   }
 
   /**
@@ -1724,7 +1775,7 @@ export class SupportChatsService {
     if (supportChat.support_chat_status_id === SupportChatStatusId.EM_ANDAMENTO) {
       // Idempotente para quem já é o dono: duplo clique não é erro.
       if (Number(supportChat.user_id) === Number(user_id)) {
-        return supportChat;
+        return comGrupo(supportChat);
       }
       throw new ConflictException(
         `Atendimento já assumido por ${nomeCompleto(supportChat.user) || 'outro atendente'}`,
@@ -2366,7 +2417,7 @@ export class SupportChatsService {
     // metodo faz releitura propria e muta *o objeto dele*, outra instancia.
     // Sem isto a resposta HTTP de iniciar/finalizar saía com a key crua,
     // enquanto o socket recebia a URL boa.
-    return this.traduzAvatares(atualizado) ?? atualizado;
+    return comGrupo(this.traduzAvatares(atualizado) ?? atualizado);
   }
 
   /**
@@ -2396,7 +2447,7 @@ export class SupportChatsService {
     await this.whatsappService.emitSupportChatState(
       completo?.user_id ?? supportChat.user_id,
       'whatsapp:chat_state',
-      {
+      comGrupo({
         ...(completo ?? supportChat),
         // Estes quatro vêm de quem chama, não da releitura: a prévia é calculada
         // da mensagem recém-salva e o contador acabou de ser incrementado, ambos
@@ -2417,7 +2468,7 @@ export class SupportChatsService {
         ...(supportChat.supportChatEvents && {
           supportChatEvents: supportChat.supportChatEvents,
         }),
-      },
+      }),
     );
   }
 }
