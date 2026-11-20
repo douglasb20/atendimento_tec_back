@@ -420,6 +420,9 @@ export class SupportChatsService {
     this.logger.log(`Enviando ${media_type} para ${chat_id}`);
 
     const enviadoEm = new Date();
+    // Em paralelo com o envio: o arquivo já está no bucket, e ler o tamanho
+    // depois somaria ~200 ms (bucket na Europa) à resposta. Falha vira null.
+    const tamanho = this.storageService.tamanhoDoObjeto(media_key);
     const sentMessage = await this.whatsappService.sendMedia(supportChat.channel.session_id, {
       to: chat_id,
       mediaType: media_type,
@@ -440,10 +443,13 @@ export class SupportChatsService {
       mimetype,
     });
 
+    const mediaSize = await tamanho;
+
     const mensagem = await this.registraEnvio({
       messageId: sentMessage.messageId,
       supportChat,
       to: chat_id,
+      mediaSize,
       content: conteudoDoEnvio(media_type, caption, duration ?? sentMessage.seconds),
       waveform: sentMessage.waveform,
       type: TIPO_INTERNO_POR_MIDIA[media_type],
@@ -506,6 +512,7 @@ export class SupportChatsService {
     mediaUrl?: string;
     mediaType?: string;
     fileName?: string;
+    mediaSize?: number | null;
     quotedMsgId?: string;
     sentAt: Date;
     waveform?: number[];
