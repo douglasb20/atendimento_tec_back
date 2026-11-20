@@ -5,6 +5,7 @@ import { ChannelsModule } from '@/channels/channels.module';
 import { ContactsModule } from '@/contacts/contacts.module';
 import { Users } from '@/users/entities/users.entity';
 import { WhatsappModule } from '@/whatsapp/whatsapp.module';
+import { PushModule } from '@/push/push.module';
 
 import { UsersModule } from '@/users/users.module';
 
@@ -30,6 +31,7 @@ import { AttendanceSettingsModule } from '@/attendance-settings/attendance-setti
 
 @Module({
   imports: [
+    PushModule,
     TypeOrmModule.forFeature([
       SupportChats,
       SupportChatMessages,

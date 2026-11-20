@@ -37,6 +37,7 @@ import { AttendanceSettingsModule } from '@/attendance-settings/attendance-setti
 import { PresencaModule } from '@/presenca/presenca.module';
 import { InternalChatsModule } from '@/internal-chats/internal-chats.module';
 import { UserConfigModule } from '@/user-config/user-config.module';
+import { DevicesModule } from '@/devices/devices.module';
 import { DashboardModule } from '@/dashboard/dashboard.module';
 import { ReportsModule } from '@/reports/reports.module';
 import { DepartmentsModule } from '@/departments/departments.module';
@@ -117,6 +118,7 @@ import { NotificationsModule } from '@/notifications/notifications.module';
     PresencaModule,
     InternalChatsModule,
     UserConfigModule,
+    DevicesModule,
     DashboardModule,
     ReportsModule,
     DepartmentsModule,

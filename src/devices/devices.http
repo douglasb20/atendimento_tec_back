@@ -1,0 +1,12 @@
+### Registrar o celular do usuário logado
+POST {{url}}/devices
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "token": "token-do-firebase", "nome": "Modelo do aparelho" }
+
+### Remover (pública: usada também com a sessão vencida)
+POST {{url}}/devices/remover
+Content-Type: application/json
+
+{ "token": "token-do-firebase" }
