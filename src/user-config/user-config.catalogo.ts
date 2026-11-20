@@ -22,7 +22,7 @@ export type DefinicaoPreferencia = {
   descricao: string;
   tipo: TipoPreferencia;
   /** Agrupa os campos nas abas do modal de perfil. */
-  grupo: 'aparencia' | 'notificacoes';
+  grupo: 'aparencia' | 'notificacoes' | 'celular';
   /**
    * Subdivide a aba de notificações.
    *
@@ -166,6 +166,59 @@ export const CATALOGO = {
     tipo: 'booleano',
     grupo: 'notificacoes',
     secao: 'entrega',
+    padrao: true,
+  },
+
+  // ==== Celular (push do app) ====
+  //
+  // Separadas das do portal de propósito: celular e computador são usados em
+  // momentos diferentes (decisão do Douglas, spec da Fase 2b do app). A aba
+  // Notificações do portal filtra `grupo === 'notificacoes'` e não as mostra;
+  // quem as edita é a tela Menu → Notificações do app. Padrões iguais aos do
+  // portal.
+
+  push_habilitado: {
+    rotulo: 'Mostrar notificações',
+    descricao: 'Desligado, nenhum aviso chega neste celular.',
+    tipo: 'booleano',
+    grupo: 'celular',
+    secao: 'geral',
+    padrao: true,
+  },
+
+  push_fila: {
+    rotulo: 'Mensagens na fila',
+    descricao: 'Mensagens de conversas que ninguém assumiu ainda.',
+    tipo: 'booleano',
+    grupo: 'celular',
+    secao: 'mensagens',
+    padrao: false,
+  },
+
+  push_chatbot: {
+    rotulo: 'Mensagens no chatbot',
+    descricao: 'Mensagens do cliente enquanto o chatbot atende.',
+    tipo: 'booleano',
+    grupo: 'celular',
+    secao: 'mensagens',
+    padrao: false,
+  },
+
+  push_mensagem_cliente: {
+    rotulo: 'Mensagens em atendimento',
+    descricao: 'Mensagens de conversas já em atendimento.',
+    tipo: 'booleano',
+    grupo: 'celular',
+    secao: 'mensagens',
+    padrao: true,
+  },
+
+  push_transferencia: {
+    rotulo: 'Transferência para mim',
+    descricao: 'Quando uma conversa é transferida para você.',
+    tipo: 'booleano',
+    grupo: 'celular',
+    secao: 'movimentacoes',
     padrao: true,
   },
 } as const satisfies Record<string, DefinicaoPreferencia>;

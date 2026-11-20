@@ -3,6 +3,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { HistoricoDto } from './dto/historico.dto';
 import { SupportChatsService } from './support-chats.service';
+jest.mock('@/push/push.service', () => ({ PushService: class {} }));
 jest.mock('@/Utils', () => ({ runInTransaction: async (banco: { manager: object }, acao: (manager: object) => unknown) => acao(banco.manager) }));
 jest.mock('./entities/support-chats.entity', () => ({ SupportChats: class {} }));
 jest.mock('@/chatbots/entities/chatbot-flow-versions.entity', () => ({ ChatbotFlowVersions: class {} }));

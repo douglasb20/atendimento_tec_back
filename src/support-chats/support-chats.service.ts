@@ -57,6 +57,7 @@ import { Departments } from '@/departments/entities/departments.entity';
 import { AttendanceSettingsService } from '@/attendance-settings/attendance-settings.service';
 import { ChannelsService } from '@/channels/channels.service';
 import { AcessoAtendimentoService } from '@/permissions/acesso-atendimento.service';
+import { PushService } from '@/push/push.service';
 import { DisponibilidadeSetorService } from '@/departments/disponibilidade-setor.service';
 import { validarFluxoSaida } from '@/chatbots/validar-fluxo-saida';
 import { DestinoEncaminhamento, validarDestinoEncaminhamento } from '@/chatbots/encaminhamento-atendimento';
@@ -113,6 +114,7 @@ export class SupportChatsService {
     private readonly acessoAtendimento: AcessoAtendimentoService,
     private readonly disponibilidadeSetor: DisponibilidadeSetorService,
     private readonly permissionService: PermissionService,
+    private readonly pushService: PushService,
   ) {}
 
   /**
@@ -1030,6 +1032,8 @@ export class SupportChatsService {
       resumeText?: string;
       waitingToken?: string;
     } | null = null;
+    // Push no celular: decidido dentro da transação, enviado depois do commit.
+    let paraAvisar: { chatId: number; mensagem: { type: string; content: string | null; from_me: boolean } } | null = null;
 
     const abertura = await runInTransaction(this.dataSource, async (manager) => {
       try {
@@ -1172,6 +1176,13 @@ export class SupportChatsService {
             'whatsapp:messages',
             supoportChatsWhitMessage,
           );
+
+          if (!savedMessage.from_me) {
+            paraAvisar = {
+              chatId: supportChat.id,
+              mensagem: { type: savedMessage.type, content: savedMessage.content, from_me: false },
+            };
+          }
         }
 
         // A saudação sai fora desta transação - ver abaixo. Só mensagem do
@@ -1212,6 +1223,9 @@ export class SupportChatsService {
 
       await this.enviaAvisosAtivos(conversa);
     }
+
+    // Sem `await`: o push não segura a fila de mensagens (`concurrency: 1`).
+    if (paraAvisar) void this.avisarMensagemNoCelular(paraAvisar.chatId, paraAvisar.mensagem);
 
     if (chatbotParaEnfileirar) {
       await this.chatbotFlowExecutionsService.enfileirar(
@@ -2350,9 +2364,39 @@ export class SupportChatsService {
       `Atendimento ${id} transferido por ${user_id} para ${destinoId ?? 'a fila de espera'}`,
     );
 
+    void this.avisarTransferenciaNoCelular(id, destinoId);
+
     return this.recarregaEEmiteEstado(id, {
       supportChatEvents: await this.supportChatEventsRepository.findPorConversa(id),
     });
+  }
+
+  /**
+   * Push da mensagem do cliente (Fase 2b do app). Relê a conversa já commitada,
+   * com contato e cliente, para o título do aviso. Nunca lança: quem chama não
+   * espera, e uma falha aqui não pode voltar para a fila.
+   */
+  private async avisarMensagemNoCelular(
+    chatId: number,
+    mensagem: { type: string; content: string | null; from_me: boolean },
+  ): Promise<void> {
+    try {
+      const conversa = await this.supportChatsRepository.findParaEstado(chatId);
+      if (conversa) await this.pushService.avisarMensagem(conversa, mensagem);
+    } catch (erro) {
+      this.logger.error(`Push da conversa ${chatId} não saiu: ${erro.message}`);
+    }
+  }
+
+  /** Push de transferência para um atendente; para a fila não avisa ninguém. */
+  private async avisarTransferenciaNoCelular(chatId: number, destinoId: number | null): Promise<void> {
+    if (destinoId === null) return;
+    try {
+      const conversa = await this.supportChatsRepository.findParaEstado(chatId);
+      if (conversa) await this.pushService.avisarTransferencia(conversa, Number(destinoId));
+    } catch (erro) {
+      this.logger.error(`Push da transferência da conversa ${chatId} não saiu: ${erro.message}`);
+    }
   }
 
   /** Eventos do atendimento, para a conversa mostrar o que aconteceu nela. */

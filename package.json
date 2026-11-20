@@ -51,6 +51,7 @@
     "crypto": "^1.0.1",
     "date-fns": "^4.1.0",
     "exceljs": "^4.4.0",
+    "firebase-admin": "^14.5.1",
     "handlebars": "^4.7.9",
     "ioredis": "^5.8.2",
     "ms": "^2.1.3",
