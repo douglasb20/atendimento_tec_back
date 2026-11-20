@@ -1,5 +1,6 @@
 // upload.service.ts
 import {
+  HeadObjectCommand,
   CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
@@ -7,7 +8,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 /** Dados que o cliente usa para enviar o arquivo direto ao storage. */
 export type PresignedUpload = {
@@ -113,6 +114,21 @@ export class StorageService {
 
     const url = await getSignedUrl(this.s3, command, { expiresIn: durationHours * 3600 });
     return url;
+  }
+
+  /**
+   * Tamanho do objeto no bucket, para gravar `media_size` no envio (o envio
+   * não tinha e o tamanho só chegava pelo eco do WhatsApp). Falha vira `null`:
+   * não pode impedir o envio.
+   */
+  async tamanhoDoObjeto(key: string): Promise<number | null> {
+    try {
+      const resposta = await this.s3.send(new HeadObjectCommand({ Bucket: process.env.STORAGE_BUCKET!, Key: key }));
+      return resposta.ContentLength ?? null;
+    } catch (erro) {
+      new Logger(StorageService.name).warn(`Tamanho de ${key} não lido: ${(erro as Error).message}`);
+      return null;
+    }
   }
 
   async deleteObject(key: string) {

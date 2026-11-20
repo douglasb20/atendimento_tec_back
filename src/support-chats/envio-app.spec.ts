@@ -69,10 +69,10 @@ describe('Envio pelo app', () => {
 });
 
 describe('Envio de áudio com duração', () => {
-  function prepararMidia(enviada: object = { messageId: 'WAMSG2' }) {
+  function prepararMidia(enviada: object = { messageId: 'WAMSG2' }, tamanho: number | null = 2516582) {
     const registrar = jest.fn().mockResolvedValue({ id: 'uuid-2' });
     const servico = Object.assign(Object.create(SupportChatsService.prototype), {
-      storageService: { getPublicUrl: (k: string) => `https://b/${k}` },
+      storageService: { getPublicUrl: (k: string) => `https://b/${k}`, tamanhoDoObjeto: jest.fn().mockResolvedValue(tamanho) },
       whatsappService: { sendMedia: jest.fn().mockResolvedValue(enviada) },
       messagesService: { reservaEnvioComMidia: jest.fn() },
       logger: { log: jest.fn(), warn: jest.fn() },
@@ -104,5 +104,18 @@ describe('Envio de áudio com duração', () => {
     const { servico, registrar } = prepararMidia({ messageId: 'WAMSG2', waveform: [10, 90] });
     await servico.sendMedia(42, 7, { chat_id: '5511@s.whatsapp.net', media_key: 'chat/voices/a', media_type: 'voice' as never });
     expect(registrar).toHaveBeenCalledWith(expect.objectContaining({ waveform: [10, 90] }));
+  });
+
+  it('documento enviado grava o tamanho lido do bucket', async () => {
+    const { servico, registrar } = prepararMidia();
+    await servico.sendMedia(42, 7, { chat_id: '5511@s.whatsapp.net', media_key: 'chat/media/a.pdf', media_type: 'document' as never, file_name: 'a.pdf' });
+    expect(registrar).toHaveBeenCalledWith(expect.objectContaining({ mediaSize: 2516582 }));
+  });
+
+  it('falha ao ler o tamanho envia e grava sem tamanho', async () => {
+    const { servico, registrar } = prepararMidia({ messageId: 'WAMSG2' }, null);
+    const resposta = await servico.sendMedia(42, 7, { chat_id: '5511@s.whatsapp.net', media_key: 'chat/media/a.pdf', media_type: 'document' as never });
+    expect(resposta).toMatchObject({ status: 'media sent' });
+    expect(registrar).toHaveBeenCalledWith(expect.objectContaining({ mediaSize: null }));
   });
 });

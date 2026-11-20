@@ -622,6 +622,8 @@ export class MessagesService {
       mediaType?: string;
       /** Nome original do arquivo - é o que identifica o documento na conversa. */
       fileName?: string;
+      /** Tamanho do arquivo no bucket, lido no envio. */
+      mediaSize?: number | null;
       quotedMsgId?: string;
       sentAt?: Date;
       /** Gerada pelo sistema (saudação, despedida, aviso), não digitada pelo
@@ -652,6 +654,8 @@ export class MessagesService {
       media_url: dados.mediaUrl ?? null,
       media_type: dados.mediaType ?? null,
       file_name: dados.fileName ?? null,
+      // Só quando veio: ausente não apaga o tamanho que o eco já tenha gravado.
+      ...(dados.mediaSize != null && { media_size: dados.mediaSize }),
       // Só quando veio: no merge com o eco já gravado, ausente não apaga a onda dele.
       ...(dados.waveform?.length && { waveform: dados.waveform }),
       has_quoted: Boolean(dados.quotedMsgId),
