@@ -3,7 +3,10 @@ import { App, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging, Message } from 'firebase-admin/messaging';
 
 /** O que o push leva: o app usa `chatId` para abrir a conversa ao tocar. */
-export type Aviso = { titulo: string; texto: string; chatId: number; tipo: 'mensagem' | 'transferencia' };
+/** Aviso de conversa (`chatId`) ou de lembrete da agenda (`compromissoId`): o app decide para onde o toque leva pelo `tipo`. */
+export type Aviso =
+  | { titulo: string; texto: string; chatId: number; tipo: 'mensagem' | 'transferencia' }
+  | { titulo: string; texto: string; compromissoId: number; tipo: 'lembrete' };
 
 /** Canal do Android criado pelo app (`features/notifications/canal.ts`). */
 const CANAL = 'conversas';
@@ -18,14 +21,16 @@ const TOKEN_INVALIDO = ['registration-token-not-registered', 'invalid-registrati
  * WhatsApp); é por ela que o envio não passa pelo serviço do Expo.
  */
 export function mensagemDoAviso(token: string, aviso: Aviso): Message {
-  const tag = `chat-${aviso.chatId}`;
+  // Um aviso por conversa (ou por compromisso): o novo troca o anterior.
+  const tag = aviso.tipo === 'lembrete' ? `agenda-${aviso.compromissoId}` : `chat-${aviso.chatId}`;
+  const alvo = aviso.tipo === 'lembrete' ? { compromissoId: String(aviso.compromissoId) } : { chatId: String(aviso.chatId) };
   return {
     token,
     notification: { title: aviso.titulo, body: aviso.texto },
     android: { priority: 'high', notification: { tag, channelId: CANAL } },
     // A tag vai também nos dados: com o app aberto quem monta o aviso é o
     // expo-notifications, que usa `data.tag` como id (senão empilhava).
-    data: { tipo: aviso.tipo, chatId: String(aviso.chatId), tag },
+    data: { tipo: aviso.tipo, ...alvo, tag },
   };
 }
 

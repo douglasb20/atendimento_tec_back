@@ -1,3 +1,4 @@
+import { PushModule } from '@/push/push.module';
 import { StorageModule } from '@/storage/storage.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -13,7 +14,7 @@ import { SchedulesService } from './schedules.service';
 import { ScheduleRemindersService } from './schedule-reminders.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Schedules, Notifications, NotificationRecipients]), AttendanceSettingsModule, WhatsappModule, StorageModule],
+  imports: [TypeOrmModule.forFeature([Schedules, Notifications, NotificationRecipients]), AttendanceSettingsModule, WhatsappModule, StorageModule, PushModule],
   controllers: [SchedulesController],
   providers: [SchedulesService, SchedulesRepository, ScheduleRemindersService],
   exports: [SchedulesService],

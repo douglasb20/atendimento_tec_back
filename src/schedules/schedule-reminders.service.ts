@@ -1,3 +1,4 @@
+import { PushService } from '@/push/push.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
@@ -13,7 +14,7 @@ type LembretePendente = { id: number; title: string; starts_at: Date; user_id: n
 export class ScheduleRemindersService {
   private readonly logger = new Logger(ScheduleRemindersService.name);
 
-  constructor(private readonly dataSource: DataSource, private readonly gateway: WhatsappGateway) {}
+  constructor(private readonly dataSource: DataSource, private readonly gateway: WhatsappGateway, private readonly push: PushService) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
   async verificar(): Promise<void> {
@@ -65,6 +66,8 @@ export class ScheduleRemindersService {
       }));
       this.gateway.emitToUser(compromisso.user_id, 'notificacao:recebida', { ...notificacao, destinatario_id: destinatario.id });
       this.logger.log(`Lembrete criado para o compromisso ${compromisso.id}.`);
+      // Push no celular (app). Sem `await`: o push nunca lança e não deve segurar a transação.
+      void this.push.avisarLembrete(compromisso.user_id, compromisso);
     });
   }
 }
