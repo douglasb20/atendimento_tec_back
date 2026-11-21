@@ -45,13 +45,16 @@ export class SchedulesRepository extends Repository<Schedules> {
     return query.getMany();
   }
 
-  async listarAtendentes(): Promise<{ id: number; name: string; last_name: string | null; schedule_color: string }[]> {
+  async listarAtendentes(): Promise<{ id: number; name: string; last_name: string | null; schedule_color: string; email: string; avatar_url: string | null }[]> {
     return this.manager
       .createQueryBuilder()
       .select('usuario.id', 'id')
       .addSelect('usuario.name', 'name')
       .addSelect('usuario.last_name', 'last_name')
       .addSelect('usuario.schedule_color', 'schedule_color')
+      // E-mail e foto: o app lista o responsável como o Google Agenda (foto, nome, e-mail).
+      .addSelect('usuario.email', 'email')
+      .addSelect('usuario.avatar_url', 'avatar_url')
       .from('users', 'usuario')
       .where('usuario.status = :status', { status: 1 })
       // Usuário master é operador técnico da instalação, não atendente a quem
