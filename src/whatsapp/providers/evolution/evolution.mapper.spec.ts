@@ -122,6 +122,50 @@ describe('EvolutionMapper', () => {
       expect(result._data.notifyName).toBe('João da Silva');
     });
 
+    it('cobrança Pix (review_and_pay) vira payment com valor e observação', () => {
+      const params = {
+        currency: 'BRL',
+        total_amount: { value: 500, offset: 100 },
+        reference_id: '4WRGU2UINWQ',
+        payment_settings: [
+          { type: 'pix_static_code', pix_static_code: { merchant_name: 'Loja', key: 'chave-aleatoria', key_type: 'EVP' } },
+        ],
+        additional_note: 'Teste',
+      };
+      const result = EvolutionMapper.mapUpsert({
+        ...upsertTexto,
+        message: {
+          interactiveMessage: {
+            nativeFlowMessage: { buttons: [{ name: 'review_and_pay', buttonParamsJson: JSON.stringify(params) }] },
+          },
+        },
+        messageType: 'interactiveMessage',
+      } as EvolutionUpsertData);
+
+      expect(result.type).toBe(MessageTypes.PAYMENT);
+      expect(JSON.parse(result.body)).toEqual({
+        merchant_name: 'Loja', key: 'chave-aleatoria', key_type: 'EVP', valor: 5, referencia: '4WRGU2UINWQ', observacao: 'Teste', cobranca: true,
+      });
+    });
+
+    it('resposta de lista e de botão: o texto escolhido vira o conteúdo e cita a pergunta', () => {
+      const lista = EvolutionMapper.mapUpsert({
+        ...upsertTexto,
+        message: { listResponseMessage: { title: '😐 Normal', singleSelectReply: { selectedRowId: '3' }, contextInfo: { stanzaId: 'CEEC' } } },
+        messageType: 'listResponseMessage',
+      } as EvolutionUpsertData);
+      expect(lista.type).toBe(MessageTypes.LIST_RESPONSE);
+      expect(lista.body).toBe('😐 Normal');
+      expect(lista.hasQuotedMsg).toBe(true);
+
+      const botao = EvolutionMapper.mapUpsert({
+        ...upsertTexto,
+        message: { buttonsResponseMessage: { selectedButtonId: '1', selectedDisplayText: 'Atendimento' } },
+        messageType: 'buttonsResponseMessage',
+      } as EvolutionUpsertData);
+      expect(botao.body).toBe('Atendimento');
+    });
+
     it('inverte from/to em mensagem enviada por nós', () => {
       const result = EvolutionMapper.mapUpsert({
         ...upsertTexto,

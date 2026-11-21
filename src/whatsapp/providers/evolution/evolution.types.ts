@@ -129,6 +129,10 @@ export type EvolutionContextInfo = {
  */
 export type EvolutionMessageContent = {
   conversation?: string;
+  /** Opção escolhida numa lista / botão (pesquisa, menu do chatbot). */
+  listResponseMessage?: { title?: string; singleSelectReply?: { selectedRowId?: string }; contextInfo?: EvolutionContextInfo };
+  buttonsResponseMessage?: { selectedButtonId?: string; selectedDisplayText?: string; contextInfo?: EvolutionContextInfo };
+  templateButtonReplyMessage?: { selectedId?: string; selectedDisplayText?: string; contextInfo?: EvolutionContextInfo };
   imageMessage?: EvolutionMediaContent;
   videoMessage?: EvolutionMediaContent & { gifPlayback?: boolean };
   audioMessage?: EvolutionMediaContent & { ptt?: boolean; seconds?: number; waveform?: unknown };
