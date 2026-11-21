@@ -93,6 +93,23 @@ export class PushService {
     }
   }
 
+  /**
+   * Lembrete da agenda para o responsável. Sem preferência própria: quem marcou
+   * lembrete no compromisso quer ser avisado. Hora no fuso de Brasília (a VPS
+   * pode rodar em UTC).
+   */
+  async avisarLembrete(userId: number, compromisso: { id: number; title: string; starts_at: Date; reminder_minutes: number }): Promise<void> {
+    try {
+      if (!this.envio.ativo) return;
+      const tokens = (await this.devices.tokensDe([userId])).map((c) => c.token);
+      const hora = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(compromisso.starts_at);
+      const falta = compromisso.reminder_minutes >= 60 ? '1 hora' : `${compromisso.reminder_minutes} minutos`;
+      await this.enviar(tokens, { titulo: `Lembrete: ${compromisso.title}`, texto: `Começa às ${hora} (em ${falta})`, compromissoId: compromisso.id, tipo: 'lembrete' });
+    } catch (erro) {
+      this.logger.error(`Push do lembrete do compromisso ${compromisso?.id} falhou: ${(erro as Error).message}`);
+    }
+  }
+
   /** Se cada setor do usuário está no horário agora; `cache` evita recalcular o mesmo setor no mesmo aviso. */
   private async setoresAbertos(userId: number, cache: Map<number, Promise<boolean>>): Promise<boolean[]> {
     const setores: { department_id: number }[] = await this.banco.query('SELECT department_id FROM user_x_department WHERE user_id = $1', [userId]);
