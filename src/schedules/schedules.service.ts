@@ -1,3 +1,4 @@
+import { StorageService } from '@/storage/storage.service';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
@@ -16,6 +17,7 @@ export class SchedulesService {
     private readonly repository: SchedulesRepository,
     private readonly dataSource: DataSource,
     private readonly attendanceSettingsService: AttendanceSettingsService,
+    private readonly storageService: StorageService,
   ) {}
 
   /** A configuração operacional define a mesma regra para leitura e escrita. */
@@ -173,8 +175,12 @@ export class SchedulesService {
     return this.repository.conflitos(userId, inicio, fim);
   }
 
-  async listarAtendentes(solicitante: Users): Promise<{ id: number; name: string; last_name: string | null; schedule_color: string }[]> {
-    const atendentes = await this.repository.listarAtendentes();
+  async listarAtendentes(solicitante: Users): Promise<{ id: number; name: string; last_name: string | null; schedule_color: string; email: string; avatar_url: string | null }[]> {
+    // `avatar_url` guarda a key do bucket: sai como URL pública, como nas outras rotas.
+    const atendentes = (await this.repository.listarAtendentes()).map((a) => ({
+      ...a,
+      avatar_url: a.avatar_url ? this.storageService.getPublicUrl(a.avatar_url) : null,
+    }));
 
     return (await this.agendaConjunta())
       ? atendentes
