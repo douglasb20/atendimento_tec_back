@@ -12,6 +12,8 @@ import { CreateContactsDto } from './dto/create-contacts.dto';
 import { UpdateContactsDto } from './dto/update-contacts.dto';
 import { SignContactAvatarDto } from './dto/sign-contact-avatar.dto';
 import { Contacts } from './entities/contacts.entity';
+import { RedisCacheRepository } from '@/redis-cache/redis-cache.repository';
+import { fotoVencida } from './foto-whatsapp';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { interromperAutomacoesContato, permiteAutomacaoContato } from './politica-atendimento';
 
@@ -56,6 +58,7 @@ export class ContactsService {
     private channelsRepository: ChannelsRepository,
     private dataSource: DataSource,
     private readonly eventos: EventEmitter2,
+    private readonly redisCache: RedisCacheRepository,
   ) {}
 
   /**
@@ -362,29 +365,12 @@ export class ContactsService {
       }
     }
 
-    // Contato já existente sem foto: tenta de novo.
-    //
-    // A busca acontecia só na criação, então um contato criado enquanto a
-    // instância ainda subia - ou antes de o dono publicar uma foto - ficava com
-    // o avatar genérico para sempre, por mais conversas que tivesse depois.
-    //
-    // Só quando está vazia: refazer a chamada em toda mensagem somaria uma ida
-    // à Evolution por mensagem recebida, e a foto muda raramente.
-    //
-    // `avatar_is_manual` sempre bloqueia: o atendente definiu a foto por
-    // upload, e o webhook não pode substituí-la só porque o campo está vazio
-    // não é mais o critério - aqui ele nem chega vazio, mas o guard fica
-    // explícito para não depender só disso.
-    if (!contact.avatar_url && !contact.avatar_is_manual) {
-      const profilePicUrl = await this.whatsappService.getProfilePicUrl(sessionId, remote_jid);
-
-      if (profilePicUrl) {
-        contact.avatar_url = profilePicUrl;
-        contact.is_avatar_external = true;
-        await manager.update(Contacts, contact.id, { avatar_url: profilePicUrl, is_avatar_external: true });
-        this.logger.log(`Foto de perfil preenchida para o contato ${contact.id}`);
-      }
-    }
+    // Foto do WhatsApp: confere de novo quando está vazia, vencida (a URL do
+    // `pps.whatsapp.net` traz a validade em `oe=` e para de abrir depois dela)
+    // ou não é conferida há 12 h (tem contato que troca de foto todo dia).
+    // Antes só buscava com o campo vazio: as URLs venciam e o avatar sumia para
+    // sempre (154 de 155 vencidas em 20/11/2026).
+    await this.renovarFotoSePreciso(contact, sessionId, remote_jid, manager);
 
     // Contato criado a partir de uma mensagem nossa (antes de ele responder)
     // nasce como "Cliente" - mesmo espírito do avatar: preenche o nome de
@@ -495,6 +481,53 @@ export class ContactsService {
         : `${PREFIXO_AVATAR_CONTATO}/${randomUUID()}.${extensao}`;
 
     return this.storageService.createPresignedPost(key, dto.fileType);
+  }
+
+  /** Intervalo mínimo entre duas conferências da foto do mesmo contato. */
+  private static readonly CONFERIR_FOTO_MS = 12 * 60 * 60 * 1000;
+  /** Mesma regra de `foto-whatsapp.ts`, exposta aqui para quem já usa o serviço. */
+  static fotoVencida = fotoVencida;
+
+  /**
+   * Busca a foto do WhatsApp de novo quando faz sentido: vazia, vencida ou sem
+   * conferência há 12 h (controle no Redis, sem migration). Foto posta à mão
+   * pelo atendente nunca é trocada. Devolve `true` se a foto mudou.
+   *
+   * O Redis só limita a frequência: fora do ar, vazia/vencida ainda renova, e
+   * a conferência de rotina fica para depois (falha fechada, para não virar
+   * uma ida ao WhatsApp por mensagem).
+   */
+  async renovarFotoSePreciso(contact: Contacts, sessionId: string, remoteJid: string, manager?: EntityManager): Promise<boolean> {
+    if (contact.avatar_is_manual) return false;
+    const vazia = !contact.avatar_url;
+    const vencida = contact.is_avatar_external && ContactsService.fotoVencida(contact.avatar_url);
+    let deRotina = false;
+    if (!vazia && !vencida) {
+      deRotina = Boolean(await this.redisCache.lock(`avatar:conferido:${contact.id}`, ContactsService.CONFERIR_FOTO_MS).catch(() => null));
+      if (!deRotina) return false;
+    } else {
+      await this.redisCache.lock(`avatar:conferido:${contact.id}`, ContactsService.CONFERIR_FOTO_MS).catch(() => null);
+    }
+
+    let nova: string | null;
+    try {
+      nova = (await this.whatsappService.getProfilePicUrl(sessionId, remoteJid)) || null;
+    } catch (erro) {
+      this.logger.warn(`Foto do contato ${contact.id} não conferida: ${(erro as Error).message}`);
+      return false;
+    }
+    // Sem foto na resposta: só limpa a que já estava vencida (não abria mesmo).
+    // Uma válida pode ser só uma falha momentânea da consulta.
+    if (!nova && !vencida) return false;
+    if (nova === contact.avatar_url) return false;
+
+    contact.avatar_url = nova;
+    contact.is_avatar_external = Boolean(nova);
+    const dados = { avatar_url: nova, is_avatar_external: Boolean(nova) };
+    if (manager) await manager.update(Contacts, contact.id, dados);
+    else await this.contactRepository.update(contact.id, dados);
+    this.logger.log(`Foto de perfil ${nova ? 'atualizada' : 'removida (vencida)'} para o contato ${contact.id}`);
+    return true;
   }
 
   /**

@@ -61,6 +61,7 @@ const MESSAGE_TYPE_MAP: Record<string, MessageTypes> = {
   listMessage: MessageTypes.LIST,
   buttonsResponseMessage: MessageTypes.BUTTONS_RESPONSE,
   listResponseMessage: MessageTypes.LIST_RESPONSE,
+  templateButtonReplyMessage: MessageTypes.BUTTONS_RESPONSE,
   editedMessage: MessageTypes.TEXT,
 };
 
@@ -547,10 +548,12 @@ export class EvolutionMapper {
   }
 
   /**
-   * Chave Pix compartilhada pelo "Pagamento" do WhatsApp: chega como
-   * `interactiveMessage` com o botão `payment_info`. O conteúdo vira JSON
-   * (`merchant_name`, `key`, `key_type`, `valor`, `referencia`) para a tela
-   * montar o cartão; `null` se a mensagem não for isso.
+   * Pix do WhatsApp Business, que chega como `interactiveMessage` em dois
+   * formatos: `payment_info` (compartilhar a chave) e `review_and_pay`
+   * (cobrança, com valor e observação). Só o primeiro era lido e a cobrança
+   * caía como `unknown`, um balão vazio. O conteúdo vira JSON (`merchant_name`,
+   * `key`, `key_type`, `valor`, `referencia`, `observacao`, `cobranca`) para a
+   * tela montar o cartão (a cobrança tem layout próprio, como no WhatsApp); `null` se a mensagem não for isso.
    */
   private static extractPix(message?: EvolutionMessageContent): {
     merchant_name: string | null;
@@ -558,9 +561,11 @@ export class EvolutionMapper {
     key_type: string | null;
     valor: number | null;
     referencia: string | null;
+    observacao: string | null;
+    cobranca: boolean;
   } | null {
     const botao = message?.interactiveMessage?.nativeFlowMessage?.buttons?.find(
-      (b) => b.name === 'payment_info',
+      (b) => b.name === 'payment_info' || b.name === 'review_and_pay',
     );
     if (!botao?.buttonParamsJson) return null;
 
@@ -580,6 +585,8 @@ export class EvolutionMapper {
         key_type: pix.key_type ?? null,
         valor: valor || null,
         referencia: params?.reference_id ?? null,
+        observacao: params?.additional_note || null,
+        cobranca: botao.name === 'review_and_pay',
       };
     } catch {
       return null;
@@ -604,7 +611,12 @@ export class EvolutionMapper {
     message?: EvolutionMessageContent,
   ): EvolutionContextInfo | undefined {
     const mediaContent = this.extractMediaContent(message);
-    return mediaContent?.contextInfo;
+    return (
+      mediaContent?.contextInfo ??
+      message?.listResponseMessage?.contextInfo ??
+      message?.buttonsResponseMessage?.contextInfo ??
+      message?.templateButtonReplyMessage?.contextInfo
+    );
   }
 
   /**
@@ -623,6 +635,12 @@ export class EvolutionMapper {
     if (!message) return '';
 
     if (message.conversation) return message.conversation;
+    // A opção que o contato tocou: sem isto a resposta ficava vazia na conversa.
+    const escolhida =
+      message.listResponseMessage?.title ??
+      message.buttonsResponseMessage?.selectedDisplayText ??
+      message.templateButtonReplyMessage?.selectedDisplayText;
+    if (escolhida) return escolhida;
     const pix = this.extractPix(message);
     if (pix) return JSON.stringify(pix);
     const comOpcoes = this.extractOpcoes(message);

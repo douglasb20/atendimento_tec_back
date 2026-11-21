@@ -676,6 +676,7 @@ export class SupportChatsService {
     if (!supportChatMessages) {
       throw new NotFoundException('Chat de suporte não encontrado');
     }
+    this.renovarFotoAoAbrir(supportChatMessages);
     this.traduzAvatares(supportChatMessages);
 
     const comMidia = await this.messagesService.getUrlForMessageMedia(supportChatMessages);
@@ -695,11 +696,31 @@ export class SupportChatsService {
    * a `antesDe` (ou as últimas), em ordem ascendente, e `tem_mais`. Busca uma a
    * mais que o limite só para saber se há página anterior.
    */
+  /**
+   * Abrir a conversa com a foto do contato vencida: renova em segundo plano,
+   * sem atrasar a resposta, e avisa pelo socket se mudou. Cobre o contato que
+   * não manda mensagem há tempo (a renovação normal acontece ao chegar
+   * mensagem, em `ContactsService.findOrCreateByRemoteJid`).
+   */
+  private renovarFotoAoAbrir(conversa: SupportChats): void {
+    const contato = conversa.contact;
+    const sessao = conversa.channel?.session_id;
+    if (!contato || !sessao || contato.avatar_is_manual || !contato.is_avatar_external) return;
+    if (!ContactsService.fotoVencida(contato.avatar_url)) return;
+    // Cópia: a original segue na resposta HTTP, que pode já ter saído.
+    void this.contactsService
+      .renovarFotoSePreciso({ ...contato }, sessao, contato.remote_jid)
+      .then((mudou) => (mudou ? this.whatsappChatStateEmit(conversa) : undefined))
+      .catch((erro) => this.logger.warn(`Foto do contato ${contato.id} não renovada ao abrir: ${(erro as Error).message}`));
+  }
+
   private async findHistoricoPaginado(id: number, limite: number, antesDe?: string) {
     const conversa = await this.supportChatsRepository.findConversaSemMensagens(id);
     if (!conversa) {
       throw new NotFoundException('Chat de suporte não encontrado');
     }
+    // Só na primeira página: rolar o histórico não precisa conferir de novo.
+    if (!antesDe) this.renovarFotoAoAbrir(conversa);
     this.traduzAvatares(conversa);
 
     const linhas = await this.supportChatsRepository.findMensagensAnteriores(id, limite + 1, antesDe);
