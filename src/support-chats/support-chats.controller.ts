@@ -21,6 +21,7 @@ import { SupportChatsService } from './support-chats.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { ReplyMessageDto } from './dto/reply-message.dto';
 import { SendMediaDto } from './dto/send-media.dto';
+import { SendLocationDto } from './dto/send-location.dto';
 import { HistoricoDto } from './dto/historico.dto';
 import { SignMediaPostDto } from './dto/sign-media-post.dto';
 import { FinalizarAtendimentoDto } from './dto/finalizar-atendimento.dto';
@@ -90,6 +91,18 @@ export class SupportChatsController {
       sendMessageDto.chat_id,
       `*${await this.assinatura(req)}:*\n${sendMessageDto.message}`,
     );
+  }
+
+  @Post('/:id/send-location')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard, AcessoAtendimentoGuard)
+  @Permissions('support.chat:update')
+  @HttpCode(HttpStatus.OK)
+  async sendLocation(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: SendLocationDto,
+    @Req() req: Request,
+  ) {
+    return this.supportChatsService.sendLocation(id, req.user['id'], dto);
   }
 
   @Post('/sign-media-post')

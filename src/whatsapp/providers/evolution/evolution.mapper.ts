@@ -1,4 +1,5 @@
 import { decodificarOnda } from '@/whatsapp/onda-audio';
+import { conteudoDaLocalizacao } from '@/whatsapp/localizacao';
 import {
   DataTypeWhatsapp,
   MessageAck,
@@ -653,9 +654,7 @@ export class EvolutionMapper {
       // link do mapa); nome e endereço, quando o local é um lugar nomeado,
       // vêm nas linhas seguintes.
       const { degreesLatitude, degreesLongitude, name, address } = message.locationMessage;
-      return [`${degreesLatitude ?? ''},${degreesLongitude ?? ''}`, name, address]
-        .filter(Boolean)
-        .join('\n');
+      return conteudoDaLocalizacao(degreesLatitude, degreesLongitude, name, address);
     }
     if (message.speechToText) return message.speechToText;
 

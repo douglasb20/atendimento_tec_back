@@ -1,3 +1,5 @@
+import { conteudoDaLocalizacao } from '@/whatsapp/localizacao';
+import { SendLocationDto } from './dto/send-location.dto';
 import {
   BadRequestException,
   ConflictException,
@@ -368,6 +370,28 @@ export class SupportChatsService {
 
     // O id volta para o front casar a mensagem otimista (exibida na hora) com a
     // definitiva, que chega depois pelo webhook.
+    return { status: 'message sent', message_id: sentMessage.messageId, mensagem };
+  }
+
+  /** A localização atual do atendente (o app manda as coordenadas e o endereço). */
+  async sendLocation(id: number, user_id: number, dto: SendLocationDto) {
+    const supportChat = await this.carregaParaEscrita(id, user_id);
+    const enviadoEm = new Date();
+    const sentMessage = await this.whatsappService.sendLocation(
+      supportChat.channel.session_id,
+      dto.chat_id,
+      dto.latitude,
+      dto.longitude,
+      dto.endereco,
+    );
+    const mensagem = await this.registraEnvio({
+      messageId: sentMessage.messageId,
+      supportChat,
+      to: dto.chat_id,
+      content: conteudoDaLocalizacao(dto.latitude, dto.longitude, null, dto.endereco),
+      type: MessageTypes.LOCATION,
+      sentAt: enviadoEm,
+    });
     return { status: 'message sent', message_id: sentMessage.messageId, mensagem };
   }
 

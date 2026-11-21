@@ -1,4 +1,5 @@
 import { StorageService } from '@/storage/storage.service';
+import { WhatsappGateway } from '@/whatsapp/whatsapp.gateway';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
@@ -18,7 +19,17 @@ export class SchedulesService {
     private readonly dataSource: DataSource,
     private readonly attendanceSettingsService: AttendanceSettingsService,
     private readonly storageService: StorageService,
+    private readonly gateway: WhatsappGateway,
   ) {}
+
+  /**
+   * Avisa que a agenda mudou, para app e portal recarregarem o período aberto.
+   * Para todos e só com o id: cada um relê pela própria rota, que já aplica
+   * quem pode ver o quê (`agenda_conjunta`), e nada do compromisso vaza.
+   */
+  private avisarMudanca(id: number) {
+    this.gateway.emitEvent('agenda:alterada', { id });
+  }
 
   /** A configuração operacional define a mesma regra para leitura e escrita. */
   private agendaConjunta(): Promise<boolean> {
@@ -127,6 +138,7 @@ export class SchedulesService {
     });
 
     const salvo = await this.dataSource.manager.save(Schedules, compromisso);
+    this.avisarMudanca(salvo.id);
     return this.repository.buscarPorId(salvo.id);
   }
 
@@ -158,12 +170,14 @@ export class SchedulesService {
     if (dto.lembrete_minutos !== undefined) atual.lembrete_minutos = dto.lembrete_minutos;
 
     await this.dataSource.manager.save(Schedules, atual);
+    this.avisarMudanca(id);
     return this.repository.buscarPorId(id);
   }
 
   async remover(id: number, solicitante: Users): Promise<{ removido: boolean }> {
     const atual = await this.buscarPorId(id, solicitante);
     await this.dataSource.manager.remove(Schedules, atual);
+    this.avisarMudanca(id);
     return { removido: true };
   }
 

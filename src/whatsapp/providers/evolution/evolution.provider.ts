@@ -547,6 +547,25 @@ export class EvolutionProvider implements WhatsappProvider {
     }
   }
 
+  async sendLocation(
+    session: ProviderSessionRef,
+    to: string,
+    latitude: number,
+    longitude: number,
+    endereco?: string,
+  ): Promise<ProviderSentMessage> {
+    try {
+      const { data } = await this.http.post<EvolutionSendResponse>(
+        `/message/sendLocation/${session.sessionId}`,
+        { number: this.toDestino(to), latitude, longitude, ...(endereco && { address: endereco }) },
+        this.comToken(session),
+      );
+      return this.toSentMessage(data);
+    } catch (error) {
+      this.fail('Não foi possível enviar a localização', error);
+    }
+  }
+
   async replyMessage(
     session: ProviderSessionRef,
     chatId: string,

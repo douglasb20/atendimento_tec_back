@@ -249,6 +249,18 @@ export class WhatsappService {
     return provider.sendMessage(session, to, message, typingDelayMs);
   }
 
+  async sendLocation(
+    sessionId: string,
+    to: string,
+    latitude: number,
+    longitude: number,
+    endereco?: string,
+  ): Promise<ProviderSentMessage> {
+    const { provider, session } = await this.resolve(sessionId);
+    this.logger.log(`Enviando localização para ${to}`);
+    return provider.sendLocation(session, to, latitude, longitude, endereco);
+  }
+
   async replyMessage(
     sessionId: string,
     chatId: string,

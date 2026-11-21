@@ -130,6 +130,15 @@ export interface WhatsappProvider {
     typingDelayMs?: number,
   ): Promise<ProviderSentMessage>;
 
+  /** Localização fixa (não a "em tempo real"); sem miniatura do mapa. */
+  sendLocation(
+    session: ProviderSessionRef,
+    to: string,
+    latitude: number,
+    longitude: number,
+    endereco?: string,
+  ): Promise<ProviderSentMessage>;
+
   replyMessage(
     session: ProviderSessionRef,
     chatId: string,
