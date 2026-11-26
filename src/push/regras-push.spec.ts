@@ -43,6 +43,11 @@ describe('deveAvisarMensagem', () => {
     expect(deveAvisarMensagem({ grupo: 'em_atendimento', preferencias: prefs(), ehDono: true, setoresAbertos: aberto })).toBe(true);
   });
 
+  it('em atendimento ou pausa, só o dono é avisado (o master não recebe a dos outros)', () => {
+    expect(deveAvisarMensagem({ grupo: 'em_atendimento', preferencias: prefs(), ehDono: false, setoresAbertos: aberto })).toBe(false);
+    expect(deveAvisarMensagem({ grupo: 'pausa', preferencias: prefs(), ehDono: false, setoresAbertos: aberto })).toBe(false);
+  });
+
   it('fora do horário só avisa a conversa que é dele', () => {
     const tudo = prefs({ push_fila: true, push_chatbot: true });
     expect(deveAvisarMensagem({ grupo: 'espera', preferencias: tudo, ehDono: false, setoresAbertos: fechado })).toBe(false);

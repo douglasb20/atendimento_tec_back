@@ -18,7 +18,7 @@ export function chaveDoGrupo(grupo: GrupoConversa): ChaveDoGrupo {
 /**
  * Avisa a mensagem do cliente a este usuário?
  *
- * Fora do horário de **todos** os setores dele, só a conversa em atendimento
+ * Em atendimento (ou pausa), só o dono. Fora do horário de **todos** os setores dele, só a conversa em atendimento
  * com ele (`ehDono`) avisa. Sem setor nenhum conta como dentro do horário: o
  * "todos fechados" de uma lista vazia seria verdade por vacuidade e calaria
  * quem não tem setor.
@@ -30,6 +30,9 @@ export function deveAvisarMensagem(p: {
   setoresAbertos: boolean[];
 }): boolean {
   if (p.preferencias.push_habilitado !== true) return false;
+  // Conversa com dono é dele: quem só pode ver (master, supervisor) não é
+  // avisado da mensagem do atendimento dos outros.
+  if ((p.grupo === 'em_atendimento' || p.grupo === 'pausa') && !p.ehDono) return false;
   if (p.preferencias[chaveDoGrupo(p.grupo)] !== true) return false;
   const foraDoHorario = p.setoresAbertos.length > 0 && p.setoresAbertos.every((aberto) => !aberto);
   return !foraDoHorario || p.ehDono;
